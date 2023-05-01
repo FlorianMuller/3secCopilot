@@ -3,12 +3,26 @@ import { StyleSheet, Text, View, Image } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { Video, AVPlaybackStatus } from 'expo-av';
+import { useWindowDimensions } from 'react-native';
+import { MyAppText } from '../../components/text/MyAppText.js';
+import { SubTitle } from "../../components/text/SubTitle.js";
 
-// function VidThumbnail(vid) {
-//   return (
+function VidThumbnail({ vid }) {
+  const { height, width } = useWindowDimensions();
+  const thumbnailSize = width / 5;
 
-//   );
-// }
+  return (
+    <View
+      style={{ height: thumbnailSize, width: thumbnailSize, padding: 1 }}
+    >
+      <Image
+        source={{ uri: vid.thumbnail.uri }}
+        style={{ height: "100%", width: "100%" }}
+        key={vid.id}
+      />
+    </View>
+  );
+}
 
 export default function CameraRoll() {
   const [status, requestPermission] = MediaLibrary.usePermissions();
@@ -23,7 +37,7 @@ export default function CameraRoll() {
       sortBy: "creationTime",
       // createdAfter: new Date(),
       // createdBefore: new Date(),
-      first: 10
+      first: 20
     });
 
     for (const vid of vidPage.assets) {
@@ -55,18 +69,10 @@ export default function CameraRoll() {
         resizeMode="contain"
       />} */}
       {/* {vids.length > 0 && <Text>{vids[0].info.localUri}</Text>} */}
-      <Text>Ouaaai</Text>
+      <SubTitle>Je t'aime Léa</SubTitle>
       <View style={styles.thumbnailList}>
         {vids.map((vid) => (
-          <>
-            {vid.thumbnail && (
-              <Image
-                source={{ uri: vid.thumbnail.uri }}
-                style={styles.VideoThumbnails}
-                key={vid.id}
-              />
-            )}
-          </>
+          <VidThumbnail vid={vid} key={vid.id} />
         ))}
       </View>
     </View>
