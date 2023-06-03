@@ -1,63 +1,71 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, Image } from 'react-native';
-import * as MediaLibrary from 'expo-media-library';
-import * as VideoThumbnails from 'expo-video-thumbnails';
-import { Video, AVPlaybackStatus } from 'expo-av';
-import { useWindowDimensions } from 'react-native';
-import { MyAppText } from '../../components/text/MyAppText.js';
-import { SubTitle } from "../../components/text/SubTitle.js";
+import { StyleSheet, Text, View, Image } from "react-native";
+import * as MediaLibrary from "expo-media-library";
+import * as VideoThumbnails from "expo-video-thumbnails";
+import { Video, AVPlaybackStatus } from "expo-av";
+import { useWindowDimensions } from "react-native";
+import { MyAppText } from "../../components/text/MyAppText";
+import { SubTitle } from "../../components/text/SubTitle";
 
 function VidThumbnail({ vid }) {
   const { height, width } = useWindowDimensions();
   const thumbnailSize = width / 5;
 
   return (
-    <View
-      style={{ height: thumbnailSize, width: thumbnailSize, padding: 1 }}
-    >
-      <Image
-        source={{ uri: vid.thumbnail.uri }}
-        style={{ height: "100%", width: "100%" }}
-        key={vid.id}
-      />
+    <View style={{ height: thumbnailSize, width: thumbnailSize, padding: 1 }}>
+      <Image source={{ uri: vid.thumbnail.uri }} style={{ height: "100%", width: "100%" }} key={vid.id} />
     </View>
   );
 }
 
+// export function DaySection({ vids }) {
+//   const day = vids[0].creationTime;
+//   return (
+//     <View>
+//       <SubTitle>Vendredi 12 mars</SubTitle>
+//       {vids.map(vid =>
+//       )}
+//     </View>
+//   );
+// }
+
+interface PhoneMedia extends MediaLibrary.Asset {
+  info?: MediaLibrary.AssetInfo;
+  thumbnail?: VideoThumbnails.VideoThumbnailsResult;
+}
+
 export default function CameraRoll() {
   const [status, requestPermission] = MediaLibrary.usePermissions();
-  const [vids, setVids] = useState([]);
+  const [vids, setVids] = useState<PhoneMedia[]>([]);
   const video = React.useRef(null);
 
   const getVid = async () => {
     await requestPermission();
 
-    const vidPage = await MediaLibrary.getAssetsAsync({
+    const vidPage: MediaLibrary.PagedInfo<PhoneMedia> = await MediaLibrary.getAssetsAsync({
       mediaType: "video",
       sortBy: "creationTime",
       // createdAfter: new Date(),
       // createdBefore: new Date(),
-      first: 20
+      first: 20,
     });
 
     for (const vid of vidPage.assets) {
       // console.log(vid.uri);
       try {
         vid.info = await MediaLibrary.getAssetInfoAsync(vid.id);
-        // console.log(vid.info);
-        vid.thumbnail = await VideoThumbnails.getThumbnailAsync(vid.info.localUri);
-        // console.log(vid.thumbnail);
+        vid.thumbnail = await VideoThumbnails.getThumbnailAsync(vid.info.localUri || "");
       } catch (e) {
         console.error(e);
       }
     }
     setVids(vidPage.assets);
     // console.log(vidPage.assets);
-  }
+  };
 
   useEffect(() => {
     getVid();
-  }, [])
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -68,7 +76,7 @@ export default function CameraRoll() {
         useNativeControls
         resizeMode="contain"
       />} */}
-      {/* {vids.length > 0 && <Text>{vids[0].info.localUri}</Text>} */}
+
       <SubTitle>Je t'aime Léa</SubTitle>
       <View style={styles.thumbnailList}>
         {vids.map((vid) => (
@@ -78,7 +86,6 @@ export default function CameraRoll() {
     </View>
   );
 }
-// uri: 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4',
 
 const styles = StyleSheet.create({
   video: {
@@ -95,13 +102,10 @@ const styles = StyleSheet.create({
     display: "flex",
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "center"
+    justifyContent: "center",
   },
   VideoThumbnails: {
     width: 90,
     height: 90,
-  }
+  },
 });
-
-// const styles = StyleSheet.create({
-// });
