@@ -1,22 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, Image } from "react-native";
+import React, { useState, useEffect, useMemo } from "react";
+import { StyleSheet, Text, View, Image, ScrollView } from "react-native";
 import * as MediaLibrary from "expo-media-library";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { Video, AVPlaybackStatus } from "expo-av";
 import { useWindowDimensions } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { SubTitle } from "../../components/text/SubTitle";
-
-function VidThumbnail({ vid }) {
-  const { height, width } = useWindowDimensions();
-  const thumbnailSize = width / 5;
-
-  return (
-    <View style={{ height: thumbnailSize, width: thumbnailSize, padding: 1 }}>
-      <Image source={{ uri: vid.thumbnail.uri }} style={{ height: "100%", width: "100%" }} key={vid.id} />
-    </View>
-  );
-}
+import { VidThumbnail } from "./VideoThumbnail";
+import { groupBy } from "../../utils/groupBy";
 
 // export function DaySection({ vids }) {
 //   const day = vids[0].creationTime;
@@ -29,15 +20,15 @@ function VidThumbnail({ vid }) {
 //   );
 // }
 
-interface PhoneMedia extends MediaLibrary.Asset {
+export interface PhoneMedia extends MediaLibrary.Asset {
   info?: MediaLibrary.AssetInfo;
   thumbnail?: VideoThumbnails.VideoThumbnailsResult;
 }
 
 export default function CameraRoll() {
   const [status, requestPermission] = MediaLibrary.usePermissions();
+
   const [vids, setVids] = useState<PhoneMedia[]>([]);
-  const video = React.useRef(null);
 
   const getVid = async () => {
     await requestPermission();
@@ -47,43 +38,48 @@ export default function CameraRoll() {
       sortBy: "creationTime",
       // createdAfter: new Date(),
       // createdBefore: new Date(),
-      first: 20,
+      first: 200,
     });
 
-    for (const vid of vidPage.assets) {
-      // console.log(vid.uri);
-      try {
-        vid.info = await MediaLibrary.getAssetInfoAsync(vid.id);
-        vid.thumbnail = await VideoThumbnails.getThumbnailAsync(vid.info.localUri || "");
-      } catch (e) {
-        console.error(e);
-      }
-    }
     setVids(vidPage.assets);
-    // console.log(vidPage.assets);
   };
 
   useEffect(() => {
     getVid();
   }, []);
 
-  return (
-    <View style={styles.container}>
-      {/* {vids.length > 0 && <Video
-        ref={video}
-        style={styles.video}
-        source={{ uri: vids[0].info.localUri}}
-        useNativeControls
-        resizeMode="contain"
-      />} */}
+  function getGroupedVideos(vids: PhoneMedia[]) {
+    const grouped = groupBy(vids, (v) => new Date(v.creationTime).toDateString());
+    const dateKey: [Date, PhoneMedia[]][] = Object.entries(grouped).map(([date, vids]) => [new Date(date), vids]);
+    const sorted = dateKey.sort(([date1, _], [date2, __]) => date2.getTime() - date1.getTime());
+    return sorted;
+  }
 
-      <SubTitle>Je t'aime Léa</SubTitle>
-      <View style={styles.thumbnailList}>
-        {vids.map((vid) => (
-          <VidThumbnail vid={vid} key={vid.id} />
+  const groupedVideos = useMemo(() => getGroupedVideos(vids), [vids]);
+
+  return (
+    <ScrollView>
+      <View style={styles.container}>
+        {/* <SubTitle>Je t'aime Léa</SubTitle> */}
+
+        {groupedVideos.map(([date, vids]) => (
+          <View>
+            <SubTitle>{date.toLocaleDateString()}</SubTitle>
+            <View style={styles.thumbnailList}>
+              {vids.map((vid) => (
+                <VidThumbnail video={vid} key={vid.id} />
+              ))}
+            </View>
+          </View>
         ))}
+
+        {/* <View style={styles.thumbnailList}>
+          {vids.map((vid) => (
+            <VidThumbnail video={vid} key={vid.id} />
+          ))}
+        </View> */}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -94,7 +90,6 @@ const styles = StyleSheet.create({
     height: 200,
   },
   container: {
-    overflow: "scroll",
     // margin: 20,
     marginTop: 60,
   },
