@@ -1,34 +1,28 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { StyleSheet, Text, View, Image, ScrollView } from "react-native";
+import { StyleSheet, View, ScrollView } from "react-native";
 import * as MediaLibrary from "expo-media-library";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import { Video, AVPlaybackStatus } from "expo-av";
-import { useWindowDimensions } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { SubTitle } from "../../components/text/SubTitle";
 import { VidThumbnail } from "./VideoThumbnail";
 import { groupBy } from "../../utils/groupBy";
-
-// export function DaySection({ vids }) {
-//   const day = vids[0].creationTime;
-//   return (
-//     <View>
-//       <SubTitle>Vendredi 12 mars</SubTitle>
-//       {vids.map(vid =>
-//       )}
-//     </View>
-//   );
-// }
+import { DateTime } from "luxon";
+import { capitalize } from "../../utils/capitalize";
 
 export interface PhoneMedia extends MediaLibrary.Asset {
   info?: MediaLibrary.AssetInfo;
   thumbnail?: VideoThumbnails.VideoThumbnailsResult;
 }
 
-export default function CameraRoll() {
+export interface CameraRollProps {
+  startDate: Date;
+  endDate?: Date;
+}
+
+export default function CameraRoll({ startDate, endDate = new Date(startDate.getFullYear(), 0) }: CameraRollProps) {
   const [status, requestPermission] = MediaLibrary.usePermissions();
 
-  const [vids, setVids] = useState<PhoneMedia[]>([]);
+  const [videos, setVideos] = useState<PhoneMedia[]>([]);
 
   const getVid = async () => {
     await requestPermission();
@@ -41,7 +35,7 @@ export default function CameraRoll() {
       first: 200,
     });
 
-    setVids(vidPage.assets);
+    setVideos(vidPage.assets);
   };
 
   useEffect(() => {
@@ -49,58 +43,98 @@ export default function CameraRoll() {
   }, []);
 
   function getGroupedVideos(vids: PhoneMedia[]) {
-    const grouped = groupBy(vids, (v) => new Date(v.creationTime).toDateString());
-    const dateKey: [Date, PhoneMedia[]][] = Object.entries(grouped).map(([date, vids]) => [new Date(date), vids]);
-    const sorted = dateKey.sort(([date1, _], [date2, __]) => date2.getTime() - date1.getTime());
-    return sorted;
+    return groupBy(vids, (v) => new Date(v.creationTime).toDateString());
   }
 
-  const groupedVideos = useMemo(() => getGroupedVideos(vids), [vids]);
+  function getDaysBetween(start: Date, end: Date) {
+    const dates: Date[] = [];
+    let lastDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    while (lastDate.getTime() >= end.getTime()) {
+      dates.push(lastDate);
+      // new date
+      lastDate = new Date(lastDate);
+      // minus 1 day
+      lastDate.setDate(lastDate.getDate() - 1);
+    }
+
+    return dates;
+  }
+
+  const loading = videos.length === 0;
+
+  const videosByDay = useMemo(() => getGroupedVideos(videos), [videos]);
+  const days = useMemo(() => getDaysBetween(startDate, endDate), [startDate, endDate]);
 
   return (
-    <ScrollView>
-      <View style={styles.container}>
-        {/* <SubTitle>Je t'aime Léa</SubTitle> */}
+    <>
+      {loading && (
+        <View style={[styles.center, styles.height100]}>
+          <MyAppText>loading...</MyAppText>
+        </View>
+      )}
 
-        {groupedVideos.map(([date, vids]) => (
-          <View>
-            <SubTitle>{date.toLocaleDateString()}</SubTitle>
-            <View style={styles.thumbnailList}>
-              {vids.map((vid) => (
-                <VidThumbnail video={vid} key={vid.id} />
-              ))}
-            </View>
+      {!loading && (
+        <ScrollView>
+          <View style={styles.container}>
+            {days.map((day) => {
+              const videosOfTheDay = videosByDay[day.toDateString()] || [];
+
+              return (
+                <View style={styles.dateSection} key={day.getTime()}>
+                  <SubTitle>
+                    {capitalize(
+                      DateTime.fromJSDate(day)
+                        .setLocale("fr")
+                        .toLocaleString({ day: "numeric", month: "long", weekday: "long" })
+                    )}
+                  </SubTitle>
+
+                  <View style={styles.thumbnailList}>
+                    {/* Video list */}
+                    {videosOfTheDay.length > 0 &&
+                      videosOfTheDay.map((vid) => <VidThumbnail video={vid} key={vid.id} />)}
+
+                    {/* No video */}
+                    {videosOfTheDay.length === 0 && (
+                      <View style={[styles.center, { height: 100 }]}>
+                        <MyAppText>❌ No videos</MyAppText>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
           </View>
-        ))}
-
-        {/* <View style={styles.thumbnailList}>
-          {vids.map((vid) => (
-            <VidThumbnail video={vid} key={vid.id} />
-          ))}
-        </View> */}
-      </View>
-    </ScrollView>
+        </ScrollView>
+      )}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  video: {
-    // alignSelf: 'center',
-    width: 320,
-    height: 200,
+  dateSection: {
+    marginBottom: 40,
   },
   container: {
-    // margin: 20,
     marginTop: 60,
   },
   thumbnailList: {
     display: "flex",
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
   VideoThumbnails: {
     width: 90,
     height: 90,
+  },
+  center: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+  },
+  height100: {
+    height: "100%",
   },
 });

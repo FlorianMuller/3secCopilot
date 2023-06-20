@@ -1,8 +1,12 @@
 import { PropsWithChildren } from "react";
-import { StyleSheet, Text } from "react-native";
+import { StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
 
-export function MyAppText({ children }: PropsWithChildren<{}>) {
-  return <Text style={styles.defaultText}>{children}</Text>;
+interface MyAppTextProps {
+  style?: StyleProp<ViewStyle>;
+}
+
+export function MyAppText({ children, style }: PropsWithChildren<MyAppTextProps>) {
+  return <Text style={[styles.defaultText, style]}>{children}</Text>;
 }
 
 const styles = StyleSheet.create({
