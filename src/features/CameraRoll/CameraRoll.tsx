@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { StyleSheet, View, ScrollView } from "react-native";
+import { StyleSheet, View, FlatList } from "react-native";
 import * as MediaLibrary from "expo-media-library";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { MyAppText } from "../../components/text/MyAppText";
-import { SubTitle } from "../../components/text/SubTitle";
-import { VidThumbnail } from "./VideoThumbnail";
 import { groupBy } from "../../utils/groupBy";
-import { DateTime } from "luxon";
-import { capitalize } from "../../utils/capitalize";
+import { DaySection } from "./DaySection";
 
 export interface PhoneMedia extends MediaLibrary.Asset {
   info?: MediaLibrary.AssetInfo;
@@ -30,8 +27,8 @@ export default function CameraRoll({ startDate, endDate = new Date(startDate.get
     const vidPage: MediaLibrary.PagedInfo<PhoneMedia> = await MediaLibrary.getAssetsAsync({
       mediaType: "video",
       sortBy: "creationTime",
-      // createdAfter: new Date(),
-      // createdBefore: new Date(),
+      // createdAfter: startDate,
+      // createdBefore: endDate,
       first: 200,
     });
 
@@ -74,38 +71,12 @@ export default function CameraRoll({ startDate, endDate = new Date(startDate.get
       )}
 
       {!loading && (
-        <ScrollView>
-          <View style={styles.container}>
-            {days.map((day) => {
-              const videosOfTheDay = videosByDay[day.toDateString()] || [];
-
-              return (
-                <View style={styles.dateSection} key={day.getTime()}>
-                  <SubTitle>
-                    {capitalize(
-                      DateTime.fromJSDate(day)
-                        .setLocale("fr")
-                        .toLocaleString({ day: "numeric", month: "long", weekday: "long" })
-                    )}
-                  </SubTitle>
-
-                  <View style={styles.thumbnailList}>
-                    {/* Video list */}
-                    {videosOfTheDay.length > 0 &&
-                      videosOfTheDay.map((vid) => <VidThumbnail video={vid} key={vid.id} />)}
-
-                    {/* No video */}
-                    {videosOfTheDay.length === 0 && (
-                      <View style={[styles.center, { height: 100 }]}>
-                        <MyAppText>❌ No videos</MyAppText>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </ScrollView>
+        <View style={styles.container}>
+          <FlatList
+            data={days.map((day) => ({ day, videosOfTheDay: videosByDay[day.toDateString()] || [] }))}
+            renderItem={DaySection}
+          />
+        </View>
       )}
     </>
   );
