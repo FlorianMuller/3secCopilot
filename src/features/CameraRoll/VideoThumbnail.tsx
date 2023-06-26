@@ -28,7 +28,7 @@ export function VidThumbnail({ video }: VidThumbnailProps) {
   return (
     <TouchableOpacity
       style={{ height: thumbnailSize, width: thumbnailSize, padding: 1 }}
-      onPress={() => navigation.navigate(VideoPlayerURI)}
+      onPress={() => navigation.navigate(VideoPlayerURI, { id: video.id })}
     >
       {thumbnail && <Image source={{ uri: thumbnail.uri }} style={{ height: "100%", width: "100%" }} />}
       {!thumbnail && <View style={{ height: "100%", width: "100%", backgroundColor: "white" }} />}

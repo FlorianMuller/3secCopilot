@@ -1,7 +1,42 @@
-import { MyAppText } from "../../../components/text/MyAppText";
+import { RouteProp, useRoute } from "@react-navigation/native";
+import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
+import { View, StyleSheet } from "react-native";
+import { ResizeMode, Video } from "expo-av";
+import { useEffect, useState } from "react";
+import * as MediaLibrary from "expo-media-library";
 
-export interface VideoPlayerProps {}
+type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
-export function VideoPlayer({}: VideoPlayerProps) {
-  return <MyAppText>vidéo !</MyAppText>;
+export function VideoPlayer() {
+  const { params } = useRoute<VideoPlayerRouteProps>();
+  const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
+
+  async function getVideo() {
+    const info = await MediaLibrary.getAssetInfoAsync(params.id);
+    setVideoInfo(info);
+  }
+
+  useEffect(() => {
+    getVideo();
+  }, []);
+
+  return (
+    <View>
+      {videoInfo && videoInfo.localUri && (
+        <Video
+          style={styles.video}
+          source={{ uri: videoInfo.localUri }}
+          useNativeControls
+          resizeMode={ResizeMode.CONTAIN}
+        />
+      )}
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  video: {
+    width: "100%",
+    height: "100%",
+  },
+});

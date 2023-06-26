@@ -1,11 +1,16 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import { CameraRollURI, VideoPlayerURI } from ".";
 import App, { AppLayout } from "../../App";
 import CameraRoll from "../features/CameraRoll/CameraRoll";
 import { VideoPlayer } from "../features/CameraRoll/VideoPlayer/VideoPlayer";
 
-const CameraRollStack = createNativeStackNavigator();
+export type CameraRollStackParamList = {
+  [CameraRollURI]: undefined;
+  [VideoPlayerURI]: { id: string };
+};
+
+const CameraRollStack = createNativeStackNavigator<CameraRollStackParamList>();
 
 export function CameraRollNavigation() {
   return (
