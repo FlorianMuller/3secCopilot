@@ -1,22 +1,18 @@
-import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { memo, PropsWithChildren } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import CameraRoll from "./src/features/CameraRoll/CameraRoll";
-import { Options } from "./src/features/Options/Options";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
+import { useColorScheme } from "react-native";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
 
-export function AppLayout({ children }: PropsWithChildren<{}>) {
-  return <View style={styles.root}>{children}</View>;
-}
-
 const Tab = createBottomTabNavigator();
 
-function AppTabs() {
+interface AppTabsProps {
+  theme: "light" | "dark";
+}
+
+function AppTabs({ theme }: AppTabsProps) {
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={theme === "dark" ? DarkTheme : DefaultTheme}>
       <Tab.Navigator initialRouteName="CameraRollTab" screenOptions={{ headerShown: false }}>
         <Tab.Screen name="CameraRollTab" component={CameraRollNavigation} />
         <Tab.Screen name="OptionsTab" component={OptionsNavigation} />
@@ -26,13 +22,8 @@ function AppTabs() {
 }
 
 export default function App() {
-  return <AppTabs />;
-}
+  const scheme = useColorScheme();
+  console.log("scheme", scheme);
 
-const styles = StyleSheet.create({
-  root: {
-    backgroundColor: "black",
-    height: "100%",
-    color: "white",
-  },
-});
+  return <AppTabs theme={"dark"} />;
+}

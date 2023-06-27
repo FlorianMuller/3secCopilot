@@ -21,7 +21,8 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
 
       <View style={styles.thumbnailList}>
         {/* Video list */}
-        {videosOfTheDay.length > 0 && videosOfTheDay.map((vid) => <VidThumbnail video={vid} key={vid.id} />)}
+        {videosOfTheDay.length > 0 &&
+          [...videosOfTheDay].reverse().map((vid) => <VidThumbnail video={vid} key={vid.id} />)}
 
         {/* No video */}
         {videosOfTheDay.length === 0 && (
