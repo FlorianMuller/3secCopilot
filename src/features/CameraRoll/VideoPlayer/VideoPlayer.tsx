@@ -28,6 +28,7 @@ export function VideoPlayer() {
           source={{ uri: videoInfo.localUri }}
           useNativeControls
           resizeMode={ResizeMode.CONTAIN}
+          shouldPlay
         />
       )}
     </View>

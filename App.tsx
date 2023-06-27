@@ -25,5 +25,5 @@ export default function App() {
   const scheme = useColorScheme();
   console.log("scheme", scheme);
 
-  return <AppTabs theme={"dark"} />;
+  return <AppTabs theme={scheme || "light"} />;
 }
