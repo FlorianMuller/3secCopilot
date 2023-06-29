@@ -15,23 +15,8 @@ const CameraRollStack = createNativeStackNavigator<CameraRollStackParamList>();
 export function CameraRollNavigation() {
   return (
     <CameraRollStack.Navigator initialRouteName={CameraRollURI} screenOptions={{ headerShown: true }}>
-      <CameraRollStack.Screen
-        name={CameraRollURI}
-        component={memo(() => (
-          <AppLayout>
-            <CameraRoll startDate={new Date()} />
-          </AppLayout>
-        ))}
-        options={{ headerShown: false }}
-      />
-      <CameraRollStack.Screen
-        name={VideoPlayerURI}
-        component={memo(() => (
-          <AppLayout>
-            <VideoPlayer />
-          </AppLayout>
-        ))}
-      />
+      <CameraRollStack.Screen name={CameraRollURI} component={CameraRoll} options={{ headerShown: false }} />
+      <CameraRollStack.Screen name={VideoPlayerURI} component={VideoPlayer} />
     </CameraRollStack.Navigator>
   );
 }

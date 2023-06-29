@@ -12,11 +12,14 @@ export interface PhoneMedia extends MediaLibrary.Asset {
 }
 
 export interface CameraRollProps {
-  startDate: Date;
+  startDate?: Date;
   endDate?: Date;
 }
 
-export default function CameraRoll({ startDate, endDate = new Date(startDate.getFullYear(), 0) }: CameraRollProps) {
+export default function CameraRoll({
+  startDate = new Date(),
+  endDate = new Date(startDate.getFullYear(), 0),
+}: CameraRollProps) {
   const [status, requestPermission] = MediaLibrary.usePermissions();
 
   const [videos, setVideos] = useState<PhoneMedia[]>([]);
@@ -36,6 +39,7 @@ export default function CameraRoll({ startDate, endDate = new Date(startDate.get
   };
 
   useEffect(() => {
+    console.log("reset");
     getVid();
   }, []);
 
