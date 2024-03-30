@@ -62,7 +62,6 @@ function AppTabs({ theme }: AppTabsProps) {
 
 export default function App() {
   const scheme = useColorScheme();
-  console.log("scheme", scheme);
 
   return <AppTabs theme={scheme || "light"} />;
 }
