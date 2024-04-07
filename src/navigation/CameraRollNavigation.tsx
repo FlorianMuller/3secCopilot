@@ -7,7 +7,7 @@ import { AppLayout } from "../../AppLayout";
 
 export type CameraRollStackParamList = {
   [CameraRollURI]: undefined;
-  [VideoPlayerURI]: { id: string };
+  [VideoPlayerURI]: { ids: string[], index: number};
 };
 
 const CameraRollStack = createNativeStackNavigator<CameraRollStackParamList>();

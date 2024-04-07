@@ -78,7 +78,7 @@ export default function CameraRoll({
         <View style={styles.container}>
           <FlatList
             data={days.map((day) => ({ day, videosOfTheDay: videosByDay[day.toDateString()] || [] }))}
-            renderItem={DaySection}
+            renderItem={(props) => <DaySection {...props}/>}
             keyExtractor={({ day }) => day.toDateString()}
             indicatorStyle="white"
           />

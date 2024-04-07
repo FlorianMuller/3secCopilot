@@ -12,7 +12,7 @@ export function VideoPlayer() {
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
 
   async function getVideo() {
-    const info = await MediaLibrary.getAssetInfoAsync(params.id);
+    const info = await MediaLibrary.getAssetInfoAsync(params.ids[params.index]);
     setVideoInfo(info);
   }
 

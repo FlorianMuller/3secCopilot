@@ -5,12 +5,20 @@ import { SubTitle } from "../../components/text/SubTitle";
 import { capitalize } from "../../utils/capitalize";
 import { PhoneMedia } from "./CameraRoll";
 import { VidThumbnail } from "./VideoThumbnail";
+import { useNavigation } from "@react-navigation/native";
+import { useState } from "react";
+import { VideoPlayerURI } from "../../navigation";
 
 interface DaySectionProps {
   item: { day: Date; videosOfTheDay: PhoneMedia[] };
 }
 
 export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
+  const navigation = useNavigation();
+
+  const reversedVideosOfTheDay = [...videosOfTheDay].reverse();
+  const videosIds = reversedVideosOfTheDay.map((vid) => vid.id);
+
   return (
     <View style={styles.dateSection} key={day.getTime()}>
       <SubTitle>
@@ -22,7 +30,15 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
       <View style={styles.thumbnailList}>
         {/* Video list */}
         {videosOfTheDay.length > 0 &&
-          [...videosOfTheDay].reverse().map((vid) => <VidThumbnail video={vid} key={vid.id} />)}
+          reversedVideosOfTheDay.map((vid, i) => (
+            <VidThumbnail
+              video={vid}
+              key={vid.id}
+              onPress={() => {
+                navigation.navigate(VideoPlayerURI, { ids: videosIds, index: i });
+              }}
+            />
+          ))}
 
         {/* No video */}
         {videosOfTheDay.length === 0 && (
