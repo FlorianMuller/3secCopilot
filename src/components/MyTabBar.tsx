@@ -4,6 +4,9 @@ import { TouchableWithoutFeedback, View, useWindowDimensions } from "react-nativ
 import { StyleSheet } from "react-native";
 import { useTheme } from "@react-navigation/native";
 
+export const tabBarHeight = 55;
+export const tabBarBottomPosition = 35;
+
 const horizontalPadding = 20;
 
 export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -70,12 +73,12 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
 
 const styles = StyleSheet.create({
   tab: {
-    height: 55,
+    height: tabBarHeight,
     backgroundColor: "#1b1b1d",
     marginHorizontal: 20,
     borderRadius: 100,
     position: "absolute",
-    bottom: 35,
+    bottom: tabBarBottomPosition,
     paddingHorizontal: 20,
     display: "flex",
     flexDirection: "row",

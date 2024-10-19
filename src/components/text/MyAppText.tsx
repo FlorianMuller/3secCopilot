@@ -13,9 +13,3 @@ export function MyAppText({ children, style, color, size = 16 }: PropsWithChildr
 
   return <Text style={[{ color: color || colors.text, fontSize: size }, style]}>{children}</Text>;
 }
-
-const styles = StyleSheet.create({
-  defaultText: {
-    color: "white",
-  },
-});
