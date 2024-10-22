@@ -49,20 +49,24 @@ export function VideoPlayer() {
     if (videoMetadata?.isSelected) {
       console.log("Unselecting video");
       try {
-        await markVideoAsUnselected(id);
+        const newMetadata = await markVideoAsUnselected(id);
+        if (newMetadata != null) {
+          setVideoMetadata(newMetadata);
+        }
       } catch (e) {
         console.error("error while unselecting video", e);
       }
     } else {
       console.log("Selecting video");
       try {
-        await markVideoAsSelected(id, new Date(videoInfo.creationTime), params.day);
+        const newMetadata = await markVideoAsSelected(id, new Date(videoInfo.creationTime), params.day);
+        if (newMetadata != null) {
+          setVideoMetadata(newMetadata);
+        }
       } catch (e) {
         console.error("error while selecting video", e);
       }
     }
-    // Refresh metadata after update
-    await getMetadata();
   }
 
   const hasPreviousVideos = params.index > 0;

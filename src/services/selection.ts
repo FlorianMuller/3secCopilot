@@ -8,7 +8,7 @@ export async function markVideoAsSelected(
   selectedForDate?: Date,
   trimStartTime?: number,
   trimEndTime?: number
-) {
+): Promise<SelectVideoMetadata | null> {
   const toSet = {
     videoOriginalDate,
     assignedToDate: selectedForDate,
@@ -18,7 +18,7 @@ export async function markVideoAsSelected(
     isHidden: false,
   };
 
-  await db
+  const res = await db
     .insert(videosMetadataTable)
     .values({
       videoId,
@@ -27,22 +27,33 @@ export async function markVideoAsSelected(
     .onConflictDoUpdate({
       target: videosMetadataTable.videoId,
       set: toSet,
-    });
+    })
+    .returning();
+  return returnOneMetadata(res);
 }
 
-export async function markVideoAsUnselected(videoId: string) {
-  await db
+export async function markVideoAsUnselected(videoId: string): Promise<SelectVideoMetadata | null> {
+  const res = await db
     .update(videosMetadataTable)
     .set({
       isSelected: false,
     })
-    .where(eq(videosMetadataTable.videoId, videoId));
+    .where(eq(videosMetadataTable.videoId, videoId))
+    .returning();
+
+  return returnOneMetadata(res);
 }
 
 export async function getVideoMetadata(videoId: string): Promise<SelectVideoMetadata | null> {
   const res = await db.select().from(videosMetadataTable).where(eq(videosMetadataTable.videoId, videoId)).limit(1);
-  if (res.length == 0) {
+  return returnOneMetadata(res);
+}
+
+// Util function to only return one videoMetadata from a list where
+// they should only be at most one videoMetadata in it.
+function returnOneMetadata(metaList: SelectVideoMetadata[]): SelectVideoMetadata | null {
+  if (metaList.length == 0) {
     return null;
   }
-  return res[0];
+  return metaList[0];
 }
