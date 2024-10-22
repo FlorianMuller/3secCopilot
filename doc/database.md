@@ -6,18 +6,21 @@
 
 Should store:
 - if video is selected
-- if video is hidden
 - new video date if cheating
-- video id or url, to retreive it directly when creating final year video
+- video id (or url), to retreive it directly when creating final year video
+- start and end time if video should be trimed
+- if video is hidden
 
 Columns
 | Name             | Description                                                                                                                                     |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `videoId`        | video unique url or id                                                                                                                          |
-| `originalDate`   | date of video in system                                                                                                                         |
-| `assignedToDate` | date if video assigned to new date (cheat)                                                                                                      |
-| `isSelected`     | true if video should be included in final montage. In general, they should only be one selected video by day (but I think will not enforce it). |
-| `isHidden`       | true if video should not be shown in video list                                                                                                 |
+| `video_id`        | video unique url or id                                                                                                                          |
+| `original_date`   | date of video in system                                                                                                                         |
+| `assigned_to_date` | date if video assigned to new date (cheat)                                                                                                      |
+| `is_selected`     | true if video should be included in final montage. In general, they should only be one selected video by day (but I think will not enforce it). |
+| `start_time`        | start time (in milisecond) of the selected portion. (If null, should be video start) |
+| `end_time`        | end time (in milisecond) of the selected portion. (If null, should be video end ?) |
+| `is_hidden`       | true if video should not be shown in video list                                                                                                 |
 
 
 ### Algo
