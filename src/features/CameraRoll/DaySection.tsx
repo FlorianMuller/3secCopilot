@@ -1,20 +1,20 @@
+import { useNavigation } from "@react-navigation/native";
 import { DateTime } from "luxon";
-import { View, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { SubTitle } from "../../components/text/SubTitle";
+import { VideoPlayerURI } from "../../navigation";
+import { CameraRollNavigationProp } from "../../navigation/CameraRollNavigation";
 import { capitalize } from "../../utils/capitalize";
 import { PhoneMedia } from "./CameraRoll";
 import { VidThumbnail } from "./VideoThumbnail";
-import { useNavigation } from "@react-navigation/native";
-import { useState } from "react";
-import { VideoPlayerURI } from "../../navigation";
 
 interface DaySectionProps {
   item: { day: Date; videosOfTheDay: PhoneMedia[] };
 }
 
 export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
-  const navigation = useNavigation();
+  const navigation = useNavigation<CameraRollNavigationProp>();
 
   const reversedVideosOfTheDay = [...videosOfTheDay].reverse();
   const videosIds = reversedVideosOfTheDay.map((vid) => vid.id);
@@ -35,7 +35,7 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
               video={vid}
               key={vid.id}
               onPress={() => {
-                navigation.navigate(VideoPlayerURI, { ids: videosIds, index: i });
+                navigation.navigate(VideoPlayerURI, { day, ids: videosIds, index: i });
               }}
             />
           ))}

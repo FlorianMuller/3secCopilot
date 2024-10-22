@@ -1,0 +1,90 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "101e8863-3f0f-48a7-8459-01b1ec510f86",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "videos_metadata": {
+      "name": "videos_metadata",
+      "columns": {
+        "videoId": {
+          "name": "videoId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "videoOriginalDate": {
+          "name": "videoOriginalDate",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "assignedToDate": {
+          "name": "assignedToDate",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "isSelected": {
+          "name": "isSelected",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "trimStartTime": {
+          "name": "trimStartTime",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "trimEndTime": {
+          "name": "trimEndTime",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "isHidden": {
+          "name": "isHidden",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "trim_start_time_positive": {
+          "name": "trim_start_time_positive",
+          "value": "\"videos_metadata\".\"trimStartTime\" >= 0"
+        },
+        "trim_end_time_positive": {
+          "name": "trim_end_time_positive",
+          "value": "\"videos_metadata\".\"trimEndTime\" >= 0"
+        },
+        "end_time_over_start_time": {
+          "name": "end_time_over_start_time",
+          "value": "\"videos_metadata\".\"trimEndTime\" > \"videos_metadata\".\"trimStartTime\""
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

@@ -14,9 +14,11 @@
     "@react-navigation/native-stack": "^6.9.12",
     "@types/react": "~18.2.79",
     "@types/react-native": "~0.69.1",
+    "drizzle-orm": "^0.35.2",
     "expo": "^51.0.38",
     "expo-av": "~14.0.7",
     "expo-media-library": "~16.0.5",
+    "expo-sqlite": "~14.0.6",
     "expo-status-bar": "~1.12.1",
     "expo-system-ui": "~3.0.7",
     "expo-video-thumbnails": "~8.0.0",
@@ -30,6 +32,8 @@
   "devDependencies": {
     "@babel/core": "^7.12.9",
     "@types/luxon": "^3.3.0",
+    "babel-plugin-inline-import": "^3.0.0",
+    "drizzle-kit": "^0.26.2",
     "prettier": "2.8.8"
   },
   "private": true

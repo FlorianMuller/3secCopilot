@@ -1,4 +1,4 @@
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createNativeStackNavigator, NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { memo, useEffect } from "react";
 import { CameraRollURI, VideoPlayerURI } from ".";
 import CameraRoll from "../features/CameraRoll/CameraRoll";
@@ -7,8 +7,11 @@ import { AppLayout } from "../../AppLayout";
 
 export type CameraRollStackParamList = {
   [CameraRollURI]: undefined;
-  [VideoPlayerURI]: { ids: string[], index: number};
+  [VideoPlayerURI]: { day: Date; ids: string[]; index: number };
 };
+
+// To type the `useNavigation()` hook
+export type CameraRollNavigationProp = NativeStackNavigationProp<CameraRollStackParamList>;
 
 const CameraRollStack = createNativeStackNavigator<CameraRollStackParamList>();
 

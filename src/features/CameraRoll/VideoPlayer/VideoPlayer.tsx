@@ -3,34 +3,67 @@ import { RouteProp, useRoute } from "@react-navigation/native";
 import { ResizeMode, Video } from "expo-av";
 import * as MediaLibrary from "expo-media-library";
 import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
-import { LinkIconRoundButton } from "../../../components/ThemedButton";
+import { LinkIconRoundButton, ThemedButton } from "../../../components/ThemedButton";
 import { VideoPlayerURI } from "../../../navigation";
 import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
-
-type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
+import { getVideoMetadata, markVideoAsSelected, markVideoAsUnselected } from "../../../services/selection";
+import { VideoMetadata } from "../../../db/schema";
+export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
 const nextPrevButtonSize = 50;
 
 export function VideoPlayer() {
   const { params } = useRoute<VideoPlayerRouteProps>();
+  const id = params.ids[params.index];
+
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
+  const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
 
   async function getVideo() {
     try {
-      const info = await MediaLibrary.getAssetInfoAsync(params.ids[params.index]);
+      const info = await MediaLibrary.getAssetInfoAsync(id);
       setVideoInfo(info);
-      console.log("new video loaded");
     } catch (e) {
-      console.error("can't load video");
+      console.error("can't load video", e);
     }
   }
-  console.log("index:", params.index);
+
+  async function getMetadata() {
+    try {
+      const meta = await getVideoMetadata(id);
+      setVideoMetadata(meta);
+      console.log("metadata:", meta);
+    } catch (e) {
+      console.error("can't retrieve metadata", e);
+    }
+  }
 
   useEffect(() => {
     getVideo();
-  }, [params.index]);
+    getMetadata();
+  }, [params.ids, params.index]);
+
+  async function toggleSelectVideo(videoInfo: MediaLibrary.AssetInfo, videoMetadata: VideoMetadata | null) {
+    if (videoMetadata?.isSelected) {
+      console.log("Unselecting video");
+      try {
+        await markVideoAsUnselected(id);
+      } catch (e) {
+        console.error("error while unselecting video", e);
+      }
+    } else {
+      console.log("Selecting video");
+      try {
+        await markVideoAsSelected(id, new Date(videoInfo.creationTime), params.day);
+      } catch (e) {
+        console.error("error while selecting video", e);
+      }
+    }
+    // Refresh metadata after update
+    await getMetadata();
+  }
 
   const hasPreviousVideos = params.index > 0;
   const hasNextVideos = params.index < params.ids.length - 1;
@@ -64,6 +97,15 @@ export function VideoPlayer() {
           />
         )}
         {!hasPreviousVideos && <View />}
+
+        {/* Select button */}
+        <View>
+          {videoInfo && videoMetadata !== undefined && (
+            <Pressable onPress={() => toggleSelectVideo(videoInfo, videoMetadata)}>
+              <ThemedButton text={videoMetadata?.isSelected ? "Unselect" : "Select"} />
+            </Pressable>
+          )}
+        </View>
 
         {/* Previous video of the day button */}
         {hasNextVideos && (

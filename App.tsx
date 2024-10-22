@@ -1,11 +1,16 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
-import { useColorScheme } from "react-native";
+import { drizzle } from "drizzle-orm/expo-sqlite";
+import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
+import * as SQLite from "expo-sqlite";
+import { memo } from "react";
+import { Text, useColorScheme, View } from "react-native";
+import migrations from "./drizzle/migrations";
+import { FloatingTabBar } from "./src/components/MyTabBar";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { FloatingTabBar } from "./src/components/MyTabBar";
-import { memo } from "react";
+import { db } from "./src/db/db";
 
 const Tab = createBottomTabNavigator();
 
@@ -14,6 +19,24 @@ interface AppTabsProps {
 }
 
 function AppTabs({ theme }: AppTabsProps) {
+  const { success, error } = useMigrations(db, migrations);
+
+  if (error) {
+    return (
+      <View>
+        <Text>Migration error: {error.message}</Text>
+      </View>
+    );
+  }
+
+  if (!success) {
+    return (
+      <View>
+        <Text>Migration is in progress...</Text>
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer theme={theme === "dark" ? DarkTheme : DefaultTheme}>
       <Tab.Navigator
