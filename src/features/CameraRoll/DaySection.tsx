@@ -19,6 +19,8 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
   const reversedVideosOfTheDay = [...videosOfTheDay].reverse();
   const videosIds = reversedVideosOfTheDay.map((vid) => vid.id);
 
+  const dayHasAVideoSelected = videosOfTheDay.some((v) => v.metadata?.isSelected);
+
   return (
     <View style={styles.dateSection} key={day.getTime()}>
       <SubTitle>
@@ -34,6 +36,7 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
             <VidThumbnail
               key={vid.id}
               video={vid}
+              displayHas={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "selected" : "unselected") : "normal"}
               onPress={() => {
                 navigation.navigate(VideoPlayerURI, { day, ids: videosIds, index: i });
               }}

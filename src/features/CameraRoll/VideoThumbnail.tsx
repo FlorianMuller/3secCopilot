@@ -1,4 +1,3 @@
-import { useNavigation } from "@react-navigation/native";
 import { VideoThumbnailsResult } from "expo-video-thumbnails";
 import { useEffect, useState } from "react";
 import {
@@ -10,18 +9,18 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { VideoPlayerURI } from "../../navigation";
+import { MyAppText } from "../../components/text/MyAppText";
+import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
 import { getVideoThumbnail } from "./mediaService";
-import { utilStyles } from "../../utils/utilStyles";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
-  selected?: boolean;
+  displayHas?: "normal" | "selected" | "unselected";
   onPress?: (event: GestureResponderEvent) => void;
 }
 
-export function VidThumbnail({ video, selected = false, onPress }: VidThumbnailProps) {
+export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumbnailProps) {
   const [thumbnail, setThumbnail] = useState<VideoThumbnailsResult>();
   const { width } = useWindowDimensions();
   const thumbnailSize = width / 5;
@@ -37,13 +36,37 @@ export function VidThumbnail({ video, selected = false, onPress }: VidThumbnailP
 
   return (
     <TouchableOpacity style={{ height: thumbnailSize, width: thumbnailSize, padding: 1 }} onPress={onPress}>
-      {thumbnail && (
-        <Image source={{ uri: thumbnail.uri }} style={[styles.thumbnail, selected ? styles.selected : undefined]} />
-      )}
+      {/* Loader */}
       {!thumbnail && (
         <View style={[{ height: "100%", width: "100%", backgroundColor: "white" }, utilStyles.center]}>
           <ActivityIndicator size="small" color="black" />
         </View>
+      )}
+      {thumbnail && (
+        <>
+          {displayHas == "unselected" && (
+            <>
+              <Image source={{ uri: thumbnail.uri }} style={[styles.thumbnail, { tintColor: "#2e2e2e" }]} />
+              <Image
+                source={{ uri: thumbnail.uri }}
+                style={[styles.thumbnail, { position: "absolute", opacity: 0.3 }]}
+              />
+            </>
+          )}
+          {displayHas != "unselected" && (
+            <>
+              <Image
+                source={{ uri: thumbnail.uri }}
+                style={[styles.thumbnail, displayHas === "selected" ? styles.selected : undefined]}
+              />
+              {displayHas === "selected" && (
+                <MyAppText style={styles.selectedIcon} size={13}>
+                  ✅
+                </MyAppText>
+              )}
+            </>
+          )}
+        </>
       )}
     </TouchableOpacity>
   );
@@ -55,7 +78,15 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   selected: {
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: "green",
+  },
+  notSelected: {
+    tintColor: "gray",
+  },
+  selectedIcon: {
+    position: "absolute",
+    right: 3,
+    bottom: 5,
   },
 });

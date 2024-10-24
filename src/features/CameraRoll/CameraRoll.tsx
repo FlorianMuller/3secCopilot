@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { StyleSheet, View, FlatList } from "react-native";
 import * as MediaLibrary from "expo-media-library";
-import * as VideoThumbnails from "expo-video-thumbnails";
+import React, { useEffect, useMemo, useState } from "react";
+import { FlatList, StyleSheet, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
+import { VideoMetadata } from "../../db/schema";
+import { getVideosMetadtaByIds } from "../../services/selection";
 import { groupBy } from "../../utils/groupBy";
 import { DaySection } from "./DaySection";
 
 export interface PhoneMedia extends MediaLibrary.Asset {
   info?: MediaLibrary.AssetInfo;
+  metadata?: VideoMetadata;
 }
 
 export interface CameraRollProps {
@@ -29,8 +31,10 @@ export default function CameraRoll({
     if (loading) {
       return;
     }
+    // Set loading lock
     setLoading(true);
 
+    // Check we have the right permission
     try {
       await requestPermission();
     } catch (e) {
@@ -38,19 +42,29 @@ export default function CameraRoll({
       setLoading(false);
     }
 
+    // Get next video page
     try {
       const vidPage: MediaLibrary.PagedInfo<PhoneMedia> = await MediaLibrary.getAssetsAsync({
         mediaType: "video",
         sortBy: "creationTime",
-        // createdAfter: startDate,
+        // createdBefore: startDate.getTime(),
         createdAfter: endDate.getTime(),
         first: 500,
         after: videoEndCursor,
       });
+      const newVideos = vidPage.assets;
 
       console.log(`loading new videos`);
-      setVideos((oldVideos) => [...oldVideos, ...vidPage.assets]);
       setVideoEndCursor(vidPage.endCursor);
+
+      // Retrieve metadata
+      const newMetadta = await getVideosMetadtaByIds(newVideos.map((v) => v.id));
+
+      // Assign metadata to video
+      const newVideoWithMetadata = newVideos.map((v) => ({ ...v, metadata: newMetadta[v.id] }));
+      setVideos((oldVideos) => [...oldVideos, ...newVideoWithMetadata]);
+
+      // Release loading lock
       setLoading(false);
     } catch (e) {
       console.error("error loading video batch", e);

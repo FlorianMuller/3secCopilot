@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { SelectVideoMetadata, videosMetadataTable } from "../db/schema";
 import { db } from "../db/db";
+import { groupByUnique } from "../utils/groupBy";
 
 export async function markVideoAsSelected(
   videoId: string,
@@ -47,6 +48,15 @@ export async function markVideoAsUnselected(videoId: string): Promise<SelectVide
 export async function getVideoMetadata(videoId: string): Promise<SelectVideoMetadata | null> {
   const res = await db.select().from(videosMetadataTable).where(eq(videosMetadataTable.videoId, videoId)).limit(1);
   return returnOneMetadata(res);
+}
+
+export async function getVideosMetadtaByIds(videoIds: string[]): Promise<Record<string, SelectVideoMetadata>> {
+  const metadataList = await db
+    .select()
+    .from(videosMetadataTable)
+    .where(inArray(videosMetadataTable.videoId, videoIds));
+
+  return groupByUnique(metadataList, (m) => m.videoId);
 }
 
 // Util function to only return one videoMetadata from a list where
