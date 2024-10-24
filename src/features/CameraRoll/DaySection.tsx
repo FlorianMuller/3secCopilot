@@ -8,7 +8,7 @@ import { CameraRollNavigationProp } from "../../navigation/CameraRollNavigation"
 import { capitalize } from "../../utils/capitalize";
 import { PhoneMedia } from "./CameraRoll";
 import { VidThumbnail } from "./VideoThumbnail";
-
+import Feather from "@expo/vector-icons/Feather";
 interface DaySectionProps {
   item: { day: Date; videosOfTheDay: PhoneMedia[] };
 }
@@ -23,11 +23,15 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
 
   return (
     <View style={styles.dateSection} key={day.getTime()}>
-      <SubTitle>
-        {capitalize(
-          DateTime.fromJSDate(day).setLocale("fr").toLocaleString({ day: "numeric", month: "long", weekday: "long" })
-        )}
-      </SubTitle>
+      <View style={styles.title}>
+        {!dayHasAVideoSelected && <Feather name="circle" size={15} color="white" />}
+        {dayHasAVideoSelected && <Feather name="check-circle" size={15} color="white" />}
+        <SubTitle>
+          {capitalize(
+            DateTime.fromJSDate(day).setLocale("fr").toLocaleString({ day: "numeric", month: "long", weekday: "long" })
+          )}
+        </SubTitle>
+      </View>
 
       <View style={styles.thumbnailList}>
         {/* Video list */}
@@ -57,6 +61,12 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
 const styles = StyleSheet.create({
   dateSection: {
     marginBottom: 40,
+  },
+  title: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
   thumbnailList: {
     display: "flex",
