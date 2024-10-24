@@ -32,8 +32,8 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
         {videosOfTheDay.length > 0 &&
           reversedVideosOfTheDay.map((vid, i) => (
             <VidThumbnail
-              video={vid}
               key={vid.id}
+              video={vid}
               onPress={() => {
                 navigation.navigate(VideoPlayerURI, { day, ids: videosIds, index: i });
               }}

@@ -8,7 +8,6 @@ import { DaySection } from "./DaySection";
 
 export interface PhoneMedia extends MediaLibrary.Asset {
   info?: MediaLibrary.AssetInfo;
-  thumbnail?: VideoThumbnails.VideoThumbnailsResult;
 }
 
 export interface CameraRollProps {
@@ -23,23 +22,43 @@ export default function CameraRoll({
   const [status, requestPermission] = MediaLibrary.usePermissions();
 
   const [videos, setVideos] = useState<PhoneMedia[]>([]);
+  const [videoEndCursor, setVideoEndCursor] = useState<MediaLibrary.AssetRef>();
+  const [loading, setLoading] = useState<boolean>(false);
 
   const getVid = async () => {
-    await requestPermission();
+    if (loading) {
+      return;
+    }
+    setLoading(true);
 
-    const vidPage: MediaLibrary.PagedInfo<PhoneMedia> = await MediaLibrary.getAssetsAsync({
-      mediaType: "video",
-      sortBy: "creationTime",
-      // createdAfter: startDate,
-      // createdBefore: endDate,
-      first: 200,
-    });
+    try {
+      await requestPermission();
+    } catch (e) {
+      console.error("error while requesting media library permission", e);
+      setLoading(false);
+    }
 
-    setVideos(vidPage.assets);
+    try {
+      const vidPage: MediaLibrary.PagedInfo<PhoneMedia> = await MediaLibrary.getAssetsAsync({
+        mediaType: "video",
+        sortBy: "creationTime",
+        // createdAfter: startDate,
+        createdAfter: endDate.getTime(),
+        first: 500,
+        after: videoEndCursor,
+      });
+
+      console.log(`loading new videos`);
+      setVideos((oldVideos) => [...oldVideos, ...vidPage.assets]);
+      setVideoEndCursor(vidPage.endCursor);
+      setLoading(false);
+    } catch (e) {
+      console.error("error loading video batch", e);
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    console.log("reset");
     getVid();
   }, []);
 
@@ -61,26 +80,31 @@ export default function CameraRoll({
     return dates;
   }
 
-  const loading = videos.length === 0;
+  const gotVideo = videos.length > 0;
 
   const videosByDay = useMemo(() => getGroupedVideos(videos), [videos]);
-  const days = useMemo(() => getDaysBetween(startDate, endDate), [startDate, endDate]);
+  const days = useMemo(
+    () => (videos.length === 0 ? [] : getDaysBetween(startDate, new Date(videos[videos.length - 1].creationTime))),
+    [startDate, videos]
+  );
 
   return (
     <>
-      {loading && (
+      {!gotVideo && (
         <View style={[styles.center, styles.height100]}>
           <MyAppText>loading...</MyAppText>
         </View>
       )}
 
-      {!loading && (
+      {gotVideo && (
         <View style={styles.container}>
           <FlatList
             data={days.map((day) => ({ day, videosOfTheDay: videosByDay[day.toDateString()] || [] }))}
-            renderItem={(props) => <DaySection {...props}/>}
+            renderItem={(props) => <DaySection {...props} />}
             keyExtractor={({ day }) => day.toDateString()}
             indicatorStyle="white"
+            onEndReached={getVid}
+            onEndReachedThreshold={0.5}
           />
         </View>
       )}
