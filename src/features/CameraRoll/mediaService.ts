@@ -8,6 +8,6 @@ export async function getVideoThumbnail(video: PhoneMedia) {
     info = await MediaLibrary.getAssetInfoAsync(video.id);
   }
 
-  const thumbnail = await VideoThumbnails.getThumbnailAsync(info.localUri || "");
+  const thumbnail = await VideoThumbnails.getThumbnailAsync(info.localUri || "", { quality: 0 });
   return thumbnail;
 }

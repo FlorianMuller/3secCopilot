@@ -1,11 +1,12 @@
 import * as MediaLibrary from "expo-media-library";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { VideoMetadata } from "../../db/schema";
 import { getVideosMetadtaByIds } from "../../services/selection";
 import { groupBy } from "../../utils/groupBy";
 import { DaySection } from "./DaySection";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 export interface PhoneMedia extends MediaLibrary.Asset {
   info?: MediaLibrary.AssetInfo;
@@ -21,6 +22,7 @@ export default function CameraRoll({
   startDate = new Date(),
   endDate = new Date(startDate.getFullYear(), 0),
 }: CameraRollProps) {
+  const navigation = useNavigation();
   const [status, requestPermission] = MediaLibrary.usePermissions();
 
   const [videos, setVideos] = useState<PhoneMedia[]>([]);
@@ -72,9 +74,27 @@ export default function CameraRoll({
     }
   };
 
+  const refetchMetadata = useCallback(async () => {
+    if (videos.length > 0) {
+      console.log("Refetching metadata");
+      const newMetadta = await getVideosMetadtaByIds(videos.map((v) => v.id));
+      setVideos((oldVideos) => oldVideos.map((v) => ({ ...v, metadata: newMetadta[v.id] })));
+    }
+  }, [videos]);
+
+  // Fetch video when component mount
   useEffect(() => {
     getVid();
   }, []);
+
+  // Refetch metadata when the page is focused
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      refetchMetadata();
+    });
+
+    return unsubscribe;
+  }, [navigation, refetchMetadata]);
 
   function getGroupedVideos(vids: PhoneMedia[]) {
     return groupBy(vids, (v) => new Date(v.creationTime).toDateString());
