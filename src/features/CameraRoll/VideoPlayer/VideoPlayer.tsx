@@ -59,7 +59,7 @@ export function VideoPlayer() {
     } else {
       console.log("Selecting video");
       try {
-        const newMetadata = await markVideoAsSelected(id, new Date(videoInfo.creationTime), params.day);
+        const newMetadata = await markVideoAsSelected(id, new Date(videoInfo.creationTime), new Date(params.day));
         if (newMetadata != null) {
           setVideoMetadata(newMetadata);
         }

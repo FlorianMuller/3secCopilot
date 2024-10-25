@@ -42,7 +42,7 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
               video={vid}
               displayHas={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "selected" : "unselected") : "normal"}
               onPress={() => {
-                navigation.navigate(VideoPlayerURI, { day, ids: videosIds, index: i });
+                navigation.navigate(VideoPlayerURI, { day: day.toISOString(), ids: videosIds, index: i });
               }}
             />
           ))}

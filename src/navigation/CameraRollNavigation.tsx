@@ -7,7 +7,7 @@ import { AppLayout } from "../../AppLayout";
 
 export type CameraRollStackParamList = {
   [CameraRollURI]: undefined;
-  [VideoPlayerURI]: { day: Date; ids: string[]; index: number };
+  [VideoPlayerURI]: { day: string; ids: string[]; index: number };
 };
 
 // To type the `useNavigation()` hook
