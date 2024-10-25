@@ -28,9 +28,10 @@ export default function CameraRoll({
   const [videos, setVideos] = useState<PhoneMedia[]>([]);
   const [videoEndCursor, setVideoEndCursor] = useState<MediaLibrary.AssetRef>();
   const [loading, setLoading] = useState<boolean>(false);
+  const [allVideoLoaded, setAllVideoLoaded] = useState<boolean>(false);
 
   const getVid = async () => {
-    if (loading) {
+    if (loading || allVideoLoaded) {
       return;
     }
     // Set loading lock
@@ -65,6 +66,10 @@ export default function CameraRoll({
       // Assign metadata to video
       const newVideoWithMetadata = newVideos.map((v) => ({ ...v, metadata: newMetadta[v.id] }));
       setVideos((oldVideos) => [...oldVideos, ...newVideoWithMetadata]);
+
+      if (!vidPage.hasNextPage) {
+        setAllVideoLoaded(true);
+      }
 
       // Release loading lock
       setLoading(false);
@@ -117,10 +122,13 @@ export default function CameraRoll({
   const gotVideo = videos.length > 0;
 
   const videosByDay = useMemo(() => getGroupedVideos(videos), [videos]);
-  const days = useMemo(
-    () => (videos.length === 0 ? [] : getDaysBetween(startDate, new Date(videos[videos.length - 1].creationTime))),
-    [startDate, videos]
-  );
+  const days = useMemo(() => {
+    if (!gotVideo) {
+      return [];
+    }
+    const lastDateToDisplay = allVideoLoaded ? endDate : new Date(videos[videos.length - 1].creationTime);
+    return getDaysBetween(startDate, lastDateToDisplay);
+  }, [startDate, endDate, videos, allVideoLoaded, gotVideo]);
 
   return (
     <>
@@ -137,7 +145,7 @@ export default function CameraRoll({
             renderItem={(props) => <DaySection {...props} />}
             keyExtractor={({ day }) => day.toDateString()}
             indicatorStyle="white"
-            onEndReached={getVid}
+            onEndReached={allVideoLoaded ? undefined : getVid}
             onEndReachedThreshold={0.5}
           />
         </View>
