@@ -10,7 +10,8 @@ import migrations from "./drizzle/migrations";
 import { FloatingTabBar } from "./src/components/MyTabBar";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
-import { db } from "./src/db/db";
+import { db, expoSqliteDb } from "./src/db/db";
+import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 
 const Tab = createBottomTabNavigator();
 
@@ -19,24 +20,6 @@ interface AppTabsProps {
 }
 
 function AppTabs({ theme }: AppTabsProps) {
-  const { success, error } = useMigrations(db, migrations);
-
-  if (error) {
-    return (
-      <View>
-        <Text>Migration error: {error.message}</Text>
-      </View>
-    );
-  }
-
-  if (!success) {
-    return (
-      <View>
-        <Text>Migration is in progress...</Text>
-      </View>
-    );
-  }
-
   return (
     <NavigationContainer theme={theme === "dark" ? DarkTheme : DefaultTheme}>
       <Tab.Navigator
@@ -84,7 +67,27 @@ function AppTabs({ theme }: AppTabsProps) {
 }
 
 export default function App() {
+  // Allow to view database in a web UI
+  useDrizzleStudio(expoSqliteDb);
+  // Migrate database if table schemas have changed
+  const { success, error } = useMigrations(db, migrations);
   const scheme = useColorScheme();
+
+  if (error) {
+    return (
+      <View>
+        <Text>Migration error: {error.message}</Text>
+      </View>
+    );
+  }
+
+  if (!success) {
+    return (
+      <View>
+        <Text>Migration is in progress...</Text>
+      </View>
+    );
+  }
 
   return <AppTabs theme={scheme || "light"} />;
 }
