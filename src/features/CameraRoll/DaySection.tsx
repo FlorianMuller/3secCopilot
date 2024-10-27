@@ -9,11 +9,12 @@ import { capitalize } from "../../utils/capitalize";
 import { PhoneMedia } from "./CameraRoll";
 import { VidThumbnail } from "./VideoThumbnail";
 import Feather from "@expo/vector-icons/Feather";
+import React from "react";
 interface DaySectionProps {
   item: { day: Date; videosOfTheDay: PhoneMedia[] };
 }
 
-export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
+export const DaySection = React.memo(function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
   const navigation = useNavigation<CameraRollNavigationProp>();
 
   const reversedVideosOfTheDay = [...videosOfTheDay].reverse();
@@ -56,7 +57,7 @@ export function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   dateSection: {

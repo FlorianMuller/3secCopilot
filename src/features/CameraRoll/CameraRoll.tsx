@@ -1,6 +1,6 @@
 import * as MediaLibrary from "expo-media-library";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FlatList, StyleSheet, unstable_batchedUpdates, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { VideoMetadata } from "../../db/schema";
 import { getVideosMetadtaByIds } from "../../services/selection";
@@ -23,26 +23,29 @@ export default function CameraRoll({
   endDate = new Date(startDate.getFullYear(), 0),
 }: CameraRollProps) {
   const navigation = useNavigation();
-  const [status, requestPermission] = MediaLibrary.usePermissions();
+  const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
 
   const [videos, setVideos] = useState<PhoneMedia[]>([]);
-  const [videoEndCursor, setVideoEndCursor] = useState<MediaLibrary.AssetRef>();
-  const [loading, setLoading] = useState<boolean>(false);
+  const videoEndCursorRef = useRef<MediaLibrary.AssetRef>();
+  const loadingVideoRef = useRef<boolean>(false);
   const [allVideoLoaded, setAllVideoLoaded] = useState<boolean>(false);
 
   const getVid = async () => {
-    if (loading || allVideoLoaded) {
+    if (loadingVideoRef.current || allVideoLoaded) {
       return;
     }
     // Set loading lock
-    setLoading(true);
+    loadingVideoRef.current = true;
 
     // Check we have the right permission
-    try {
-      await requestPermission();
-    } catch (e) {
-      console.error("error while requesting media library permission", e);
-      setLoading(false);
+    if (permissionResponse?.status !== "granted") {
+      try {
+        await requestPermission();
+      } catch (e) {
+        console.error("error while requesting media library permission", e);
+        loadingVideoRef.current = false;
+        return;
+      }
     }
 
     // Get next video page
@@ -52,30 +55,32 @@ export default function CameraRoll({
         sortBy: "creationTime",
         // createdBefore: startDate.getTime(),
         createdAfter: endDate.getTime(),
-        first: 500,
-        after: videoEndCursor,
+        first: 1000,
+        after: videoEndCursorRef.current,
       });
       const newVideos = vidPage.assets;
 
-      console.log(`loading new videos`);
-      setVideoEndCursor(vidPage.endCursor);
+      videoEndCursorRef.current = vidPage.endCursor;
 
       // Retrieve metadata
       const newMetadta = await getVideosMetadtaByIds(newVideos.map((v) => v.id));
 
       // Assign metadata to video
       const newVideoWithMetadata = newVideos.map((v) => ({ ...v, metadata: newMetadta[v.id] }));
-      setVideos((oldVideos) => [...oldVideos, ...newVideoWithMetadata]);
 
-      if (!vidPage.hasNextPage) {
-        setAllVideoLoaded(true);
-      }
+      // Update videos and allVideoLoaded together
+      unstable_batchedUpdates(() => {
+        setVideos((oldVideos) => oldVideos.concat(newVideoWithMetadata));
+        if (!vidPage.hasNextPage) {
+          setAllVideoLoaded(true);
+        }
+      });
 
       // Release loading lock
-      setLoading(false);
+      loadingVideoRef.current = false;
     } catch (e) {
       console.error("error loading video batch", e);
-      setLoading(false);
+      loadingVideoRef.current = false;
     }
   };
 
@@ -146,7 +151,9 @@ export default function CameraRoll({
             keyExtractor={({ day }) => day.toDateString()}
             indicatorStyle="white"
             onEndReached={allVideoLoaded ? undefined : getVid}
-            onEndReachedThreshold={0.5}
+            onEndReachedThreshold={300}
+            initialNumToRender={20}
+            maxToRenderPerBatch={20}
           />
         </View>
       )}
