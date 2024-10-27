@@ -18,7 +18,7 @@ export function ThemedButton({ Icon, text, children, ...props }: ThemeButtonProp
   return (
     <View {...props} style={[styles.defaultButton, { backgroundColor: colors.primary, borderRadius: 20 }, props.style]}>
       {Icon && <Icon theme={theme} />}
-      {text && <MyAppText>{text}</MyAppText>}
+      {text && <MyAppText color={theme.colors.textOnPrimary}>{text}</MyAppText>}
       {children}
     </View>
   );

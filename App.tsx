@@ -1,17 +1,16 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
-import { drizzle } from "drizzle-orm/expo-sqlite";
+import { NavigationContainer } from "@react-navigation/native";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
-import * as SQLite from "expo-sqlite";
+import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 import { memo } from "react";
 import { Text, useColorScheme, View } from "react-native";
 import migrations from "./drizzle/migrations";
 import { FloatingTabBar } from "./src/components/MyTabBar";
+import { db, expoSqliteDb } from "./src/db/db";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
-import { db, expoSqliteDb } from "./src/db/db";
-import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
+import { myDarkTheme, myLightTheme } from "./src/theme/themes";
 
 const Tab = createBottomTabNavigator();
 
@@ -21,7 +20,7 @@ interface AppTabsProps {
 
 function AppTabs({ theme }: AppTabsProps) {
   return (
-    <NavigationContainer theme={theme === "dark" ? DarkTheme : DefaultTheme}>
+    <NavigationContainer theme={theme === "dark" ? myDarkTheme : myLightTheme}>
       <Tab.Navigator
         initialRouteName="CameraRollTab"
         screenOptions={{
