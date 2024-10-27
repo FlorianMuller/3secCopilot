@@ -12,7 +12,7 @@ import {
 import { MyAppText } from "../../components/text/MyAppText";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
-import { getVideoThumbnail } from "./mediaService";
+import { getCachedThumbnailUri, getVideoThumbnail } from "./mediaService";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
@@ -21,7 +21,9 @@ export interface VidThumbnailProps {
 }
 
 export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumbnailProps) {
-  const [thumbnail, setThumbnail] = useState<VideoThumbnailsResult>();
+  const [thumbnailUri, setThumbnailUri] = useState<string>(getCachedThumbnailUri(video.id));
+  const [refreshCount, setRefreshCount] = useState<number>(0);
+  const thumbnailUriWithRefresh = thumbnailUri + `?refresh=${refreshCount}`;
   const { width } = useWindowDimensions();
   const thumbnailSize = width / 5;
 
@@ -30,43 +32,50 @@ export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumb
   }, [video]);
 
   async function handleThumbnail() {
-    const newThumbnail = await getVideoThumbnail(video);
-    setThumbnail(newThumbnail);
+    const newThumbnailResult = await getVideoThumbnail(video);
+
+    // Thumnail was generated, we need to refresh the <Image> uri to load the image
+    if (newThumbnailResult.status === "generatedAndCached") {
+      setRefreshCount((oldRefresh) => oldRefresh + 1);
+    }
+
+    // Cache failed, use uri of generated thumbnail directly
+    if (newThumbnailResult.status === "generatedAndCachedFailed" && newThumbnailResult.uri) {
+      setThumbnailUri(newThumbnailResult.uri);
+    }
+
+    // Todo: manage generation failed status (show a 'X', a'?' ?)
   }
 
   return (
     <TouchableOpacity style={{ height: thumbnailSize, width: thumbnailSize, padding: 1 }} onPress={onPress}>
-      {/* Loader */}
-      {!thumbnail && (
-        <View style={[{ height: "100%", width: "100%", backgroundColor: "white" }, utilStyles.center]}>
-          <ActivityIndicator size="small" color="black" />
-        </View>
+      {/* Centered spinner (showd if thumbnailUri doesn't exist) */}
+      {/* todo: set color from theme */}
+      <View style={[{ height: "100%", width: "100%" }, utilStyles.center]}>
+        <ActivityIndicator size="small" color="white" />
+      </View>
+
+      {/* Gray background for unselected video */}
+      {/* Todo: if thumbnailUri doesn't exist, this will hide the spinner, find a solution */}
+      {displayHas === "unselected" && (
+        <Image source={{ uri: thumbnailUriWithRefresh }} style={[styles.thumbnail, { tintColor: "#2e2e2e" }]} />
       )}
-      {thumbnail && (
-        <>
-          {displayHas == "unselected" && (
-            <>
-              <Image source={{ uri: thumbnail.uri }} style={[styles.thumbnail, { tintColor: "#2e2e2e" }]} />
-              <Image
-                source={{ uri: thumbnail.uri }}
-                style={[styles.thumbnail, { position: "absolute", opacity: 0.3 }]}
-              />
-            </>
-          )}
-          {displayHas != "unselected" && (
-            <>
-              <Image
-                source={{ uri: thumbnail.uri }}
-                style={[styles.thumbnail, displayHas === "selected" ? styles.selected : undefined]}
-              />
-              {displayHas === "selected" && (
-                <MyAppText style={styles.selectedIcon} size={13}>
-                  ✅
-                </MyAppText>
-              )}
-            </>
-          )}
-        </>
+
+      {/* Thumbnail */}
+      <Image
+        source={{ uri: thumbnailUriWithRefresh }}
+        style={[
+          styles.thumbnail,
+          displayHas === "selected" ? styles.selected : undefined,
+          displayHas === "unselected" ? { opacity: 0.3 } : undefined,
+        ]}
+      />
+
+      {/* Selected badge */}
+      {displayHas === "selected" && (
+        <MyAppText style={styles.selectedIcon} size={13}>
+          ✅
+        </MyAppText>
       )}
     </TouchableOpacity>
   );
@@ -76,6 +85,7 @@ const styles = StyleSheet.create({
   thumbnail: {
     height: "100%",
     width: "100%",
+    position: "absolute",
   },
   selected: {
     borderWidth: 2,
