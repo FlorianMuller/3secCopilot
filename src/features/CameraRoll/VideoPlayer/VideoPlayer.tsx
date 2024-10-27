@@ -1,20 +1,23 @@
 import EvilIcons from "@expo/vector-icons/EvilIcons";
-import { RouteProp, useRoute } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { ResizeMode, Video } from "expo-av";
 import * as MediaLibrary from "expo-media-library";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { NavigationTitle } from "../../../components/NavigationTitle";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
 import { LinkIconRoundButton, ThemedButton } from "../../../components/ThemedButton";
+import { VideoMetadata } from "../../../db/schema";
 import { VideoPlayerURI } from "../../../navigation";
 import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
 import { getVideoMetadata, markVideoAsSelected, markVideoAsUnselected } from "../../../services/selection";
-import { VideoMetadata } from "../../../db/schema";
+import { displayDate, displayTime } from "../../../utils/dateTime";
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
 const nextPrevButtonSize = 50;
 
 export function VideoPlayer() {
+  const navigation = useNavigation();
   const { params } = useRoute<VideoPlayerRouteProps>();
   const id = params.ids[params.index];
 
@@ -34,7 +37,6 @@ export function VideoPlayer() {
     try {
       const meta = await getVideoMetadata(id);
       setVideoMetadata(meta);
-      console.log("metadata:", meta);
     } catch (e) {
       console.error("can't retrieve metadata", e);
     }
@@ -44,6 +46,20 @@ export function VideoPlayer() {
     getVideo();
     getMetadata();
   }, [params.ids, params.index]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerTitle: () => {
+        const videoDate = videoInfo && new Date(videoInfo.creationTime);
+        return (
+          <NavigationTitle
+            title={displayDate(new Date(params.day))}
+            subTitle={videoDate === undefined ? " " : displayTime(videoDate)}
+          />
+        );
+      },
+    });
+  }, [params.day, videoInfo]);
 
   async function toggleSelectVideo(videoInfo: MediaLibrary.AssetInfo, videoMetadata: VideoMetadata | null) {
     if (videoMetadata?.isSelected) {

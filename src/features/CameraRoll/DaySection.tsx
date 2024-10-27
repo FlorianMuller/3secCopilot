@@ -1,15 +1,14 @@
+import Feather from "@expo/vector-icons/Feather";
 import { useNavigation } from "@react-navigation/native";
-import { DateTime } from "luxon";
+import React from "react";
 import { StyleSheet, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { SubTitle } from "../../components/text/SubTitle";
 import { VideoPlayerURI } from "../../navigation";
 import { CameraRollNavigationProp } from "../../navigation/CameraRollNavigation";
-import { capitalize } from "../../utils/capitalize";
+import { displayDate } from "../../utils/dateTime";
 import { PhoneMedia } from "./CameraRoll";
 import { VidThumbnail } from "./VideoThumbnail";
-import Feather from "@expo/vector-icons/Feather";
-import React from "react";
 interface DaySectionProps {
   item: { day: Date; videosOfTheDay: PhoneMedia[] };
 }
@@ -27,11 +26,7 @@ export const DaySection = React.memo(function DaySection({ item: { day, videosOf
       <View style={styles.title}>
         {!dayHasAVideoSelected && <Feather name="circle" size={15} color="white" />}
         {dayHasAVideoSelected && <Feather name="check-circle" size={15} color="white" />}
-        <SubTitle>
-          {capitalize(
-            DateTime.fromJSDate(day).setLocale("fr").toLocaleString({ day: "numeric", month: "long", weekday: "long" })
-          )}
-        </SubTitle>
+        <SubTitle>{displayDate(day)}</SubTitle>
       </View>
 
       <View style={styles.thumbnailList}>

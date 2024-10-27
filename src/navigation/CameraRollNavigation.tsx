@@ -1,9 +1,7 @@
 import { createNativeStackNavigator, NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { memo, useEffect } from "react";
 import { CameraRollURI, VideoPlayerURI } from ".";
 import CameraRoll from "../features/CameraRoll/CameraRoll";
 import { VideoPlayer } from "../features/CameraRoll/VideoPlayer/VideoPlayer";
-import { AppLayout } from "../../AppLayout";
 
 export type CameraRollStackParamList = {
   [CameraRollURI]: undefined;
