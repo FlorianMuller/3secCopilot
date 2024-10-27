@@ -2,7 +2,7 @@ import { View, Text, Pressable } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { ThemedButton } from "../../components/ThemedButton";
 import * as FileSystem from "expo-file-system";
-import { thumbnailCacheDir } from "../CameraRoll/mediaService";
+import { thumbnailCacheDir } from "../CameraRoll/thumbnailService";
 
 export function Options() {
   return (

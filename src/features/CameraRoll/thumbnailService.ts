@@ -2,25 +2,16 @@ import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { PhoneMedia } from "./CameraRoll";
+import { doesFileExists, ensureDirExists } from "../../utils/fileSytem";
 
 export const thumbnailCacheDir = FileSystem.cacheDirectory + "videoThumbnailsCache/";
 
-async function ensureDirExists(dir: string) {
-  const dirInfo = await FileSystem.getInfoAsync(dir);
-  if (!dirInfo.exists) {
-    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-  }
-}
-
-async function doesFileExists(fileUri: string): Promise<boolean> {
-  const fileInfo = await FileSystem.getInfoAsync(fileUri);
-  return fileInfo.exists;
-}
-
+// Return the location of a cached thumbnail based on a video id
 export function getCachedThumbnailUri(videoId: string): string {
   return thumbnailCacheDir + `${videoId.replaceAll("/", "--")}.jpg`;
 }
 
+// Save a generated thumbnail in a cache directory
 async function cacheThumbnail(videoId: string, generatedthumbnailUri: string): Promise<string | null> {
   const cachedThumbnailUri = getCachedThumbnailUri(videoId);
   try {
@@ -41,6 +32,7 @@ export interface GetThumbnailResult {
   status: "alreadyCached" | "generatedAndCached" | "generatedAndCachedFailed" | "generationFailed";
 }
 
+// Check if a video thumbnail has already been cached, if not generate it and cached it
 export async function getVideoThumbnail(video: PhoneMedia): Promise<GetThumbnailResult> {
   let info = video.info;
   if (info === undefined) {

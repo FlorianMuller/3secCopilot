@@ -12,7 +12,7 @@ import {
 import { MyAppText } from "../../components/text/MyAppText";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
-import { getCachedThumbnailUri, getVideoThumbnail } from "./mediaService";
+import { getCachedThumbnailUri, getVideoThumbnail } from "./thumbnailService";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
@@ -56,7 +56,6 @@ export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumb
       </View>
 
       {/* Gray background for unselected video */}
-      {/* Todo: if thumbnailUri doesn't exist, this will hide the spinner, find a solution */}
       {displayHas === "unselected" && (
         <Image source={{ uri: thumbnailUriWithRefresh }} style={[styles.thumbnail, { tintColor: "#2e2e2e" }]} />
       )}
