@@ -9,7 +9,7 @@ export interface NavigationTitleProps {
 
 export function NavigationTitle({ title, subTitle }: NavigationTitleProps) {
   return (
-    <View style={utilStyles.center}>
+    <View style={utilStyles.centerVertical}>
       {title && (
         <MyAppText size={16} weight={500}>
           {title}

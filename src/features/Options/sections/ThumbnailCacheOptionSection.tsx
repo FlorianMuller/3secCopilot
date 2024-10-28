@@ -1,12 +1,12 @@
+import Feather from "@expo/vector-icons/Feather";
 import * as FileSystem from "expo-file-system";
 import { useEffect, useState } from "react";
 import { Pressable } from "react-native";
 import { MyAppText } from "../../../components/text/MyAppText";
 import { ThemedButton } from "../../../components/ThemedButton";
+import { formatBytes } from "../../../utils/formatBytes";
 import { thumbnailCacheDir } from "../../CameraRoll/thumbnailService";
 import { OptionSection } from "../OptionSection";
-import { formatBytes } from "../../../utils/formatBytes";
-
 export function ThumbnailCacheOptionSection() {
   const [thumbnailCacheDirSize, setThumbnailCacheDirSize] = useState<number>();
 
@@ -40,7 +40,11 @@ export function ThumbnailCacheOptionSection() {
   const sizeTopShow = thumbnailCacheDirSize !== undefined ? formatBytes(thumbnailCacheDirSize) : "...";
 
   return (
-    <OptionSection title="Thumbnail cache" description="Advanced settings about videos thumbnlail cache">
+    <OptionSection
+      title="Thumbnail cache"
+      description="Advanced settings about videos thumbnlail cache"
+      Icon={({ theme: { colors } }) => <Feather name="archive" size={25} color={colors.text} />}
+    >
       <MyAppText>The thumbnail cache is taking {sizeTopShow}</MyAppText>
 
       <Pressable onPress={deleteThumnnailCache}>

@@ -52,7 +52,7 @@ export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumb
     <TouchableOpacity style={{ height: thumbnailSize, width: thumbnailSize, padding: 1 }} onPress={onPress}>
       {/* Centered spinner (showd if thumbnailUri doesn't exist) */}
       {/* todo: set color from theme */}
-      <View style={[{ height: "100%", width: "100%" }, utilStyles.center]}>
+      <View style={[utilStyles.hw100, utilStyles.centerVertical]}>
         <ActivityIndicator size="small" color="white" />
       </View>
 
