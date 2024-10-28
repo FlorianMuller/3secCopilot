@@ -1,5 +1,4 @@
 import { View } from "react-native";
-import { displayTime } from "../utils/dateTime";
 import { MyAppText } from "./text/MyAppText";
 import { utilStyles } from "../utils/utilStyles";
 

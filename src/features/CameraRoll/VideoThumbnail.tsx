@@ -13,6 +13,7 @@ import { MyAppText } from "../../components/text/MyAppText";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
 import { getCachedThumbnailUri, getVideoThumbnail } from "./thumbnailService";
+import { displayDuration } from "../../utils/dateTime";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
@@ -76,6 +77,9 @@ export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumb
           ✅
         </MyAppText>
       )}
+      <MyAppText style={styles.videoDuration} size={13} weight={600}>
+        {displayDuration(video.duration * 1000)}
+      </MyAppText>
     </TouchableOpacity>
   );
 }
@@ -93,9 +97,14 @@ const styles = StyleSheet.create({
   notSelected: {
     tintColor: "gray",
   },
+  videoDuration: {
+    position: "absolute",
+    right: 5,
+    bottom: 5,
+  },
   selectedIcon: {
     position: "absolute",
-    right: 3,
-    bottom: 5,
+    right: 5,
+    top: 4,
   },
 });

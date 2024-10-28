@@ -1,4 +1,4 @@
-import { DateTime } from "luxon";
+import { DateTime, Duration } from "luxon";
 import { capitalize } from "./capitalize";
 
 export function displayDate(date: Date): string {
@@ -9,4 +9,8 @@ export function displayDate(date: Date): string {
 
 export function displayTime(date: Date): string {
   return capitalize(DateTime.fromJSDate(date).setLocale("fr").toLocaleString({ hour: "2-digit", minute: "2-digit" }));
+}
+
+export function displayDuration(durationInMilis: number): string {
+  return Duration.fromMillis(durationInMilis).toFormat("m:ss");
 }
