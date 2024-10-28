@@ -1,12 +1,14 @@
+import { useNavigation } from "@react-navigation/native";
 import * as MediaLibrary from "expo-media-library";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, StyleSheet, unstable_batchedUpdates, View } from "react-native";
+import { FlatList, unstable_batchedUpdates, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { VideoMetadata } from "../../db/schema";
 import { getVideosMetadtaByIds } from "../../services/selection";
 import { groupBy } from "../../utils/groupBy";
+import { utilStyles } from "../../utils/utilStyles";
 import { DaySection } from "./DaySection";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 
 export interface PhoneMedia extends MediaLibrary.Asset {
   info?: MediaLibrary.AssetInfo;
@@ -137,54 +139,34 @@ export default function CameraRoll({
 
   return (
     <>
+      {/* Linear gradient between thumbnails and phone status bar (time, wifi icon...) */}
+      {/* Todo: compute dynamically status bar size */}
+      <LinearGradient
+        colors={["rgba(0, 0, 0, 0.6)", "rgba(0, 0, 0, 0)"]}
+        style={{ width: "100%", height: 80, position: "absolute", zIndex: 100 }}
+      />
+
       {!gotVideo && (
-        <View style={[styles.center, styles.height100]}>
-          <MyAppText>loading...</MyAppText>
+        <View style={[utilStyles.centerVertical, utilStyles.hw100]}>
+          <MyAppText>loading videos...</MyAppText>
         </View>
       )}
 
       {gotVideo && (
-        <View style={styles.container}>
-          <FlatList
-            data={days.map((day) => ({ day, videosOfTheDay: videosByDay[day.toDateString()] || [] }))}
-            renderItem={(props) => <DaySection {...props} />}
-            keyExtractor={({ day }) => day.toDateString()}
-            indicatorStyle="white"
-            onEndReached={allVideoLoaded ? undefined : getVid}
-            onEndReachedThreshold={300}
-            initialNumToRender={20}
-            maxToRenderPerBatch={20}
-          />
-        </View>
+        <FlatList
+          data={days.map((day) => ({ day, videosOfTheDay: videosByDay[day.toDateString()] || [] }))}
+          renderItem={(props) => <DaySection {...props} />}
+          keyExtractor={({ day }) => day.toDateString()}
+          indicatorStyle="white"
+          onEndReached={allVideoLoaded ? undefined : getVid}
+          onEndReachedThreshold={300}
+          initialNumToRender={20}
+          maxToRenderPerBatch={20}
+          // To not render fist section under iPhone notch
+          // todo: use safe zone component to detect if there's a notch
+          ListHeaderComponent={<View style={{ height: 70 }} />}
+        />
       )}
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  dateSection: {
-    marginBottom: 40,
-  },
-  container: {
-    marginTop: 60,
-  },
-  thumbnailList: {
-    display: "flex",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-start",
-  },
-  VideoThumbnails: {
-    width: 90,
-    height: 90,
-  },
-  center: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
-  },
-  height100: {
-    height: "100%",
-  },
-});
