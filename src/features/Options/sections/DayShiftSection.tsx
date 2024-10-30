@@ -1,8 +1,15 @@
 import { MyAppText } from "../../../components/text/MyAppText";
+import preferences from "../../../services/preferences";
 import { OptionSection } from "../OptionSection";
 import Feather from "@expo/vector-icons/Feather";
 
+export interface DayShiftTime {
+  minute: number;
+  hour: number;
+}
+
 export function DayShiftSection() {
+  const { dayShift, saveDayShift } = preferences.useDayShiftPreference();
   return (
     <OptionSection
       title="Day shift"

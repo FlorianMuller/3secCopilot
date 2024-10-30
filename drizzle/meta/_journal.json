@@ -15,6 +15,13 @@
       "when": 1729633717177,
       "tag": "0001_productive_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1730229424214,
+      "tag": "0002_premium_karnak",
+      "breakpoints": true
     }
   ]
 }

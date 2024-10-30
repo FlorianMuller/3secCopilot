@@ -1,6 +1,14 @@
 import { InferSelectModel, sql } from "drizzle-orm";
 import { check, int, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+/**
+ * IMPORTANT: if you change the schemas in this file, run
+ * `make update-migration` to update the drizzle migration files.
+ *
+ * At app start, drizzle will update/migrate the user local sqlite
+ * database to make it work with the last schemas defined in this file.
+ */
+
 export const videosMetadataTable = sqliteTable(
   "videos_metadata",
   {
@@ -33,5 +41,9 @@ export const videosMetadataTable = sqliteTable(
 
 export type SelectVideoMetadata = typeof videosMetadataTable.$inferSelect;
 export type InsertVideoMetadata = typeof videosMetadataTable.$inferInsert;
-
 export type VideoMetadata = SelectVideoMetadata;
+
+export const preferencesTable = sqliteTable("preferences", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+});
