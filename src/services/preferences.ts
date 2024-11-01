@@ -32,6 +32,20 @@ export async function deletePreference(key: string): Promise<void> {
 // ----------------------------------------------------------------------------------------------------
 // Helper to create specific preference function
 
+type GetPreferenceFunction<T> = () => Promise<T | null>;
+type GetPreferenceFunctionWithDefault<T> = () => Promise<T>;
+type SetPreferenceFunction<T> = (value: T) => Promise<void>;
+type DeletePreferenceFunction = () => Promise<void>;
+
+type PreferenceHook<K extends string, T> = () => {
+  [P in K | `save${Capitalize<K>}`]: P extends `save${Capitalize<K>}`
+    ? (newValue: T) => Promise<void>
+    : undefined | T | null;
+};
+type PreferenceHookWithDefault<K extends string, T> = () => {
+  [P in K | `save${Capitalize<K>}`]: P extends `save${Capitalize<K>}` ? (newValue: T) => Promise<void> : undefined | T;
+};
+
 // Object with the 3 preferences function we want to use (get, set and delete)
 type DynamicPreferenceFunctions<K extends string, T> = {
   [P in
@@ -39,16 +53,26 @@ type DynamicPreferenceFunctions<K extends string, T> = {
     | `set${Capitalize<K>}Preference`
     | `delete${Capitalize<K>}Preference`
     | `use${Capitalize<K>}Preference`]: P extends `get${Capitalize<K>}Preference`
-    ? () => Promise<T | null>
+    ? GetPreferenceFunction<T>
     : P extends `set${Capitalize<K>}Preference`
-    ? (value: T) => Promise<void>
+    ? SetPreferenceFunction<T>
     : P extends `delete${Capitalize<K>}Preference`
-    ? () => Promise<void>
-    : () => {
-        [P in K | `save${Capitalize<K>}`]: P extends `save${Capitalize<K>}`
-          ? (newValue: T) => Promise<void>
-          : undefined | T | null;
-      };
+    ? DeletePreferenceFunction
+    : PreferenceHook<K, T>;
+};
+
+type DynamicPreferenceFunctionsWithDefaultValue<K extends string, T> = {
+  [P in
+    | `get${Capitalize<K>}Preference`
+    | `set${Capitalize<K>}Preference`
+    | `delete${Capitalize<K>}Preference`
+    | `use${Capitalize<K>}Preference`]: P extends `get${Capitalize<K>}Preference`
+    ? GetPreferenceFunctionWithDefault<T>
+    : P extends `set${Capitalize<K>}Preference`
+    ? SetPreferenceFunction<T>
+    : P extends `delete${Capitalize<K>}Preference`
+    ? DeletePreferenceFunction
+    : PreferenceHookWithDefault<K, T>;
 };
 
 // Used to save T as string and read string as T
@@ -61,12 +85,28 @@ interface Converter<T> {
 function createPreferencesFunctions<K extends string, T>(
   key: K,
   converter: Converter<T>
+): DynamicPreferenceFunctions<K, T>;
+function createPreferencesFunctions<K extends string, T>(
+  key: K,
+  converter: Converter<T>,
+  defaultValue: T
+): DynamicPreferenceFunctionsWithDefaultValue<K, T>;
+function createPreferencesFunctions<K extends string, T>(
+  key: K,
+  converter: Converter<T>,
+  defaultValue?: T
 ): DynamicPreferenceFunctions<K, T> {
   const capitalizedKey = capitalize(key);
 
-  const saveValue = (value: T) => savePreference(key, converter.toString(value));
-  const getValue = async () => converter.fromString(await getPreference(key));
-  const deleteValue = () => deletePreference(key);
+  const saveValue: SetPreferenceFunction<T> = (value: T) => savePreference(key, converter.toString(value));
+  const getValue: GetPreferenceFunction<T> = async () => {
+    const prefValue = converter.fromString(await getPreference(key));
+    if (prefValue === null && defaultValue !== undefined) {
+      return defaultValue;
+    }
+    return prefValue;
+  };
+  const deleteValue: DeletePreferenceFunction = () => deletePreference(key);
   const usePreferenceHook = () => {
     const [preference, setPreference] = useState<T | null>();
 
@@ -84,9 +124,8 @@ function createPreferencesFunctions<K extends string, T>(
       setPreference(newValue);
     }
 
-    // return [preference, savePreference];
     return {
-      [key]: preference,
+      [key]: preference === null && defaultValue !== undefined ? defaultValue : preference,
       [`save${capitalizedKey}`]: savePreference,
     };
   };
@@ -146,6 +185,6 @@ function objectConverter<T extends object>(): Converter<T> {
 const preferences = {
   ...createPreferencesFunctions("useDarkTheme", booleanConverter),
   ...createPreferencesFunctions("birthday", dateConverter),
-  ...createPreferencesFunctions("dayShift", objectConverter<DayShiftTime>()),
+  ...createPreferencesFunctions("dayShift", objectConverter<DayShiftTime>(), { hour: 0, minute: 0 }),
 };
 export default preferences;

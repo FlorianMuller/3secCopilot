@@ -30,9 +30,9 @@ export function DayShiftSection() {
             style={styles.picker}
             mode="dropdown"
             itemStyle={{ color: "white" }}
-            selectedValue={dayShift?.hour || 0}
+            selectedValue={dayShift.hour}
             onValueChange={(itemValue, itemIndex) => {
-              saveDayShift({ hour: itemValue, minute: dayShift?.minute || 0 });
+              saveDayShift({ hour: itemValue, minute: dayShift.minute });
             }}
           >
             {hours.map((hour) => (
@@ -41,9 +41,9 @@ export function DayShiftSection() {
           </Picker>
           <Picker
             style={styles.picker}
-            selectedValue={dayShift?.minute || 0}
+            selectedValue={dayShift.minute}
             onValueChange={(itemValue, itemIndex) => {
-              saveDayShift({ hour: dayShift?.hour || 0, minute: itemValue || 0 });
+              saveDayShift({ hour: dayShift.hour, minute: itemValue });
             }}
           >
             {minutes.map((minute) => (

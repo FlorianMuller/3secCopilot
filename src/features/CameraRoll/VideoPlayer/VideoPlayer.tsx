@@ -55,9 +55,8 @@ export function VideoPlayer() {
     navigation.setOptions({
       headerTitle: () => {
         const videoDate = videoInfo && new Date(videoInfo.creationTime);
-        const isShifted =
-          videoDate && dayShift != undefined && isVideoDayShifted(videoDate, dayShift || { hour: 0, minute: 0 });
-        const shiftedText = isShifted ? ` (${displayShortDate(videoDate)})` : "";
+        const isShifted = videoDate && dayShift != undefined && isVideoDayShifted(videoDate, dayShift);
+        const shiftedText = isShifted ? `(${displayShortDate(videoDate)})` : "";
         return (
           <NavigationTitle
             title={displayDate(new Date(params.day))}

@@ -111,10 +111,6 @@ export default function CameraRoll({
     return unsubscribe;
   }, [navigation, refetchMetadata]);
 
-  function getGroupedVideos(vids: PhoneMedia[]) {
-    return groupBy(vids, (v) => getEffectiveDate(new Date(v.creationTime), dayShift).toDateString());
-  }
-
   function getDaysBetween(start: Date, end: Date) {
     const dates: Date[] = [];
     let lastDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
