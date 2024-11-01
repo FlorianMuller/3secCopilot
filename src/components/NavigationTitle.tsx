@@ -5,9 +5,10 @@ import { utilStyles } from "../utils/utilStyles";
 export interface NavigationTitleProps {
   title?: string;
   subTitle?: string;
+  rightSubTItle?: string;
 }
 
-export function NavigationTitle({ title, subTitle }: NavigationTitleProps) {
+export function NavigationTitle({ title, subTitle, rightSubTItle }: NavigationTitleProps) {
   return (
     <View style={utilStyles.centerVertical}>
       {title && (
@@ -15,11 +16,21 @@ export function NavigationTitle({ title, subTitle }: NavigationTitleProps) {
           {title}
         </MyAppText>
       )}
-      {subTitle && (
-        <MyAppText size={12} weight={400}>
-          {subTitle}
-        </MyAppText>
-      )}
+      <View style={utilStyles.centerRow}>
+        {subTitle && <MyAppText size={12}>{subTitle}</MyAppText>}
+        {rightSubTItle && (
+          <MyAppText
+            size={10}
+            weight={300}
+            style={{
+              position: "absolute",
+              right: -35,
+            }}
+          >
+            {rightSubTItle}
+          </MyAppText>
+        )}
+      </View>
     </View>
   );
 }

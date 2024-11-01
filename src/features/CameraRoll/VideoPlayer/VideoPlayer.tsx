@@ -10,8 +10,11 @@ import { LinkIconRoundButton, ThemedButton } from "../../../components/ThemedBut
 import { VideoMetadata } from "../../../db/schema";
 import { VideoPlayerURI } from "../../../navigation";
 import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
+import { isVideoDayShifted } from "../../../services/dayShift";
+import preferences from "../../../services/preferences";
 import { getVideoMetadata, markVideoAsSelected, markVideoAsUnselected } from "../../../services/selection";
-import { displayDate, displayTime } from "../../../utils/dateTime";
+import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
+
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
 const nextPrevButtonSize = 50;
@@ -20,6 +23,7 @@ export function VideoPlayer() {
   const navigation = useNavigation();
   const { params } = useRoute<VideoPlayerRouteProps>();
   const id = params.ids[params.index];
+  const { dayShift } = preferences.useDayShiftPreference();
 
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
@@ -51,15 +55,19 @@ export function VideoPlayer() {
     navigation.setOptions({
       headerTitle: () => {
         const videoDate = videoInfo && new Date(videoInfo.creationTime);
+        const isShifted =
+          videoDate && dayShift != undefined && isVideoDayShifted(videoDate, dayShift || { hour: 0, minute: 0 });
+        const shiftedText = isShifted ? ` (${displayShortDate(videoDate)})` : "";
         return (
           <NavigationTitle
             title={displayDate(new Date(params.day))}
             subTitle={videoDate === undefined ? " " : displayTime(videoDate)}
+            rightSubTItle={shiftedText}
           />
         );
       },
     });
-  }, [params.day, videoInfo]);
+  }, [params.day, videoInfo, dayShift]);
 
   async function toggleSelectVideo(videoInfo: MediaLibrary.AssetInfo, videoMetadata: VideoMetadata | null) {
     if (videoMetadata?.isSelected) {

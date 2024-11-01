@@ -1,14 +1,16 @@
 import { useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, unstable_batchedUpdates, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { VideoMetadata } from "../../db/schema";
+import { getEffectiveDate } from "../../services/dayShift";
+import preferences from "../../services/preferences";
 import { getVideosMetadtaByIds } from "../../services/selection";
 import { groupBy } from "../../utils/groupBy";
 import { utilStyles } from "../../utils/utilStyles";
 import { DaySection } from "./DaySection";
-import { LinearGradient } from "expo-linear-gradient";
 
 export interface PhoneMedia extends MediaLibrary.Asset {
   info?: MediaLibrary.AssetInfo;
@@ -26,6 +28,7 @@ export default function CameraRoll({
 }: CameraRollProps) {
   const navigation = useNavigation();
   const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
+  const { dayShift } = preferences.useDayShiftPreference();
 
   const [videos, setVideos] = useState<PhoneMedia[]>([]);
   const videoEndCursorRef = useRef<MediaLibrary.AssetRef>();
@@ -109,7 +112,7 @@ export default function CameraRoll({
   }, [navigation, refetchMetadata]);
 
   function getGroupedVideos(vids: PhoneMedia[]) {
-    return groupBy(vids, (v) => new Date(v.creationTime).toDateString());
+    return groupBy(vids, (v) => getEffectiveDate(new Date(v.creationTime), dayShift).toDateString());
   }
 
   function getDaysBetween(start: Date, end: Date) {
@@ -128,7 +131,14 @@ export default function CameraRoll({
 
   const gotVideo = videos.length > 0;
 
-  const videosByDay = useMemo(() => getGroupedVideos(videos), [videos]);
+  const videosByDay = useMemo(
+    () =>
+      groupBy(videos, (v) =>
+        getEffectiveDate(new Date(v.creationTime), dayShift || { hour: 0, minute: 0 }).toDateString()
+      ),
+    [videos, dayShift]
+  );
+
   const days = useMemo(() => {
     if (!gotVideo) {
       return [];

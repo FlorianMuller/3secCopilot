@@ -7,6 +7,10 @@ export function displayDate(date: Date): string {
   );
 }
 
+export function displayShortDate(date: Date): string {
+  return capitalize(DateTime.fromJSDate(date).setLocale("fr").toLocaleString({ day: "2-digit", month: "2-digit" }));
+}
+
 export function displayTime(date: Date): string {
   return capitalize(DateTime.fromJSDate(date).setLocale("fr").toLocaleString({ hour: "2-digit", minute: "2-digit" }));
 }

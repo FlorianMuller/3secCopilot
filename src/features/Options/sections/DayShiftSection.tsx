@@ -1,23 +1,64 @@
-import { MyAppText } from "../../../components/text/MyAppText";
-import preferences from "../../../services/preferences";
-import { OptionSection } from "../OptionSection";
 import Feather from "@expo/vector-icons/Feather";
+import { Picker } from "@react-native-picker/picker";
+import { useTheme } from "@react-navigation/native";
+import { StyleSheet, View } from "react-native";
+import preferences from "../../../services/preferences";
+import { utilStyles } from "../../../utils/utilStyles";
+import { OptionSection } from "../OptionSection";
+
+const hours = [...Array(24).keys()];
+const minutes = [...Array(60).keys()];
 
 export interface DayShiftTime {
   minute: number;
   hour: number;
 }
-
+const a = {};
 export function DayShiftSection() {
+  const theme = useTheme();
   const { dayShift, saveDayShift } = preferences.useDayShiftPreference();
+
   return (
     <OptionSection
       title="Day shift"
-      description="As we sometimes live and go to bed past midnight, this option allow you to assign video past midnight and unit x hour to the previous day"
+      description="As we sometimes live and go to bed past midnight, this option allow you to assign video past midnight and until the chosen hour to the previous day"
       Icon={({ theme: { colors } }) => <Feather name="moon" size={29} color={colors.text} />}
     >
-      <MyAppText>Shift Day at ...</MyAppText>
-      {/* todo: add picker */}
+      {dayShift !== undefined && (
+        <View style={utilStyles.centerRow}>
+          <Picker
+            style={styles.picker}
+            mode="dropdown"
+            itemStyle={{ color: "white" }}
+            selectedValue={dayShift?.hour || 0}
+            onValueChange={(itemValue, itemIndex) => {
+              saveDayShift({ hour: itemValue, minute: dayShift?.minute || 0 });
+            }}
+          >
+            {hours.map((hour) => (
+              <Picker.Item label={`${hour}`} value={hour} key={hour} color={theme.colors.text} />
+            ))}
+          </Picker>
+          <Picker
+            style={styles.picker}
+            selectedValue={dayShift?.minute || 0}
+            onValueChange={(itemValue, itemIndex) => {
+              saveDayShift({ hour: dayShift?.hour || 0, minute: itemValue || 0 });
+            }}
+          >
+            {minutes.map((minute) => (
+              <Picker.Item label={`${minute}`} value={minute} key={minute} color={theme.colors.text} />
+            ))}
+          </Picker>
+        </View>
+      )}
     </OptionSection>
   );
 }
+
+const styles = StyleSheet.create({
+  picker: {
+    height: 200,
+    width: 100,
+  },
+});
