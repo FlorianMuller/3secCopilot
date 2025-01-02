@@ -24,7 +24,7 @@ export interface CameraRollProps {
 
 export default function CameraRoll({
   startDate = new Date(),
-  endDate = new Date(startDate.getFullYear(), 0),
+  endDate = new Date(startDate.getFullYear() - 1, 0), // todo: add a year selector
 }: CameraRollProps) {
   const navigation = useNavigation();
   const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
@@ -60,7 +60,7 @@ export default function CameraRoll({
         sortBy: "creationTime",
         // createdBefore: startDate.getTime(),
         createdAfter: endDate.getTime(),
-        first: 1000,
+        first: 200,
         after: videoEndCursorRef.current,
       });
       const newVideos = vidPage.assets;

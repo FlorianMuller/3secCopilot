@@ -4,6 +4,12 @@
 
 The app uses `expo-sqlite` with Drizzle as an ORM to store data.
 
+### Update
+
+If you update the schemas defined in [schema.ts](src/db/schema.ts), the `make update-migration` command should be run to update the Drizzle migration file.r
+
+### UI
+
 [Drizzle studio expo](https://github.com/drizzle-team/drizzle-studio-expo) is also configured to allow you to view the databases tables in a nice web UI. To access it:
 
 1. Run the application (`npm start`) and open it
