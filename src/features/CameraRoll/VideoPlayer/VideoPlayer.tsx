@@ -2,7 +2,7 @@ import EvilIcons from "@expo/vector-icons/EvilIcons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { ResizeMode, Video } from "expo-av";
 import * as MediaLibrary from "expo-media-library";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
@@ -14,6 +14,11 @@ import { isVideoDayShifted } from "../../../services/dayShift";
 import preferences from "../../../services/preferences";
 import { getVideoMetadata, markVideoAsSelected, markVideoAsUnselected } from "../../../services/selection";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
+import { utilStyles } from "../../../utils/utilStyles";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { MyAppText } from "../../../components/text/MyAppText";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -27,11 +32,73 @@ export function VideoPlayer() {
 
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
+  const [myText, setMyText] = useState<string>("HELLOOO");
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  const videoPlayerRef = useRef(null);
+  const player = useVideoPlayer({});
+  const seekBy = player.seekBy;
+
+  const isPressed = useSharedValue(false);
+  const start = useSharedValue({ x: 0, y: 0 });
+  const offset = useSharedValue({ x: 0, y: 0 });
+
+  const pan = Gesture.Pan()
+    .onBegin(() => {
+      isPressed.value = true;
+    })
+    .onChange((e) => {
+      offset.value = {
+        x: e.translationX + start.value.x,
+        y: e.translationY + start.value.y,
+      };
+    })
+    .onFinalize(() => {
+      console.log("start", start.value);
+      console.log("offset", offset.value);
+      isPressed.value = false;
+      start.value = {
+        x: offset.value.x,
+        y: offset.value.y,
+      };
+      if (videoInfo) {
+        const barLenght = 280;
+        const newVideoPos = (videoInfo.duration * offset.value.x) / barLenght;
+        console.log("duration", videoInfo.duration);
+        console.log("newVideoPos", newVideoPos);
+        console.log("player", player);
+        runOnJS(setMyText)("WEEEEESH");
+        runOnJS(seekBy)(newVideoPos);
+        // player.pause();
+        // player.replay();
+        // player.play();
+      }
+    });
+
+  const animatedStyles = useAnimatedStyle(() => ({
+    transform: [{ translateX: offset.value.x }, { scale: withTiming(isPressed.value ? 1.2 : 1) }],
+    backgroundColor: isPressed.value ? "yellow" : "white",
+  }));
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   async function getVideo() {
     try {
       const info = await MediaLibrary.getAssetInfoAsync(id);
       setVideoInfo(info);
+      console.log("uri", info.uri);
+      console.log("localUri", info.localUri);
+      console.log("filename", info.filename);
+      // const a = require(info.localUri);
+      player.replace({
+        uri: info.localUri,
+      });
+      console.log("player", player);
+
+      player.play();
+      player.pause();
+      player.seekBy(2);
+      // player.replay();
     } catch (e) {
       console.error("can't load video", e);
     }
@@ -98,15 +165,52 @@ export function VideoPlayer() {
   return (
     <View style={{ display: "flex", height: "100%" }}>
       {/* Video player, taking all the remaining space */}
+      <VideoView
+        // nativeControls={false}
+        style={[styles.video]}
+        ref={videoPlayerRef}
+        player={player}
+      />
       {videoInfo && videoInfo.localUri && (
-        <Video
-          style={styles.video}
-          source={{ uri: videoInfo.localUri }}
-          useNativeControls
-          resizeMode={ResizeMode.CONTAIN}
-          shouldPlay
-        />
+        <>
+          {/* <Video
+            style={styles.video}
+            source={{ uri: videoInfo.localUri }}
+            useNativeControls
+            resizeMode={ResizeMode.CONTAIN}
+            shouldPlay
+            ref={videoPlayerRef}
+          /> */}
+        </>
       )}
+
+      <View
+        style={[
+          {
+            height: 10,
+            width: "auto",
+            backgroundColor: "gray",
+            marginHorizontal: 50,
+            marginVertical: 20,
+            borderRadius: 100,
+          },
+          utilStyles.ListRow,
+        ]}
+      >
+        <GestureDetector gesture={pan}>
+          <Animated.View
+            style={[
+              {
+                height: 50,
+                width: 10,
+                position: "relative",
+                borderRadius: 100,
+              },
+              animatedStyles,
+            ]}
+          />
+        </GestureDetector>
+      </View>
 
       {/* Toolbar */}
       <View style={styles.toolBar}>
@@ -132,6 +236,9 @@ export function VideoPlayer() {
               <ThemedButton text={videoMetadata?.isSelected ? "Unselect" : "Select"} />
             </Pressable>
           )}
+        </View>
+        <View>
+          <MyAppText>{myText}</MyAppText>
         </View>
 
         {/* Previous video of the day button */}
