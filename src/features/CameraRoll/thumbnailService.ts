@@ -3,6 +3,7 @@ import * as MediaLibrary from "expo-media-library";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { PhoneMedia } from "./CameraRoll";
 import { doesFileExists, ensureDirExists } from "../../utils/fileSytem";
+import { getLocalUri } from "../../services/mediaLocalUri";
 
 export const thumbnailCacheDir = FileSystem.cacheDirectory + "videoThumbnailsCache/";
 
@@ -52,9 +53,10 @@ export async function getVideoThumbnail(video: PhoneMedia): Promise<GetThumbnail
   // Generating video thumbnail
   let thumbnailResult: VideoThumbnails.VideoThumbnailsResult;
   try {
-    thumbnailResult = await VideoThumbnails.getThumbnailAsync(info.localUri || "", { quality: 0 });
+    thumbnailResult = await VideoThumbnails.getThumbnailAsync(getLocalUri(info) || "", { quality: 0 });
+    // thumbnailResult = await VideoThumbnails.getThumbnailAsync(info.localUri || "", { quality: 0 });
   } catch (e) {
-    console.error("error while generating video thumbnail", e);
+    console.error("error while generating video thumbnail", e, info);
     return { status: "generationFailed", uri: null };
   }
 

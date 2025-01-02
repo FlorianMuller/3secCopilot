@@ -1,6 +1,5 @@
 import EvilIcons from "@expo/vector-icons/EvilIcons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { ResizeMode, Video } from "expo-av";
 import * as MediaLibrary from "expo-media-library";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -14,6 +13,8 @@ import { isVideoDayShifted } from "../../../services/dayShift";
 import preferences from "../../../services/preferences";
 import { getVideoMetadata, markVideoAsSelected, markVideoAsUnselected } from "../../../services/selection";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { getLocalUri } from "../../../services/mediaLocalUri";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -25,6 +26,8 @@ export function VideoPlayer() {
   const id = params.ids[params.index];
   const { dayShift } = preferences.useDayShiftPreference();
 
+  const player = useVideoPlayer({});
+
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
 
@@ -32,6 +35,11 @@ export function VideoPlayer() {
     try {
       const info = await MediaLibrary.getAssetInfoAsync(id);
       setVideoInfo(info);
+      player.replace({
+        // uri: info.localUri,
+        uri: getLocalUri(info),
+      });
+      player.play();
     } catch (e) {
       console.error("can't load video", e);
     }
@@ -98,15 +106,11 @@ export function VideoPlayer() {
   return (
     <View style={{ display: "flex", height: "100%" }}>
       {/* Video player, taking all the remaining space */}
-      {videoInfo && videoInfo.localUri && (
-        <Video
-          style={styles.video}
-          source={{ uri: videoInfo.localUri }}
-          useNativeControls
-          resizeMode={ResizeMode.CONTAIN}
-          shouldPlay
-        />
-      )}
+      <VideoView
+        // nativeControls={false}
+        style={[styles.video]}
+        player={player}
+      />
 
       {/* Toolbar */}
       <View style={styles.toolBar}>
