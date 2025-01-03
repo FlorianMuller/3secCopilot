@@ -1,6 +1,7 @@
 import EvilIcons from "@expo/vector-icons/EvilIcons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as MediaLibrary from "expo-media-library";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
@@ -10,11 +11,10 @@ import { VideoMetadata } from "../../../db/schema";
 import { VideoPlayerURI } from "../../../navigation";
 import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
 import { isVideoDayShifted } from "../../../services/dayShift";
+import { getLocalUri } from "../../../services/mediaLocalUri";
 import preferences from "../../../services/preferences";
 import { getVideoMetadata, markVideoAsSelected, markVideoAsUnselected } from "../../../services/selection";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
-import { useVideoPlayer, VideoView } from "expo-video";
-import { getLocalUri } from "../../../services/mediaLocalUri";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -30,6 +30,16 @@ export function VideoPlayer() {
 
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
+
+  // Pause video before navigating out
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", () => {
+      player.pause();
+      player.release();
+    });
+
+    return unsubscribe;
+  }, [navigation, player]);
 
   async function getVideo() {
     try {
@@ -54,11 +64,13 @@ export function VideoPlayer() {
     }
   }
 
+  // Get video and metadata when selected id change
   useEffect(() => {
     getVideo();
     getMetadata();
   }, [params.ids, params.index]);
 
+  // Set page title
   useEffect(() => {
     navigation.setOptions({
       headerTitle: () => {
