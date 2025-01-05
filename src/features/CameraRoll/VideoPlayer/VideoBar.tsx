@@ -1,5 +1,6 @@
-import { useEvent } from "expo";
+import { useEvent, useEventListener } from "expo";
 import { VideoPlayer } from "expo-video";
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -14,6 +15,7 @@ import { displayDurationFromSecond } from "../../../utils/dateTime";
 import { utilStyles } from "../../../utils/utilStyles";
 
 const seekerWidth = 10;
+const barLength = 283;
 
 export interface VideoBarProps {
   player: VideoPlayer;
@@ -28,16 +30,43 @@ export function VideoBar({ player }: VideoBarProps) {
     currentOffsetFromLive: player.currentOffsetFromLive,
   });
 
+  // Limit video to selected trim part
+  const startTrim = 0;
+  const endTrim = 10000;
+  useEventListener(player, "timeUpdate", ({ currentTime }) => {
+    if (currentTime < startTrim) {
+      console.log("Before", startTrim);
+      player.currentTime = startTrim;
+    }
+    if (currentTime > endTrim) {
+      console.log("after", endTrim);
+      player.pause();
+      player.currentTime = endTrim;
+    }
+
+    const barLength = 283;
+    const position = (barLength * currentTime) / player.duration;
+    xOffset.value = position;
+  });
+
   // Animate Bar
   const barRef = useAnimatedRef<View>();
   const isPressed = useSharedValue(false);
   const xStart = useSharedValue(0);
   const xOffset = useSharedValue(0);
   // const seekBy = player.seekBy;
+  const currentTimeFromBar = useSharedValue(0);
+
+  function setCurrentTime(newTime: number) {
+    player.currentTime = newTime;
+  }
 
   const pan = Gesture.Pan()
     .onBegin(() => {
       isPressed.value = true;
+
+      // todo: run on js
+      player.pause();
     })
     .onChange((e) => {
       const barSize = measure(barRef);
@@ -51,44 +80,36 @@ export function VideoBar({ player }: VideoBarProps) {
           newOffset = maxOffset;
         }
       }
-
       xOffset.value = newOffset;
-      // xOffset.value = writhClamp({ min: 0, max: 300 }, xStart.value + e.translationX);
+
+      // todo: run on js
+      const newVideoPos = (player.duration * xOffset.value) / barLength;
+      setCurrentTime(newVideoPos);
     })
     .onFinalize(() => {
       isPressed.value = false;
       xStart.value = xOffset.value;
+      barLength;
 
-      // if (videoInfo) {
-      //   const barLenght = 280;
-      //   const newVideoPos = (videoInfo.duration * offset.value.x) / barLenght;
-      //   console.log("duration", videoInfo.duration);
-      //   console.log("newVideoPos", newVideoPos);
-      //   console.log("player", player);
-      //   runOnJS(setMyText)("WEEEEESH");
-      //   runOnJS(seekBy)(newVideoPos);
-      //   // player.pause();
-      //   // player.replay();
-      //   // player.play();
-      // }
-    });
+      // todo: run on js
+      const newVideoPos = (player.duration * xOffset.value) / barLength;
+      currentTimeFromBar.value = newVideoPos;
+      setCurrentTime(newVideoPos);
+      player.play();
+
+      // runOnJS(setCurrentTime)(newVideoPos);
+      // runOnJS(setMyText)("Changed from UI Lezgo");
+    })
+    .runOnJS(true);
 
   const animatedStyles = useAnimatedStyle(() => ({
     transform: [{ translateX: xOffset.value }, { scale: withTiming(isPressed.value ? 1.2 : 1) }],
     backgroundColor: isPressed.value ? "yellow" : "white",
   }));
 
-  // const textDerived = useDerivedValue(() => {
-  //   const barSize = measure(barRef) ?? { width: 100 };
-  //   const maxOffset = barSize.width - seekerWidth;
-
-  //   return `(${Math.round(xOffset.value)}/${maxOffset})`;
-  // });
-
   return (
     <View>
       <MyAppText>{`${displayDurationFromSecond(currentTime)}/${displayDurationFromSecond(player.duration)}`}</MyAppText>
-      {/* <ReText text={textDerived} style={{ color: "white" }} /> */}
       <View
         ref={barRef}
         style={[

@@ -60,7 +60,7 @@ export default function CameraRoll({
         sortBy: "creationTime",
         // createdBefore: startDate.getTime(),
         createdAfter: endDate.getTime(),
-        first: 200,
+        first: 100,
         after: videoEndCursorRef.current,
       });
       const newVideos = vidPage.assets;

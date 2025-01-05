@@ -30,7 +30,7 @@ export function VideoPlayer() {
 
   const player = useVideoPlayer({}, (player) => {
     player.audioMixingMode = "duckOthers";
-    player.timeUpdateEventInterval = 1;
+    player.timeUpdateEventInterval = 0.01;
   });
   // todo: show video player error
   // const { status, error } = useEvent(player, "statusChange", { status: player.status });
