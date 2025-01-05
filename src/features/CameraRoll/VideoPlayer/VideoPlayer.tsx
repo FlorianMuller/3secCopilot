@@ -1,5 +1,6 @@
 import EvilIcons from "@expo/vector-icons/EvilIcons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useEvent } from "expo";
 import * as MediaLibrary from "expo-media-library";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
@@ -15,6 +16,7 @@ import { getLocalUri } from "../../../services/mediaLocalUri";
 import preferences from "../../../services/preferences";
 import { getVideoMetadata, markVideoAsSelected, markVideoAsUnselected } from "../../../services/selection";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
+import { VideoBar } from "./VideoBar";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -26,7 +28,12 @@ export function VideoPlayer() {
   const id = params.ids[params.index];
   const { dayShift } = preferences.useDayShiftPreference();
 
-  const player = useVideoPlayer({});
+  const player = useVideoPlayer({}, (player) => {
+    player.audioMixingMode = "duckOthers";
+    player.timeUpdateEventInterval = 1;
+  });
+  // todo: show video player error
+  // const { status, error } = useEvent(player, "statusChange", { status: player.status });
 
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
@@ -123,6 +130,8 @@ export function VideoPlayer() {
         style={[styles.video]}
         player={player}
       />
+
+      <VideoBar player={player} />
 
       {/* Toolbar */}
       <View style={styles.toolBar}>

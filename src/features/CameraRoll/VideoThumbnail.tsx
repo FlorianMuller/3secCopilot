@@ -1,4 +1,3 @@
-import { VideoThumbnailsResult } from "expo-video-thumbnails";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,7 +12,7 @@ import { MyAppText } from "../../components/text/MyAppText";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
 import { getCachedThumbnailUri, getVideoThumbnail } from "./thumbnailService";
-import { displayDuration } from "../../utils/dateTime";
+import { displayDurationFromSecond } from "../../utils/dateTime";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
@@ -78,7 +77,7 @@ export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumb
         </MyAppText>
       )}
       <MyAppText style={styles.videoDuration} size={13} weight={600}>
-        {displayDuration(video.duration * 1000)}
+        {displayDurationFromSecond(video.duration)}
       </MyAppText>
     </TouchableOpacity>
   );
