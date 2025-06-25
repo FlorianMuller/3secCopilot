@@ -32,8 +32,10 @@ export function VideoPlayer() {
     player.audioMixingMode = "duckOthers";
     player.timeUpdateEventInterval = 0.01;
   });
-  // todo: show video player error
-  // const { status, error } = useEvent(player, "statusChange", { status: player.status });
+
+  // Listen for player status changes to know when video is loaded
+  const { status, error } = useEvent(player, "statusChange", { status: player.status });
+  console.log("Player status:", status, "Error:", error);
 
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
@@ -50,13 +52,22 @@ export function VideoPlayer() {
 
   async function getVideo() {
     try {
+      console.log("Loading video for ID:", id);
       const info = await MediaLibrary.getAssetInfoAsync(id);
+      console.log("Video info loaded:", info);
       setVideoInfo(info);
-      player.replace({
-        // uri: info.localUri,
-        uri: getLocalUri(info),
+
+      const uri = getLocalUri(info);
+      console.log("Using URI:", uri);
+
+      // Use replaceAsync instead of replace
+      await player.replaceAsync({
+        uri: uri,
       });
+      console.log("Video replaced, duration:", player.duration);
+
       player.play();
+      console.log("Video play called");
     } catch (e) {
       console.error("can't load video", e);
     }
@@ -131,7 +142,12 @@ export function VideoPlayer() {
         player={player}
       />
 
-      <VideoBar player={player} />
+      {/* Only render VideoBar if player.duration > 0 */}
+      {player.duration > 0 && (status === 'readyToPlay' || status === 'loading') ? (
+        (() => { console.log("Rendering VideoBar with duration", player.duration, "status", status); return <VideoBar player={player} />; })()
+      ) : (
+        (() => { console.log("Waiting for video to load, duration:", player.duration, "status:", status); return <View style={{ alignItems: 'center', margin: 20 }}><ThemedButton text={`Loading video... (${status})`} /></View>; })()
+      )}
 
       {/* Toolbar */}
       <View style={styles.toolBar}>

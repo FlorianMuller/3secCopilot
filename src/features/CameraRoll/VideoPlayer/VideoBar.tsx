@@ -1,11 +1,8 @@
-import { useEvent, useEventListener } from "expo";
+import { useEvent } from "expo";
 import { VideoPlayer } from "expo-video";
-import { useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { LayoutChangeEvent, PanResponder, StyleSheet, View } from "react-native";
 import Animated, {
-  measure,
-  useAnimatedRef,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -15,7 +12,7 @@ import { displayDurationFromSecond } from "../../../utils/dateTime";
 import { utilStyles } from "../../../utils/utilStyles";
 
 const seekerWidth = 10;
-const barLength = 283;
+const DEFAULT_BAR_LENGTH = 283;
 
 export interface VideoBarProps {
   player: VideoPlayer;
@@ -30,124 +27,130 @@ export function VideoBar({ player }: VideoBarProps) {
     currentOffsetFromLive: player.currentOffsetFromLive,
   });
 
-  // Limit video to selected trim part
-  const startTrim = 0;
-  const endTrim = 10000;
-  useEventListener(player, "timeUpdate", ({ currentTime }) => {
-    if (currentTime < startTrim) {
-      console.log("Before", startTrim);
-      player.currentTime = startTrim;
-    }
-    if (currentTime > endTrim) {
-      console.log("after", endTrim);
-      player.pause();
-      player.currentTime = endTrim;
-    }
+  // --- Bar length (dynamic) ---
+  const [barLength, setBarLength] = useState(DEFAULT_BAR_LENGTH);
+  const onBarLayout = useCallback((e: LayoutChangeEvent) => {
+    setBarLength(e.nativeEvent.layout.width);
+    console.log("Bar layout width:", e.nativeEvent.layout.width);
+  }, []);
 
-    const barLength = 283;
-    const position = (barLength * currentTime) / player.duration;
-    xOffset.value = position;
-  });
+  // --- Scrubber position ---
+  const scrubberOffset = useSharedValue(0);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [displayedTime, setDisplayedTime] = useState(0);
+  const startOffset = useRef(0);
 
-  // Animate Bar
-  const barRef = useAnimatedRef<View>();
-  const isPressed = useSharedValue(false);
-  const xStart = useSharedValue(0);
-  const xOffset = useSharedValue(0);
-  // const seekBy = player.seekBy;
-  const currentTimeFromBar = useSharedValue(0);
-
-  function setCurrentTime(newTime: number) {
-    player.currentTime = newTime;
-  }
-
-  const pan = Gesture.Pan()
-    .onBegin(() => {
-      isPressed.value = true;
-
-      // todo: run on js
-      player.pause();
-    })
-    .onChange((e) => {
-      const barSize = measure(barRef);
-      let newOffset = xStart.value + e.translationX;
-      if (newOffset < 0) {
-        newOffset = 0;
+  // Update scrubber position when video time changes (when not scrubbing)
+  useEffect(() => {
+    if (!isScrubbing && player.duration > 0 && barLength > 0) {
+      const pos = (barLength * player.currentTime) / player.duration;
+      if (!isNaN(pos) && isFinite(pos)) {
+        scrubberOffset.value = pos;
       }
-      if (barSize) {
-        const maxOffset = barSize.width - seekerWidth;
-        if (newOffset > maxOffset) {
-          newOffset = maxOffset;
+    }
+  }, [currentTime, player.duration, barLength, isScrubbing]);
+
+  // --- PanResponder for gesture handling ---
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        console.log("Pan grant");
+        setIsScrubbing(true);
+        startOffset.current = scrubberOffset.value;
+        player.pause();
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (barLength <= 0 || player.duration <= 0) {
+          console.log("Skipping pan move: invalid values", { barLength, duration: player.duration });
+          return;
         }
-      }
-      xOffset.value = newOffset;
 
-      // todo: run on js
-      const newVideoPos = (player.duration * xOffset.value) / barLength;
-      setCurrentTime(newVideoPos);
+        let newOffset = startOffset.current + gestureState.dx;
+        if (newOffset < 0) newOffset = 0;
+        if (newOffset > barLength - seekerWidth) newOffset = barLength - seekerWidth;
+
+        scrubberOffset.value = newOffset;
+
+        // Calculate time for preview
+        const newTime = (player.duration * newOffset) / barLength;
+        if (!isNaN(newTime) && isFinite(newTime)) {
+          setDisplayedTime(newTime);
+        }
+      },
+      onPanResponderRelease: () => {
+        console.log("Pan release");
+        setIsScrubbing(false);
+
+        if (barLength <= 0 || player.duration <= 0) {
+          console.log("Skipping pan release: invalid values", { barLength, duration: player.duration });
+          return;
+        }
+
+        // Seek video to new time
+        const newTime = (player.duration * scrubberOffset.value) / barLength;
+        if (!isNaN(newTime) && isFinite(newTime)) {
+          console.log("Seeking to", newTime);
+          player.currentTime = newTime;
+          player.play();
+        }
+      },
     })
-    .onFinalize(() => {
-      isPressed.value = false;
-      xStart.value = xOffset.value;
-      barLength;
+  ).current;
 
-      // todo: run on js
-      const newVideoPos = (player.duration * xOffset.value) / barLength;
-      currentTimeFromBar.value = newVideoPos;
-      setCurrentTime(newVideoPos);
-      player.play();
-
-      // runOnJS(setCurrentTime)(newVideoPos);
-      // runOnJS(setMyText)("Changed from UI Lezgo");
-    })
-    .runOnJS(true);
-
+  // --- Animated styles ---
   const animatedStyles = useAnimatedStyle(() => ({
-    transform: [{ translateX: xOffset.value }, { scale: withTiming(isPressed.value ? 1.2 : 1) }],
-    backgroundColor: isPressed.value ? "yellow" : "white",
+    transform: [
+      { translateX: scrubberOffset.value },
+      { scale: withTiming(isScrubbing ? 1.2 : 1) },
+    ],
+    backgroundColor: isScrubbing ? "yellow" : "white",
   }));
+
+  // Defensive: fallback UI if player or bar is not ready
+  if (!player || player.duration <= 0 || barLength <= 0) {
+    console.log("VideoBar not ready", { player, duration: player?.duration, barLength });
+    return <MyAppText>Loading video bar...</MyAppText>;
+  }
 
   return (
     <View>
-      <MyAppText>{`${displayDurationFromSecond(currentTime)}/${displayDurationFromSecond(player.duration)}`}</MyAppText>
+      <MyAppText>
+        {`${displayDurationFromSecond(
+          isScrubbing ? displayedTime : currentTime
+        )}/${displayDurationFromSecond(player.duration)}`}
+      </MyAppText>
       <View
-        ref={barRef}
+        onLayout={onBarLayout}
         style={[
           {
             height: 10,
-            width: "auto",
+            width: "90%",
             backgroundColor: "gray",
-            marginHorizontal: 50,
+            marginHorizontal: "5%",
             marginVertical: 20,
             borderRadius: 100,
+            overflow: "hidden",
           },
           utilStyles.ListRow,
         ]}
       >
-        <GestureDetector gesture={pan}>
+        <View {...panResponder.panHandlers}>
           <Animated.View
             style={[
               {
                 height: 50,
                 width: seekerWidth,
-                position: "relative",
+                position: "absolute",
                 borderRadius: 100,
+                top: -20,
               },
               animatedStyles,
             ]}
           />
-        </GestureDetector>
+        </View>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  ball: {
-    width: 100,
-    height: 100,
-    borderRadius: 100 / 2,
-    backgroundColor: "blue",
-    alignSelf: "center",
-  },
-});
