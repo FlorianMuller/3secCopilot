@@ -41,7 +41,7 @@ function AppTabs({ theme }: AppTabsProps) {
         />
         <Tab.Screen
           name="Preview"
-          component={gestureHandlerRootHOC(memo(() => <></>))}
+          component={gestureHandlerRootHOC(memo(() => <View></View>))}
           options={{
             title: "Preview",
             tabBarIcon: ({ focused, color, size }) => (

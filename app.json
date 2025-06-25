@@ -41,7 +41,8 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-sqlite"
     ]
   }
 }
