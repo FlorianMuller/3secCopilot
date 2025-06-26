@@ -34,12 +34,6 @@ export function VideoBar({ player }: VideoBarProps) {
     const width = e.nativeEvent.layout.width;
     barLengthRef.current = width;
     forceRerender((v) => v + 1); // Force re-render so all calculations use the new width
-    console.log("Bar layout:", {
-      width,
-      x: e.nativeEvent.layout.x,
-      y: e.nativeEvent.layout.y,
-      height: e.nativeEvent.layout.height,
-    });
   }, []);
 
   // --- Scrubber position ---
@@ -56,13 +50,6 @@ export function VideoBar({ player }: VideoBarProps) {
       const pos = (maxOffset * player.currentTime) / player.duration;
       if (!isNaN(pos) && isFinite(pos)) {
         scrubberOffset.value = pos;
-        console.log("Video time update:", {
-          currentTime: player.currentTime,
-          duration: player.duration,
-          barLength,
-          maxOffset,
-          calculatedPos: pos,
-        });
       }
     }
   }, [currentTime, player.duration, isScrubbing]);
@@ -72,16 +59,7 @@ export function VideoBar({ player }: VideoBarProps) {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const barLength = barLengthRef.current;
-        console.log("Pan grant:", {
-          locationX: evt.nativeEvent.locationX,
-          locationY: evt.nativeEvent.locationY,
-          pageX: evt.nativeEvent.pageX,
-          pageY: evt.nativeEvent.pageY,
-          currentOffset: scrubberOffset.value,
-          barLength,
-        });
+      onPanResponderGrant: () => {
         setIsScrubbing(true);
         startOffset.current = scrubberOffset.value;
         player.pause();
@@ -89,57 +67,28 @@ export function VideoBar({ player }: VideoBarProps) {
       onPanResponderMove: (evt, gestureState) => {
         const barLength = barLengthRef.current;
         if (barLength <= 0 || player.duration <= 0) {
-          console.log("Skipping pan move: invalid values", { barLength, duration: player.duration });
           return;
         }
-
-        // Calculate new offset based on gesture movement
         let newOffset = startOffset.current + gestureState.dx;
-
-        // Clamp to bar boundaries (accounting for seeker width)
         const maxOffset = barLength - seekerWidth;
         if (newOffset < 0) newOffset = 0;
         if (newOffset > maxOffset) newOffset = maxOffset;
-
         scrubberOffset.value = newOffset;
-
-        // Calculate time for preview (use the full bar length for time calculation)
         const newTime = (player.duration * newOffset) / maxOffset;
         if (!isNaN(newTime) && isFinite(newTime)) {
           setDisplayedTime(newTime);
           player.currentTime = newTime; // Live update video position
         }
-
-        console.log("Pan move:", {
-          dx: gestureState.dx,
-          startOffset: startOffset.current,
-          newOffset,
-          maxOffset,
-          newTime,
-          barLength,
-          seekerWidth,
-          percentage: (newOffset / maxOffset) * 100,
-        });
       },
       onPanResponderRelease: () => {
         const barLength = barLengthRef.current;
-        console.log("Pan release:", {
-          finalOffset: scrubberOffset.value,
-          maxOffset: barLength - seekerWidth,
-          barLength,
-        });
         setIsScrubbing(false);
-
         if (barLength <= 0 || player.duration <= 0) {
-          console.log("Skipping pan release: invalid values", { barLength, duration: player.duration });
           return;
         }
-
-        // Seek video to new time (use the full bar length for time calculation)
         const maxOffset = barLength - seekerWidth;
         const newTime = (player.duration * scrubberOffset.value) / maxOffset;
         if (!isNaN(newTime) && isFinite(newTime)) {
-          console.log("Seeking to", newTime, "from offset", scrubberOffset.value, "maxOffset", maxOffset, "barLength", barLength);
           player.currentTime = newTime;
           player.play();
         }
@@ -147,9 +96,7 @@ export function VideoBar({ player }: VideoBarProps) {
     })
   ).current;
 
-  // Defensive: fallback UI if player or bar is not ready
   if (!player || player.duration <= 0 || barLengthRef.current <= 0) {
-    console.log("VideoBar not ready", { player, duration: player?.duration, barLength: barLengthRef.current });
     return <MyAppText>Loading video bar...</MyAppText>;
   }
 
