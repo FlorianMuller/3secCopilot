@@ -107,6 +107,7 @@ export function VideoBar({ player }: VideoBarProps) {
         const newTime = (player.duration * newOffset) / maxOffset;
         if (!isNaN(newTime) && isFinite(newTime)) {
           setDisplayedTime(newTime);
+          player.currentTime = newTime; // Live update video position
         }
 
         console.log("Pan move:", {
