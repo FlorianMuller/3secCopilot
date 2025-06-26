@@ -27,11 +27,19 @@ export function VideoBar({ player }: VideoBarProps) {
     currentOffsetFromLive: player.currentOffsetFromLive,
   });
 
-  // --- Bar length (dynamic) ---
-  const [barLength, setBarLength] = useState(DEFAULT_BAR_LENGTH);
+  // --- Bar length (dynamic, useRef for consistency) ---
+  const barLengthRef = useRef(DEFAULT_BAR_LENGTH);
+  const [, forceRerender] = useState(0); // Used to force re-render on layout
   const onBarLayout = useCallback((e: LayoutChangeEvent) => {
-    setBarLength(e.nativeEvent.layout.width);
-    console.log("Bar layout width:", e.nativeEvent.layout.width);
+    const width = e.nativeEvent.layout.width;
+    barLengthRef.current = width;
+    forceRerender((v) => v + 1); // Force re-render so all calculations use the new width
+    console.log("Bar layout:", {
+      width,
+      x: e.nativeEvent.layout.x,
+      y: e.nativeEvent.layout.y,
+      height: e.nativeEvent.layout.height,
+    });
   }, []);
 
   // --- Scrubber position ---
@@ -42,45 +50,83 @@ export function VideoBar({ player }: VideoBarProps) {
 
   // Update scrubber position when video time changes (when not scrubbing)
   useEffect(() => {
+    const barLength = barLengthRef.current;
     if (!isScrubbing && player.duration > 0 && barLength > 0) {
-      const pos = (barLength * player.currentTime) / player.duration;
+      const maxOffset = barLength - seekerWidth;
+      const pos = (maxOffset * player.currentTime) / player.duration;
       if (!isNaN(pos) && isFinite(pos)) {
         scrubberOffset.value = pos;
+        console.log("Video time update:", {
+          currentTime: player.currentTime,
+          duration: player.duration,
+          barLength,
+          maxOffset,
+          calculatedPos: pos,
+        });
       }
     }
-  }, [currentTime, player.duration, barLength, isScrubbing]);
+  }, [currentTime, player.duration, isScrubbing]);
 
   // --- PanResponder for gesture handling ---
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        console.log("Pan grant");
+      onPanResponderGrant: (evt) => {
+        const barLength = barLengthRef.current;
+        console.log("Pan grant:", {
+          locationX: evt.nativeEvent.locationX,
+          locationY: evt.nativeEvent.locationY,
+          pageX: evt.nativeEvent.pageX,
+          pageY: evt.nativeEvent.pageY,
+          currentOffset: scrubberOffset.value,
+          barLength,
+        });
         setIsScrubbing(true);
         startOffset.current = scrubberOffset.value;
         player.pause();
       },
       onPanResponderMove: (evt, gestureState) => {
+        const barLength = barLengthRef.current;
         if (barLength <= 0 || player.duration <= 0) {
           console.log("Skipping pan move: invalid values", { barLength, duration: player.duration });
           return;
         }
 
+        // Calculate new offset based on gesture movement
         let newOffset = startOffset.current + gestureState.dx;
+
+        // Clamp to bar boundaries (accounting for seeker width)
+        const maxOffset = barLength - seekerWidth;
         if (newOffset < 0) newOffset = 0;
-        if (newOffset > barLength - seekerWidth) newOffset = barLength - seekerWidth;
+        if (newOffset > maxOffset) newOffset = maxOffset;
 
         scrubberOffset.value = newOffset;
 
-        // Calculate time for preview
-        const newTime = (player.duration * newOffset) / barLength;
+        // Calculate time for preview (use the full bar length for time calculation)
+        const newTime = (player.duration * newOffset) / maxOffset;
         if (!isNaN(newTime) && isFinite(newTime)) {
           setDisplayedTime(newTime);
         }
+
+        console.log("Pan move:", {
+          dx: gestureState.dx,
+          startOffset: startOffset.current,
+          newOffset,
+          maxOffset,
+          newTime,
+          barLength,
+          seekerWidth,
+          percentage: (newOffset / maxOffset) * 100,
+        });
       },
       onPanResponderRelease: () => {
-        console.log("Pan release");
+        const barLength = barLengthRef.current;
+        console.log("Pan release:", {
+          finalOffset: scrubberOffset.value,
+          maxOffset: barLength - seekerWidth,
+          barLength,
+        });
         setIsScrubbing(false);
 
         if (barLength <= 0 || player.duration <= 0) {
@@ -88,16 +134,23 @@ export function VideoBar({ player }: VideoBarProps) {
           return;
         }
 
-        // Seek video to new time
-        const newTime = (player.duration * scrubberOffset.value) / barLength;
+        // Seek video to new time (use the full bar length for time calculation)
+        const maxOffset = barLength - seekerWidth;
+        const newTime = (player.duration * scrubberOffset.value) / maxOffset;
         if (!isNaN(newTime) && isFinite(newTime)) {
-          console.log("Seeking to", newTime);
+          console.log("Seeking to", newTime, "from offset", scrubberOffset.value, "maxOffset", maxOffset, "barLength", barLength);
           player.currentTime = newTime;
           player.play();
         }
       },
     })
   ).current;
+
+  // Defensive: fallback UI if player or bar is not ready
+  if (!player || player.duration <= 0 || barLengthRef.current <= 0) {
+    console.log("VideoBar not ready", { player, duration: player?.duration, barLength: barLengthRef.current });
+    return <MyAppText>Loading video bar...</MyAppText>;
+  }
 
   // --- Animated styles ---
   const animatedStyles = useAnimatedStyle(() => ({
@@ -107,12 +160,6 @@ export function VideoBar({ player }: VideoBarProps) {
     ],
     backgroundColor: isScrubbing ? "yellow" : "white",
   }));
-
-  // Defensive: fallback UI if player or bar is not ready
-  if (!player || player.duration <= 0 || barLength <= 0) {
-    console.log("VideoBar not ready", { player, duration: player?.duration, barLength });
-    return <MyAppText>Loading video bar...</MyAppText>;
-  }
 
   return (
     <View>
