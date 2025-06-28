@@ -1,17 +1,15 @@
 import { useEvent } from "expo";
 import { VideoPlayer } from "expo-video";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LayoutChangeEvent, PanResponder, StyleSheet, View } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, useDerivedValue, withTiming } from "react-native-reanimated";
 import { MyAppText } from "../../../components/text/MyAppText";
-import { displayDurationFromSecond } from "../../../utils/dateTime";
+import { ThemedButton } from "../../../components/ThemedButton";
+import { displayDurationWithMilliseconds } from "../../../utils/dateTime";
 import { utilStyles } from "../../../utils/utilStyles";
 
 const seekerWidth = 10;
+const trimHandleWidth = 18;
 const DEFAULT_BAR_LENGTH = 283;
 
 export interface VideoBarProps {
@@ -36,65 +34,68 @@ export function VideoBar({ player }: VideoBarProps) {
     forceRerender((v) => v + 1); // Force re-render so all calculations use the new width
   }, []);
 
-  // --- Scrubber position ---
-  const scrubberOffset = useSharedValue(0);
-  const [isScrubbing, setIsScrubbing] = useState(false);
-  const [displayedTime, setDisplayedTime] = useState(0);
-  const startOffset = useRef(0);
+  // --- Trim state ---
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(player.duration);
 
-  // Update scrubber position when video time changes (when not scrubbing)
+  // --- Scrubber position (read-only, synced with video) ---
+  const scrubberOffset = useSharedValue(0);
+
+  // --- Trim handles positions ---
+  const trimStartOffset = useSharedValue(0);
+  const trimEndOffset = useSharedValue(0);
+
+  // --- Update trim handles on duration or bar length change ---
   useEffect(() => {
     const barLength = barLengthRef.current;
-    if (!isScrubbing && player.duration > 0 && barLength > 0) {
-      const maxOffset = barLength - seekerWidth;
-      const pos = (maxOffset * player.currentTime) / player.duration;
+    const maxOffset = barLength - trimHandleWidth;
+    trimStartOffset.value = 0;
+    trimEndOffset.value = maxOffset;
+    setTrimStart(0);
+    setTrimEnd(player.duration);
+  }, [player.duration]);
+
+  // --- Update trim handles when trimStart/trimEnd change ---
+  useEffect(() => {
+    const barLength = barLengthRef.current;
+    const maxOffset = barLength - trimHandleWidth;
+    trimStartOffset.value = (maxOffset * trimStart) / player.duration;
+    trimEndOffset.value = (maxOffset * trimEnd) / player.duration;
+  }, [trimStart, trimEnd, player.duration]);
+
+  // --- Update scrubber position when video time changes (read-only) ---
+  useEffect(() => {
+    const barLength = barLengthRef.current;
+    const maxOffset = barLength - seekerWidth;
+    if (player.duration > 0 && barLength > 0) {
+      // Clamp currentTime to trim bounds
+      let clampedTime = Math.max(trimStart, Math.min(currentTime, trimEnd));
+      const pos = (maxOffset * clampedTime) / player.duration;
       if (!isNaN(pos) && isFinite(pos)) {
         scrubberOffset.value = pos;
       }
     }
-  }, [currentTime, player.duration, isScrubbing]);
+  }, [currentTime, player.duration, trimStart, trimEnd]);
 
-  // --- PanResponder for gesture handling ---
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        setIsScrubbing(true);
-        startOffset.current = scrubberOffset.value;
-        player.pause();
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        const barLength = barLengthRef.current;
-        if (barLength <= 0 || player.duration <= 0) {
-          return;
-        }
-        let newOffset = startOffset.current + gestureState.dx;
-        const maxOffset = barLength - seekerWidth;
-        if (newOffset < 0) newOffset = 0;
-        if (newOffset > maxOffset) newOffset = maxOffset;
-        scrubberOffset.value = newOffset;
-        const newTime = (player.duration * newOffset) / maxOffset;
-        if (!isNaN(newTime) && isFinite(newTime)) {
-          setDisplayedTime(newTime);
-          player.currentTime = newTime; // Live update video position
-        }
-      },
-      onPanResponderRelease: () => {
-        const barLength = barLengthRef.current;
-        setIsScrubbing(false);
-        if (barLength <= 0 || player.duration <= 0) {
-          return;
-        }
-        const maxOffset = barLength - seekerWidth;
-        const newTime = (player.duration * scrubberOffset.value) / maxOffset;
-        if (!isNaN(newTime) && isFinite(newTime)) {
-          player.currentTime = newTime;
-          player.play();
-        }
-      },
-    })
-  ).current;
+  // --- Enforce trim bounds during playback (even with native controls) ---
+  useEffect(() => {
+    if (player.currentTime < trimStart) {
+      player.currentTime = trimStart;
+      player.pause();
+    } else if (player.currentTime > trimEnd) {
+      player.currentTime = trimEnd;
+      player.pause();
+    }
+  }, [player.currentTime, trimStart, trimEnd]);
+
+  // --- Button handlers ---
+  const handleSetStart = () => {
+    setTrimStart(currentTime);
+  };
+
+  const handleSetEnd = () => {
+    setTrimEnd(currentTime);
+  };
 
   if (!player || player.duration <= 0 || barLengthRef.current <= 0) {
     return <MyAppText>Loading video bar...</MyAppText>;
@@ -102,49 +103,146 @@ export function VideoBar({ player }: VideoBarProps) {
 
   // --- Animated styles ---
   const animatedStyles = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: scrubberOffset.value },
-      { scale: withTiming(isScrubbing ? 1.2 : 1) },
-    ],
-    backgroundColor: isScrubbing ? "yellow" : "white",
+    transform: [{ translateX: scrubberOffset.value }],
+    backgroundColor: "white",
   }));
+
+  // Animated styles for trim handles
+  const trimStartHandleStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: trimStartOffset.value }],
+  }));
+  const trimEndHandleStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: trimEndOffset.value }],
+  }));
+
+  // Calculate trim region position using derived values
+  const trimRegionLeft = useDerivedValue(() => {
+    return trimStartOffset.value + trimHandleWidth / 2;
+  });
+
+  const trimRegionWidth = useDerivedValue(() => {
+    const right = trimEndOffset.value + trimHandleWidth / 2;
+    const left = trimStartOffset.value + trimHandleWidth / 2;
+    return right - left;
+  });
+
+  // Highlighted region between trim handles
+  const trimRegionStyle = useAnimatedStyle(() => {
+    return {
+      position: "absolute",
+      left: trimRegionLeft.value,
+      width: trimRegionWidth.value,
+      height: 10,
+      backgroundColor: "#ffb34755",
+      borderRadius: 100,
+      zIndex: 1,
+    };
+  });
 
   return (
     <View>
       <MyAppText>
-        {`${displayDurationFromSecond(
-          isScrubbing ? displayedTime : currentTime
-        )}/${displayDurationFromSecond(player.duration)}`}
+        {`${displayDurationWithMilliseconds(currentTime)}/${displayDurationWithMilliseconds(player.duration)}`}
       </MyAppText>
+
+      {/* Trim control buttons */}
+      <View style={{ flexDirection: "row", justifyContent: "space-around", marginVertical: 10 }}>
+        <Pressable onPress={handleSetStart}>
+          <ThemedButton text="Set Start" />
+        </Pressable>
+        <Pressable onPress={handleSetEnd}>
+          <ThemedButton text="Set End" />
+        </Pressable>
+      </View>
+
       <View
         onLayout={onBarLayout}
         style={[
           {
-            height: 10,
+            height: 30,
             width: "90%",
             backgroundColor: "gray",
             marginHorizontal: "5%",
             marginVertical: 20,
             borderRadius: 100,
-            overflow: "hidden",
+            overflow: "visible",
+            position: "relative",
+            justifyContent: "center",
           },
           utilStyles.ListRow,
         ]}
       >
-        <View {...panResponder.panHandlers}>
-          <Animated.View
-            style={[
-              {
-                height: 50,
-                width: seekerWidth,
-                position: "absolute",
-                borderRadius: 100,
-                top: -20,
-              },
-              animatedStyles,
-            ]}
-          />
-        </View>
+        {/* Highlighted trim region */}
+        <Animated.View style={trimRegionStyle} pointerEvents="none" />
+
+        {/* Trim start marker (visual only) */}
+        <Animated.View
+          style={[
+            {
+              position: "absolute",
+              width: trimHandleWidth,
+              height: 30,
+              borderRadius: 8,
+              borderWidth: 2,
+              borderColor: "#ffb347",
+              top: 0,
+              left: 0,
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 2,
+              backgroundColor: "#fff",
+            },
+            trimStartHandleStyle,
+          ]}
+        >
+          <View style={{ width: 6, height: 20, backgroundColor: "#ffb347", borderRadius: 3 }} />
+        </Animated.View>
+
+        {/* Trim end marker (visual only) */}
+        <Animated.View
+          style={[
+            {
+              position: "absolute",
+              width: trimHandleWidth,
+              height: 30,
+              borderRadius: 8,
+              borderWidth: 2,
+              borderColor: "#ffb347",
+              top: 0,
+              left: 0,
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 2,
+              backgroundColor: "#fff",
+            },
+            trimEndHandleStyle,
+          ]}
+        >
+          <View style={{ width: 6, height: 20, backgroundColor: "#ffb347", borderRadius: 3 }} />
+        </Animated.View>
+
+        {/* Main scrubber (read-only, visual only) */}
+        <Animated.View
+          style={[
+            {
+              height: 50,
+              width: seekerWidth,
+              position: "absolute",
+              borderRadius: 100,
+              top: -10,
+              backgroundColor: "white",
+              borderWidth: 2,
+              borderColor: "#888",
+              zIndex: 3,
+            },
+            animatedStyles,
+          ]}
+        />
+      </View>
+
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginHorizontal: "5%" }}>
+        <MyAppText size={12}>Trim Start: {displayDurationWithMilliseconds(trimStart)}</MyAppText>
+        <MyAppText size={12}>Trim End: {displayDurationWithMilliseconds(trimEnd)}</MyAppText>
       </View>
     </View>
   );

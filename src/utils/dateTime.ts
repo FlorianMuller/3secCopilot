@@ -22,3 +22,7 @@ export function displayDurationFromMilis(durationInMilis: number): string {
 export function displayDurationFromSecond(durationInSecond: number): string {
   return displayDurationFromMilis(durationInSecond * 1000);
 }
+
+export function displayDurationWithMilliseconds(durationInSeconds: number): string {
+  return Duration.fromObject({ seconds: durationInSeconds }).toFormat('mm:ss.SS');
+}
