@@ -4,7 +4,7 @@ import { useEvent } from "expo";
 import * as MediaLibrary from "expo-media-library";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
 import { LinkIconRoundButton, ThemedButton } from "../../../components/ThemedButton";
@@ -25,6 +25,7 @@ const nextPrevButtonSize = 50;
 export function VideoPlayer() {
   const navigation = useNavigation();
   const { params } = useRoute<VideoPlayerRouteProps>();
+  const { width: screenWidth } = useWindowDimensions();
   const id = params.ids[params.index];
   const { dayShift } = preferences.useDayShiftPreference();
 
@@ -39,6 +40,7 @@ export function VideoPlayer() {
 
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
+  const [videoContainerHeight, setVideoContainerHeight] = useState<number | null>(null);
 
   // Pause video before navigating out
   useEffect(() => {
@@ -136,18 +138,37 @@ export function VideoPlayer() {
   return (
     <View style={{ display: "flex", height: "100%" }}>
       {/* Video player, taking all the remaining space */}
-      <VideoView
-        // nativeControls={false}
-        style={[styles.video]}
-        player={player}
-      />
+      <View
+        style={{ flexGrow: 1, justifyContent: "center", alignItems: "center" }}
+        onLayout={(e) => setVideoContainerHeight(e.nativeEvent.layout.height)}
+      >
+        <VideoView
+          style={[
+            styles.video,
+            videoInfo?.width && videoInfo?.height && videoContainerHeight
+              ? {
+                  height: Math.min((videoInfo.height / videoInfo.width) * screenWidth, videoContainerHeight),
+                }
+              : {},
+          ]}
+          player={player}
+        />
+      </View>
 
       {/* Only render VideoBar if player.duration > 0 */}
-      {player.duration > 0 && (status === 'readyToPlay' || status === 'loading') ? (
-        (() => { console.log("Rendering VideoBar with duration", player.duration, "status", status); return <VideoBar player={player} />; })()
-      ) : (
-        (() => { console.log("Waiting for video to load, duration:", player.duration, "status:", status); return <View style={{ alignItems: 'center', margin: 20 }}><ThemedButton text={`Loading video... (${status})`} /></View>; })()
-      )}
+      {player.duration > 0 && (status === "readyToPlay" || status === "loading")
+        ? (() => {
+            console.log("Rendering VideoBar with duration", player.duration, "status", status);
+            return <VideoBar player={player} />;
+          })()
+        : (() => {
+            console.log("Waiting for video to load, duration:", player.duration, "status:", status);
+            return (
+              <View style={{ alignItems: "center", margin: 20 }}>
+                <ThemedButton text={`Loading video... (${status})`} />
+              </View>
+            );
+          })()}
 
       {/* Toolbar */}
       <View style={styles.toolBar}>
@@ -197,11 +218,7 @@ export function VideoPlayer() {
 
 const styles = StyleSheet.create({
   video: {
-    flexGrow: 1,
-    borderColor: "white",
-    borderWidth: 3,
-    borderRadius: 10,
-    margin: 20,
+    width: "100%",
   },
   toolBar: {
     height: 80,
