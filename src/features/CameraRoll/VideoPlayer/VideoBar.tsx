@@ -6,6 +6,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   measure,
   useAnimatedRef,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -61,20 +62,23 @@ export function VideoBar({ player }: VideoBarProps) {
     player.currentTime = newTime;
   }
 
+  const pausePlayer = () => player.pause();
+  const playPlayer = () => player.play();
+
   const pan = Gesture.Pan()
     .onBegin(() => {
+      "worklet";
       isPressed.value = true;
-
-      // todo: run on js
-      player.pause();
+      runOnJS(pausePlayer)();
     })
     .onChange((e) => {
+      "worklet";
       const barSize = measure(barRef);
       let newOffset = xStart.value + e.translationX;
       if (newOffset < 0) {
         newOffset = 0;
       }
-      if (barSize) {
+      if (barSize?.width) {
         const maxOffset = barSize.width - seekerWidth;
         if (newOffset > maxOffset) {
           newOffset = maxOffset;
@@ -82,29 +86,26 @@ export function VideoBar({ player }: VideoBarProps) {
       }
       xOffset.value = newOffset;
 
-      // todo: run on js
       const newVideoPos = (player.duration * xOffset.value) / barLength;
-      setCurrentTime(newVideoPos);
+      runOnJS(setCurrentTime)(newVideoPos);
     })
     .onFinalize(() => {
+      "worklet";
       isPressed.value = false;
       xStart.value = xOffset.value;
-      barLength;
 
-      // todo: run on js
       const newVideoPos = (player.duration * xOffset.value) / barLength;
       currentTimeFromBar.value = newVideoPos;
-      setCurrentTime(newVideoPos);
-      player.play();
+      runOnJS(setCurrentTime)(newVideoPos);
+      runOnJS(playPlayer)();
 
       // runOnJS(setCurrentTime)(newVideoPos);
       // runOnJS(setMyText)("Changed from UI Lezgo");
-    })
-    .runOnJS(true);
+    });
 
   const animatedStyles = useAnimatedStyle(() => ({
     transform: [{ translateX: xOffset.value }, { scale: withTiming(isPressed.value ? 1.2 : 1) }],
-    backgroundColor: isPressed.value ? "yellow" : "white",
+    backgroundColor: withTiming(isPressed.value ? "yellow" : "white"),
   }));
 
   return (
