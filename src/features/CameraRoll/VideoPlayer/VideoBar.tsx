@@ -1,6 +1,5 @@
-import { useEvent, useEventListener } from "expo";
-import { VideoPlayer } from "expo-video";
-import { useState } from "react";
+import { AVPlaybackStatus, Video } from "expo-av";
+import React, { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -18,36 +17,27 @@ const seekerWidth = 10;
 const barLength = 283;
 
 export interface VideoBarProps {
-  player: VideoPlayer;
+  videoRef: Video | null;
+  playbackStatus: AVPlaybackStatus | null;
 }
 
-export function VideoBar({ player }: VideoBarProps) {
-  // Get video current time
-  const { currentTime } = useEvent(player, "timeUpdate", {
-    currentTime: player.currentTime,
-    bufferedPosition: player.bufferedPosition,
-    currentLiveTimestamp: player.currentLiveTimestamp,
-    currentOffsetFromLive: player.currentOffsetFromLive,
-  });
+export function VideoBar({ videoRef, playbackStatus }: VideoBarProps) {
+  // Get video current time from playback status
+  const currentTime = playbackStatus?.isLoaded ? (playbackStatus.positionMillis || 0) / 1000 : 0;
+  const duration = playbackStatus?.isLoaded ? (playbackStatus.durationMillis || 0) / 1000 : 0;
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Limit video to selected trim part
+  // Update bar position based on current time
   const startTrim = 0;
   const endTrim = 10000;
-  useEventListener(player, "timeUpdate", ({ currentTime }) => {
-    if (currentTime < startTrim) {
-      console.log("Before", startTrim);
-      player.currentTime = startTrim;
+  
+  // Update bar position when currentTime changes (but not while dragging)
+  React.useEffect(() => {
+    if (duration > 0 && !isDragging) {
+      const position = (barLength * currentTime) / duration;
+      xOffset.value = position;
     }
-    if (currentTime > endTrim) {
-      console.log("after", endTrim);
-      player.pause();
-      player.currentTime = endTrim;
-    }
-
-    const barLength = 283;
-    const position = (barLength * currentTime) / player.duration;
-    xOffset.value = position;
-  });
+  }, [currentTime, duration, isDragging]);
 
   // Animate Bar
   const barRef = useAnimatedRef<View>();
@@ -57,16 +47,22 @@ export function VideoBar({ player }: VideoBarProps) {
   // const seekBy = player.seekBy;
   const currentTimeFromBar = useSharedValue(0);
 
-  function setCurrentTime(newTime: number) {
-    player.currentTime = newTime;
+  async function setCurrentTime(newTime: number) {
+    if (videoRef) {
+      await videoRef.setPositionAsync(newTime * 1000, {
+        toleranceBefore: 0,
+        toleranceAfter: 0,
+      });
+    }
   }
 
   const pan = Gesture.Pan()
     .onBegin(() => {
       isPressed.value = true;
-
-      // todo: run on js
-      player.pause();
+      setIsDragging(true);
+      if (videoRef) {
+        videoRef.pauseAsync();
+      }
     })
     .onChange((e) => {
       const barSize = measure(barRef);
@@ -82,25 +78,24 @@ export function VideoBar({ player }: VideoBarProps) {
       }
       xOffset.value = newOffset;
 
-      // todo: run on js
-      const newVideoPos = (player.duration * xOffset.value) / barLength;
+      const newVideoPos = (duration * xOffset.value) / barLength;
+      // More frequent seeking during drag for smoother scrubbing
       setCurrentTime(newVideoPos);
     })
     .onFinalize(() => {
       isPressed.value = false;
+      setIsDragging(false);
       xStart.value = xOffset.value;
-      barLength;
 
-      // todo: run on js
-      const newVideoPos = (player.duration * xOffset.value) / barLength;
+      const newVideoPos = (duration * xOffset.value) / barLength;
       currentTimeFromBar.value = newVideoPos;
       setCurrentTime(newVideoPos);
-      player.play();
-
-      // runOnJS(setCurrentTime)(newVideoPos);
-      // runOnJS(setMyText)("Changed from UI Lezgo");
+      if (videoRef) {
+        videoRef.playAsync();
+      }
     })
-    .runOnJS(true);
+    .runOnJS(true)
+    .minDistance(0);
 
   const animatedStyles = useAnimatedStyle(() => ({
     transform: [{ translateX: xOffset.value }, { scale: withTiming(isPressed.value ? 1.2 : 1) }],
@@ -109,7 +104,7 @@ export function VideoBar({ player }: VideoBarProps) {
 
   return (
     <View>
-      <MyAppText>{`${displayDurationFromSecond(currentTime)}/${displayDurationFromSecond(player.duration)}`}</MyAppText>
+      <MyAppText>{`${displayDurationFromSecond(currentTime)}/${displayDurationFromSecond(duration)}`}</MyAppText>
       <View
         ref={barRef}
         style={[

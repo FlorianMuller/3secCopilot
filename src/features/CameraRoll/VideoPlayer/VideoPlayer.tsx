@@ -1,8 +1,7 @@
 import EvilIcons from "@expo/vector-icons/EvilIcons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { useEvent } from "expo";
+import { AVPlaybackStatus, Video, ResizeMode } from "expo-av";
 import * as MediaLibrary from "expo-media-library";
-import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
@@ -28,10 +27,8 @@ export function VideoPlayer() {
   const id = params.ids[params.index];
   const { dayShift } = preferences.useDayShiftPreference();
 
-  const player = useVideoPlayer({}, (player) => {
-    player.audioMixingMode = "duckOthers";
-    player.timeUpdateEventInterval = 0.01;
-  });
+  const [videoRef, setVideoRef] = useState<Video | null>(null);
+  const [playbackStatus, setPlaybackStatus] = useState<AVPlaybackStatus | null>(null);
   // todo: show video player error
   // const { status, error } = useEvent(player, "statusChange", { status: player.status });
 
@@ -41,22 +38,27 @@ export function VideoPlayer() {
   // Pause video before navigating out
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", () => {
-      player.pause();
-      player.release();
+      if (videoRef) {
+        videoRef.pauseAsync();
+      }
     });
 
     return unsubscribe;
-  }, [navigation, player]);
+  }, [navigation, videoRef]);
 
   async function getVideo() {
     try {
       const info = await MediaLibrary.getAssetInfoAsync(id);
       setVideoInfo(info);
-      player.replace({
-        // uri: info.localUri,
-        uri: getLocalUri(info),
-      });
-      player.play();
+      if (videoRef) {
+        const videoUri = getLocalUri(info) || info.localUri || info.uri;
+        console.log('Loading video:', videoUri);
+        await videoRef.loadAsync({
+          uri: videoUri,
+        });
+        console.log('Video loaded, playing...');
+        await videoRef.playAsync();
+      }
     } catch (e) {
       console.error("can't load video", e);
     }
@@ -73,9 +75,11 @@ export function VideoPlayer() {
 
   // Get video and metadata when selected id change
   useEffect(() => {
-    getVideo();
-    getMetadata();
-  }, [params.ids, params.index]);
+    if (videoRef) {
+      getVideo();
+      getMetadata();
+    }
+  }, [params.ids, params.index, videoRef]);
 
   // Set page title
   useEffect(() => {
@@ -125,13 +129,20 @@ export function VideoPlayer() {
   return (
     <View style={{ display: "flex", height: "100%" }}>
       {/* Video player, taking all the remaining space */}
-      <VideoView
-        // nativeControls={false}
+      <Video
+        ref={setVideoRef}
         style={[styles.video]}
-        player={player}
+        useNativeControls={false}
+        resizeMode={ResizeMode.CONTAIN}
+        shouldPlay={true}
+        onPlaybackStatusUpdate={(status) => {
+          console.log('Playback status:', status);
+          setPlaybackStatus(status);
+        }}
+        progressUpdateIntervalMillis={16}
       />
 
-      <VideoBar player={player} />
+      <VideoBar videoRef={videoRef} playbackStatus={playbackStatus} />
 
       {/* Toolbar */}
       <View style={styles.toolBar}>
