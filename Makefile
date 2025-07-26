@@ -9,13 +9,19 @@ update-migration: ## Update the drizzle migration file. Should be run if drizzle
 
 #@ Build
 
+IOS_DEVICE ?= "iPhone de Florian"
+
 .PHONY: ios-build
 ios-build: ## Build the iOS app
-	npx expo run:ios
+	npx expo run:ios --device ${IOS_DEVICE}
 
-.PHOMY: open-xcode
-open-xcode: ## Open the iOS project in Xcode
+.PHOMY: xcode-open-workspace
+xcode-open-workspace: ## Open the iOS project in Xcode
 	open ios/3secCopilot.xcworkspace
+
+.PHONY: ios-list-devices
+xcode-list-devices: ## List available devices in Xcode
+	xcrun xctrace list devices
 
 #@ Other
 
