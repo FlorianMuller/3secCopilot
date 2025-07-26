@@ -31,3 +31,13 @@ Follow the [Expo documentation on upgrading](https://docs.expo.dev/workflow/upgr
     ```shell
     npx expo install --fix
     ```
+## Expo developpment build
+
+This app is using expo devlopment build to run the app on real devices and be able to use native modules (that don't work in Expo go).
+
+To create the ios build:
+```sh
+make ios-build
+```
+
+Then open it in xcode (`make open-xcode`) and run it on a device or simulator.
