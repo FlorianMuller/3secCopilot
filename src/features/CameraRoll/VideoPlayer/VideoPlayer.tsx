@@ -4,14 +4,12 @@ import { useEvent } from "expo";
 import * as MediaLibrary from "expo-media-library";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, View, type EventSubscription } from "react-native";
-import * as FileSystem from "expo-file-system";
-import { isValidFile, showEditor } from "react-native-video-trim";
-import videoTrim from "react-native-video-trim";
+import { Pressable, StyleSheet, View } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
 import { LinkIconRoundButton, ThemedButton } from "../../../components/ThemedButton";
 import { VideoMetadata } from "../../../db/schema";
+import { useVideoTrim } from "../../../hooks/useVideoTrim";
 import { VideoPlayerURI } from "../../../navigation";
 import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
 import { isVideoDayShifted } from "../../../services/dayShift";
@@ -51,51 +49,17 @@ export function VideoPlayer() {
     return unsubscribe;
   }, [navigation, player]);
 
-  // Video trim event listeners
-  const listenerSubscription = useRef<Record<string, EventSubscription>>({});
-  useEffect(() => {
-    listenerSubscription.current.onLoad = videoTrim.onLoad(({ duration }) => console.log("onLoad", duration));
-
-    listenerSubscription.current.onStartTrimming = videoTrim.onStartTrimming(() => console.log("onStartTrimming"));
-
-    listenerSubscription.current.onCancelTrimming = videoTrim.onCancelTrimming(() => console.log("onCancelTrimming"));
-    listenerSubscription.current.onCancel = videoTrim.onCancel(() => console.log("onCancel"));
-    listenerSubscription.current.onHide = videoTrim.onHide(() => console.log("onHide"));
-    listenerSubscription.current.onShow = videoTrim.onShow(() => console.log("onShow"));
-    listenerSubscription.current.onFinishTrimming = videoTrim.onFinishTrimming(
-      ({ outputPath, startTime, endTime, duration }) =>
-        console.log(
-          "onFinishTrimming",
-          `outputPath: ${outputPath}, startTime: ${startTime}, endTime: ${endTime}, duration: ${duration}`
-        )
-    );
-    // listenerSubscription.current.onLog = videoTrim.onLog(({ level, message, sessionId }) =>
-    //   console.log("onLog", `level: ${level}, message: ${message}, sessionId: ${sessionId}`)
-    // );
-    // listenerSubscription.current.onStatistics = videoTrim.onStatistics(
-    //   ({ sessionId, videoFrameNumber, videoFps, videoQuality, size, time, bitrate, speed }) =>
-    //     console.log(
-    //       "onStatistics",
-    //       `sessionId: ${sessionId}, videoFrameNumber: ${videoFrameNumber}, videoFps: ${videoFps}, videoQuality: ${videoQuality}, size: ${size}, time: ${time}, bitrate: ${bitrate}, speed: ${speed}`
-    //     )
-    // );
-    listenerSubscription.current.onError = videoTrim.onError(({ message, errorCode }) =>
-      console.log("onError", `message: ${message}, errorCode: ${errorCode}`)
-    );
-
-    return () => {
-      listenerSubscription.current.onLoad?.remove();
-      listenerSubscription.current.onStartTrimming?.remove();
-      listenerSubscription.current.onCancelTrimming?.remove();
-      listenerSubscription.current.onCancel?.remove();
-      listenerSubscription.current.onHide?.remove();
-      listenerSubscription.current.onShow?.remove();
-      listenerSubscription.current.onFinishTrimming?.remove();
-      // listenerSubscription.current.onLog?.remove();
-      // listenerSubscription.current.onStatistics?.remove();
-      listenerSubscription.current.onError?.remove();
-      listenerSubscription.current = {};
-    };
+  // Video trim functionality
+  const { openTrimEditor } = useVideoTrim({
+    maxDuration: 20,
+    onTrimComplete: (result) => {
+      console.log("Trim completed:", result);
+      // TODO: Save trim metadata to database
+    },
+    onError: (error) => {
+      console.error("Trim error:", error);
+      // TODO: Show user-friendly error message
+    },
   });
 
   async function getVideo() {
@@ -175,46 +139,7 @@ export function VideoPlayer() {
       return;
     }
 
-    try {
-      // Use localUri and clean it by removing metadata after #
-      const rawLocalUri = videoInfo.localUri;
-      const localUri = rawLocalUri?.split("#")[0];
-      console.log("Original Video URI:", localUri);
-
-      if (localUri === undefined) {
-        console.error("Video local URI is undefined, cannot launch editor");
-        return;
-      }
-
-      // Copy video to temp directory for trim library access
-      const tempDir = FileSystem.documentDirectory + "temp/";
-      await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
-
-      const fileExtension = localUri.split(".").pop() || "mov";
-      const tempVideoPath = tempDir + `video_${Date.now()}.${fileExtension}`;
-
-      console.log("Copying video to temp location:", tempVideoPath);
-      await FileSystem.copyAsync({
-        from: localUri,
-        to: tempVideoPath,
-      });
-
-      const validResult = await isValidFile(tempVideoPath);
-      console.log("Temp video file valid:", validResult);
-
-      if (!validResult.isValid) {
-        console.error("Temp video file is not valid, cannot launch editor");
-        return;
-      }
-
-      console.log("will launch editor with temp file");
-      showEditor(tempVideoPath, {
-        maxDuration: 20,
-      });
-      console.log("Trim editor launched for video:", tempVideoPath);
-    } catch (error) {
-      console.error("Error preparing video for trim editor:", error);
-    }
+    await openTrimEditor(videoInfo);
   }
 
   const hasPreviousVideos = params.index > 0;
