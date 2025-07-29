@@ -2,14 +2,14 @@ import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { PhoneMedia } from "./CameraRoll";
-import { doesFileExists, ensureDirExists } from "../../utils/fileSytem";
+import { doesFileExists, ensureDirExists, idToFileName } from "../../utils/fileSytem";
 import { getLocalUri } from "../../services/mediaLocalUri";
 
 export const thumbnailCacheDir = FileSystem.cacheDirectory + "videoThumbnailsCache/";
 
 // Return the location of a cached thumbnail based on a video id
 export function getCachedThumbnailUri(videoId: string): string {
-  return thumbnailCacheDir + `${videoId.replaceAll("/", "--")}.jpg`;
+  return thumbnailCacheDir + `${idToFileName(videoId)}.jpg`;
 }
 
 // Save a generated thumbnail in a cache directory

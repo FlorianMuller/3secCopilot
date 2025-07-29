@@ -7,7 +7,7 @@ import { MyAppText } from "../../components/text/MyAppText";
 import { VideoMetadata } from "../../db/schema";
 import { getEffectiveDate } from "../../services/dayShift";
 import preferences from "../../services/preferences";
-import { getVideosMetadtaByIds } from "../../services/selection";
+import { getVideosMetadtaByIds } from "../../services/metadata";
 import { groupBy } from "../../utils/groupBy";
 import { utilStyles } from "../../utils/utilStyles";
 import { DaySection } from "./DaySection";

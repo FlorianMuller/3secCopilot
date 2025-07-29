@@ -59,6 +59,23 @@ export async function getVideosMetadtaByIds(videoIds: string[]): Promise<Record<
   return groupByUnique(metadataList, (m) => m.videoId);
 }
 
+export async function updateVideoTrimMetadata(
+  videoId: string,
+  trimStartTime: number,
+  trimEndTime: number
+): Promise<SelectVideoMetadata | null> {
+  const res = await db
+    .update(videosMetadataTable)
+    .set({
+      trimStartTime,
+      trimEndTime,
+    })
+    .where(eq(videosMetadataTable.videoId, videoId))
+    .returning();
+
+  return returnOneMetadata(res);
+}
+
 // Util function to only return one videoMetadata from a list where
 // they should only be at most one videoMetadata in it.
 function returnOneMetadata(metaList: SelectVideoMetadata[]): SelectVideoMetadata | null {

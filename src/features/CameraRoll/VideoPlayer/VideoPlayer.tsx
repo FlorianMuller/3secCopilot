@@ -1,9 +1,8 @@
 import EvilIcons from "@expo/vector-icons/EvilIcons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { useEvent } from "expo";
 import * as MediaLibrary from "expo-media-library";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
@@ -15,9 +14,14 @@ import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigati
 import { isVideoDayShifted } from "../../../services/dayShift";
 import { getLocalUri } from "../../../services/mediaLocalUri";
 import preferences from "../../../services/preferences";
-import { getVideoMetadata, markVideoAsSelected, markVideoAsUnselected } from "../../../services/selection";
+import {
+  getVideoMetadata,
+  markVideoAsSelected,
+  markVideoAsUnselected,
+  updateVideoTrimMetadata,
+} from "../../../services/metadata";
+import { doesTrimmedVideoExist, getTrimmedVideoPath } from "../../../services/trim";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
-import { VideoBar } from "./VideoBar";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -38,6 +42,7 @@ export function VideoPlayer() {
 
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
+  const [isLoadingTrimmedVideo, setIsLoadingTrimmedVideo] = useState(false);
 
   // Pause video before navigating out
   useEffect(() => {
@@ -52,9 +57,20 @@ export function VideoPlayer() {
   // Video trim functionality
   const { openTrimEditor } = useVideoTrim({
     maxDuration: 20,
-    onTrimComplete: (result) => {
+    onTrimComplete: async (result) => {
       console.log("Trim completed:", result);
-      // TODO: Save trim metadata to database
+      try {
+        const updatedMetadata = await updateVideoTrimMetadata(result.videoId, result.startTime, result.endTime);
+        if (updatedMetadata && result.videoId === id && videoInfo) {
+          setVideoMetadata(updatedMetadata);
+          // Reload video source to show the trimmed video
+          await loadVideoSource(videoInfo, updatedMetadata);
+        }
+        console.log("Trim metadata saved to database");
+      } catch (error) {
+        // todo: Show user-friendly error message
+        console.error("Failed to save trim metadata:", error);
+      }
     },
     onError: (error) => {
       console.error("Trim error:", error);
@@ -64,31 +80,61 @@ export function VideoPlayer() {
 
   async function getVideo() {
     try {
-      const info = await MediaLibrary.getAssetInfoAsync(id);
+      const [info, metadata] = await Promise.all([MediaLibrary.getAssetInfoAsync(id), getVideoMetadata(id)]);
+
       setVideoInfo(info);
-      await player.replaceAsync({
-        // uri: info.localUri,
-        uri: getLocalUri(info),
-      });
+      setVideoMetadata(metadata);
+
+      await loadVideoSource(info, metadata);
       player.play();
     } catch (e) {
       console.error("can't load video", e);
     }
   }
 
-  async function getMetadata() {
+  async function loadVideoSource(info: MediaLibrary.AssetInfo, metadata: VideoMetadata | null) {
     try {
-      const meta = await getVideoMetadata(id);
-      setVideoMetadata(meta);
+      if (metadata?.trimStartTime === null || metadata?.trimEndTime === null) {
+        // No trim metadata - load original video
+        await player.replaceAsync({
+          uri: getLocalUri(info),
+        });
+        return;
+      }
+
+      const hasCachedTrimmedVideo = await doesTrimmedVideoExist(info.id);
+      if (hasCachedTrimmedVideo) {
+        // Trinned video exist - Load it
+        const trimmedVideoPath = getTrimmedVideoPath(info.id);
+        console.log("Loading cached trimmed video:", trimmedVideoPath);
+        await player.replaceAsync({
+          uri: trimmedVideoPath,
+        });
+        return;
+      }
+
+      setIsLoadingTrimmedVideo(true);
+      // TODO: In the future, re-trim the original video using react-native-video-trim
+
+      console.log("Trimmed video cache not found, loading original video");
+      await player.replaceAsync({
+        uri: getLocalUri(info),
+      });
+      setIsLoadingTrimmedVideo(false);
     } catch (e) {
-      console.error("can't retrieve metadata", e);
+      // todo: Show user-friendly error message
+      console.error("Error loading video source:", e);
+      setIsLoadingTrimmedVideo(false);
+      // Fallback to original video
+      await player.replaceAsync({
+        uri: getLocalUri(info),
+      });
     }
   }
 
   // Get video and metadata when selected id change
   useEffect(() => {
     getVideo();
-    getMetadata();
   }, [params.ids, params.index]);
 
   // Set page title
