@@ -3,34 +3,55 @@ import { SelectVideoMetadata, videosMetadataTable } from "../db/schema";
 import { db } from "../db/db";
 import { groupByUnique } from "../utils/groupBy";
 
-export async function markVideoAsSelected(
-  videoId: string,
-  videoOriginalDate: Date,
-  selectedForDate?: Date,
-  trimStartTime?: number,
-  trimEndTime?: number
-): Promise<SelectVideoMetadata | null> {
-  const toSet = {
-    videoOriginalDate,
-    assignedToDate: selectedForDate,
-    isSelected: true,
-    trimStartTime,
-    trimEndTime,
-    isHidden: false,
-  };
+type VideoMetadataUpsertData = {
+  videoId: string;
+  videoOriginalDate: Date;
+  assignedToDate?: Date;
+  isSelected?: boolean;
+  trimStartTime?: number;
+  trimEndTime?: number;
+  isHidden?: boolean;
+};
+
+async function upsertVideoMetadata(data: VideoMetadataUpsertData): Promise<SelectVideoMetadata | null> {
+  const { videoId, videoOriginalDate, ...updateFields } = data;
+
+  // Remove undefined values to avoid overwriting with null
+  const cleanUpdateFields = Object.fromEntries(
+    Object.entries(updateFields).filter(([_, value]) => value !== undefined)
+  );
 
   const res = await db
     .insert(videosMetadataTable)
     .values({
       videoId,
-      ...toSet,
+      videoOriginalDate,
+      // Provide required defaults for insert case
+      isSelected: data.isSelected ?? false,
+      isHidden: data.isHidden ?? false,
+      ...cleanUpdateFields,
     })
     .onConflictDoUpdate({
       target: videosMetadataTable.videoId,
-      set: toSet,
+      set: cleanUpdateFields,
     })
     .returning();
+
   return returnOneMetadata(res);
+}
+
+export async function markVideoAsSelected(
+  videoId: string,
+  videoOriginalDate: Date,
+  selectedForDate?: Date
+): Promise<SelectVideoMetadata | null> {
+  return upsertVideoMetadata({
+    videoId,
+    videoOriginalDate,
+    assignedToDate: selectedForDate,
+    isSelected: true,
+    isHidden: false,
+  });
 }
 
 export async function markVideoAsUnselected(videoId: string): Promise<SelectVideoMetadata | null> {
@@ -61,19 +82,16 @@ export async function getVideosMetadtaByIds(videoIds: string[]): Promise<Record<
 
 export async function updateVideoTrimMetadata(
   videoId: string,
+  videoOriginalDate: Date,
   trimStartTime: number,
   trimEndTime: number
 ): Promise<SelectVideoMetadata | null> {
-  const res = await db
-    .update(videosMetadataTable)
-    .set({
-      trimStartTime,
-      trimEndTime,
-    })
-    .where(eq(videosMetadataTable.videoId, videoId))
-    .returning();
-
-  return returnOneMetadata(res);
+  return upsertVideoMetadata({
+    videoId,
+    videoOriginalDate,
+    trimStartTime,
+    trimEndTime,
+  });
 }
 
 // Util function to only return one videoMetadata from a list where

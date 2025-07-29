@@ -60,13 +60,27 @@ export function VideoPlayer() {
     onTrimComplete: async (result) => {
       console.log("Trim completed:", result);
       try {
-        const updatedMetadata = await updateVideoTrimMetadata(result.videoId, result.startTime, result.endTime);
-        if (updatedMetadata && result.videoId === id && videoInfo) {
-          setVideoMetadata(updatedMetadata);
-          // Reload video source to show the trimmed video
-          await loadVideoSource(videoInfo, updatedMetadata);
+        if (!videoInfo) {
+          console.error("Video info not available for trim metadata save");
+          return;
         }
-        console.log("Trim metadata saved to database");
+        
+        const updatedMetadata = await updateVideoTrimMetadata(
+          result.videoId,
+          new Date(videoInfo.creationTime),
+          result.startTime,
+          result.endTime
+        );
+        if (updatedMetadata) {
+          setVideoMetadata(updatedMetadata);
+          console.log("Trim metadata saved to database");
+
+          // Reload video source to show the trimmed video
+          if (result.videoId === id) {
+            await loadVideoSource(videoInfo, updatedMetadata);
+            player.play();
+          }
+        }
       } catch (error) {
         // todo: Show user-friendly error message
         console.error("Failed to save trim metadata:", error);
@@ -84,6 +98,7 @@ export function VideoPlayer() {
 
       setVideoInfo(info);
       setVideoMetadata(metadata);
+      console.log("metadata", metadata);
 
       await loadVideoSource(info, metadata);
       player.play();
@@ -94,7 +109,7 @@ export function VideoPlayer() {
 
   async function loadVideoSource(info: MediaLibrary.AssetInfo, metadata: VideoMetadata | null) {
     try {
-      if (metadata?.trimStartTime === null || metadata?.trimEndTime === null) {
+      if (metadata === null || (metadata.trimStartTime === null && metadata.trimEndTime === null)) {
         // No trim metadata - load original video
         await player.replaceAsync({
           uri: getLocalUri(info),
@@ -185,6 +200,7 @@ export function VideoPlayer() {
       return;
     }
 
+    player.pause();
     await openTrimEditor(videoInfo);
   }
 
