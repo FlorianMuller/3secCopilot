@@ -1,11 +1,11 @@
 import { ScrollView, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { DayShiftSection } from "./sections/DayShiftSection";
-import { ThumbnailCacheOptionSection } from "./sections/ThumbnailCacheOptionSection";
+import { CacheOptionSection } from "./sections/CacheOptionSection";
 
 export function Options() {
   return (
-    <ScrollView style={{ paddingTop: 30 }}>
+    <ScrollView style={{ paddingTop: 30 }} contentContainerStyle={{ paddingBottom: 100 }}>
       <View style={{ gap: 20 }}>
         <DayShiftSection />
 
@@ -13,7 +13,7 @@ export function Options() {
           Advanced
         </MyAppText>
 
-        <ThumbnailCacheOptionSection />
+        <CacheOptionSection />
       </View>
     </ScrollView>
   );
