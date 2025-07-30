@@ -65,8 +65,10 @@ function AppTabs({ theme }: AppTabsProps) {
 }
 
 export default function App() {
-  // Allow to view database in a web UI
-  useDrizzleStudio(expoSqliteDb);
+  // Allow to view database in a web UI (only in development)
+  if (__DEV__) {
+    useDrizzleStudio(expoSqliteDb);
+  }
   // Migrate database if table schemas have changed
   const { success, error } = useMigrations(db, migrations);
   const scheme = useColorScheme();
@@ -89,7 +91,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView>
-      <AppTabs theme={scheme || "light"} />;
+      <AppTabs theme={scheme || "light"} />
     </GestureHandlerRootView>
   );
 }
