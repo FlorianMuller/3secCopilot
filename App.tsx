@@ -5,6 +5,7 @@ import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 import { memo } from "react";
 import { Text, useColorScheme, View } from "react-native";
+import { gestureHandlerRootHOC, GestureHandlerRootView } from "react-native-gesture-handler";
 import migrations from "./drizzle/migrations";
 import { FloatingTabBar } from "./src/components/MyTabBar";
 import { db, expoSqliteDb } from "./src/db/db";
@@ -30,7 +31,7 @@ function AppTabs({ theme }: AppTabsProps) {
       >
         <Tab.Screen
           name="CameraRollTab"
-          component={CameraRollNavigation}
+          component={gestureHandlerRootHOC(CameraRollNavigation)}
           options={{
             title: "Videos",
             tabBarIcon: ({ focused, color, size }) => (
@@ -40,9 +41,7 @@ function AppTabs({ theme }: AppTabsProps) {
         />
         <Tab.Screen
           name="Preview"
-          component={memo(() => (
-            <></>
-          ))}
+          component={gestureHandlerRootHOC(memo(() => <View></View>))}
           options={{
             title: "Preview",
             tabBarIcon: ({ focused, color, size }) => (
@@ -52,7 +51,7 @@ function AppTabs({ theme }: AppTabsProps) {
         />
         <Tab.Screen
           name="OptionsTab"
-          component={OptionsNavigation}
+          component={gestureHandlerRootHOC(OptionsNavigation)}
           options={{
             title: "Settings",
             tabBarIcon: ({ focused, color, size }) => (
@@ -66,8 +65,10 @@ function AppTabs({ theme }: AppTabsProps) {
 }
 
 export default function App() {
-  // Allow to view database in a web UI
-  useDrizzleStudio(expoSqliteDb);
+  // Allow to view database in a web UI (only in development)
+  if (__DEV__) {
+    useDrizzleStudio(expoSqliteDb);
+  }
   // Migrate database if table schemas have changed
   const { success, error } = useMigrations(db, migrations);
   const scheme = useColorScheme();
@@ -88,5 +89,9 @@ export default function App() {
     );
   }
 
-  return <AppTabs theme={scheme || "light"} />;
+  return (
+    <GestureHandlerRootView>
+      <AppTabs theme={scheme || "light"} />
+    </GestureHandlerRootView>
+  );
 }

@@ -11,3 +11,7 @@ export async function doesFileExists(fileUri: string): Promise<boolean> {
   const fileInfo = await FileSystem.getInfoAsync(fileUri);
   return fileInfo.exists;
 }
+
+export function idToFileName(videoId: string): string {
+  return videoId.replaceAll("/", "--");
+}
