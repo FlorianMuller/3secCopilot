@@ -20,7 +20,7 @@ import {
   markVideoAsUnselected,
   updateVideoTrimMetadata,
 } from "../../../services/metadata";
-import { doesTrimmedVideoExist, getTrimmedVideoPath } from "../../../services/trim";
+import { doesTrimmedVideoExist, getTrimmedVideoPath, reTrimVideo } from "../../../services/trim";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
@@ -64,7 +64,7 @@ export function VideoPlayer() {
           console.error("Video info not available for trim metadata save");
           return;
         }
-        
+
         const updatedMetadata = await updateVideoTrimMetadata(
           result.videoId,
           new Date(videoInfo.creationTime),
@@ -129,12 +129,19 @@ export function VideoPlayer() {
       }
 
       setIsLoadingTrimmedVideo(true);
-      // TODO: In the future, re-trim the original video using react-native-video-trim
-
-      console.log("Trimmed video cache not found, loading original video");
-      await player.replaceAsync({
-        uri: getLocalUri(info),
-      });
+      try {
+        // Re-trim the original video using react-native-video-trim
+        const trimmedPath = await reTrimVideo(info, metadata);
+        console.log("Re-trimmed video successfully, loading:", trimmedPath);
+        await player.replaceAsync({
+          uri: trimmedPath,
+        });
+      } catch (error) {
+        console.error("Failed to re-trim video, loading original:", error);
+        await player.replaceAsync({
+          uri: getLocalUri(info),
+        });
+      }
       setIsLoadingTrimmedVideo(false);
     } catch (e) {
       // todo: Show user-friendly error message

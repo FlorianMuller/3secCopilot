@@ -1,17 +1,13 @@
-import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import { useEffect, useRef } from "react";
 import { type EventSubscription } from "react-native";
-import { isValidFile, showEditor } from "react-native-video-trim";
+import { showEditor } from "react-native-video-trim";
 import videoTrim from "react-native-video-trim";
 import {
-  getCleanLocalUri,
-  getVideoToTrimPathFromInfo,
-  getTrimmedVideoPath,
-  trimmedVideoDirectory,
-  videoToTrimDirectory,
+  prepareVideoForTrim,
+  finalizeTrimmedVideo,
+  cleanupTempVideoFile,
 } from "../services/trim";
-import { ensureDirExists } from "../utils/fileSytem";
 
 export interface TrimResult {
   outputPath: string;
@@ -37,13 +33,7 @@ export function useVideoTrim(options: UseVideoTrimOptions = {}) {
 
   async function cleanupTempFile() {
     if (currentVideoInfo.current) {
-      try {
-        const tempPath = getVideoToTrimPathFromInfo(currentVideoInfo.current);
-        await FileSystem.deleteAsync(tempPath, { idempotent: true });
-        console.log("Cleaned up temp video file:", tempPath);
-      } catch (error) {
-        console.warn("Failed to cleanup temp video file:", error);
-      }
+      await cleanupTempVideoFile(currentVideoInfo.current);
     }
   }
 
@@ -84,14 +74,7 @@ export function useVideoTrim(options: UseVideoTrimOptions = {}) {
         if (currentVideoInfo.current) {
           try {
             // Move trimmed video to permanent location
-            await ensureDirExists(trimmedVideoDirectory);
-            const permanentPath = getTrimmedVideoPath(currentVideoInfo.current.id);
-
-            await FileSystem.moveAsync({
-              from: outputPath,
-              to: permanentPath,
-            });
-            console.log("Moved trimmed video to:", permanentPath);
+            const permanentPath = await finalizeTrimmedVideo(outputPath, currentVideoInfo.current.id);
 
             onTrimComplete?.({
               outputPath: permanentPath,
@@ -134,35 +117,8 @@ export function useVideoTrim(options: UseVideoTrimOptions = {}) {
       // Store current video info for later use
       currentVideoInfo.current = videoInfo;
 
-      // Get clean local URI
-      const localUri = getCleanLocalUri(videoInfo);
-      console.log("Original Video URI:", localUri);
-
-      if (localUri === undefined) {
-        console.error("Video local URI is undefined, cannot launch editor");
-        onError?.({ message: "Video local URI is undefined" });
-        return false;
-      }
-
-      // Copy video to temp directory for trim library access
-      await ensureDirExists(videoToTrimDirectory);
-      const tempPath = getVideoToTrimPathFromInfo(videoInfo);
-
-      console.log("Copying video to temp location:", tempPath);
-      await FileSystem.copyAsync({
-        from: localUri,
-        to: tempPath,
-      });
-
-      // Check if file is valid
-      const validResult = await isValidFile(tempPath);
-      console.log("Temp video file valid:", validResult);
-
-      if (!validResult.isValid) {
-        console.error("Temp video file is not valid, cannot launch editor");
-        onError?.({ message: "Video file is not valid for trimming" });
-        return false;
-      }
+      // Prepare video for trimming
+      const tempPath = await prepareVideoForTrim(videoInfo);
 
       // Launch the trim editor
       console.log("Launching trim editor with temp file");
