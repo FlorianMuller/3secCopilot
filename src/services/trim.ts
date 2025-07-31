@@ -4,9 +4,13 @@ import { doesFileExists, idToFileName } from "../utils/fileSytem";
 import { trim, isValidFile } from "react-native-video-trim";
 import { VideoMetadata } from "../db/schema";
 import { ensureDirExists } from "../utils/fileSytem";
-import { get } from "react-native/Libraries/TurboModule/TurboModuleRegistry";
+
 export const videoToTrimDirectory = FileSystem.cacheDirectory + "videoToTrim/";
-export const trimmedVideoDirectory = FileSystem.cacheDirectory + "trimmedVideos/";
+
+// todo: ss reTrim is not working for now, we will use the document directory.
+// In the future we should switch back to cache directory
+export const trimmedVideoDirectory = FileSystem.documentDirectory + "trimmedVideos/";
+// export const trimmedVideoDirectory = FileSystem.cacheDirectory + "trimmedVideos/";
 
 export function getCleanLocalUri(videoInfo: MediaLibrary.AssetInfo): string | undefined {
   return videoInfo.localUri?.split("#")[0];
