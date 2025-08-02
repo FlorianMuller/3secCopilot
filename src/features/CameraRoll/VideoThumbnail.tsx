@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   GestureResponderEvent,
@@ -14,7 +14,12 @@ import { MyAppText } from "../../components/text/MyAppText";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
 import { getCachedThumbnailUri, getVideoThumbnail } from "./thumbnailService";
-import { displayDurationFromSecond } from "../../utils/dateTime";
+import { displayDurationFromMilis, displayDurationFromSecond } from "../../utils/dateTime";
+import { isVideoTrimmed } from "../../services/trim";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useTheme } from "@react-navigation/native";
+import { IconBadge } from "../../components/IconBadge";
+import Feather from "@expo/vector-icons/Feather";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
@@ -30,6 +35,7 @@ export function VidThumbnail({ video, displayAs = "normal", onPress, size, style
   const thumbnailUriWithRefresh = thumbnailUri + `?refresh=${refreshCount}`;
   const { width } = useWindowDimensions();
   const thumbnailSize = size ?? width / 5;
+  const theme = useTheme();
 
   useEffect(() => {
     handleThumbnail();
@@ -63,7 +69,7 @@ export function VidThumbnail({ video, displayAs = "normal", onPress, size, style
       ]}
       onPress={onPress}
     >
-      {/* Centered spinner (showd if thumbnailUri doesn't exist) */}
+      {/* Centered spinner (shown only if thumbnailUri doesn't exist) */}
       {/* todo: set color from theme */}
       <View style={[utilStyles.hw100, utilStyles.centerVertical]}>
         <ActivityIndicator size="small" color="white" />
@@ -79,23 +85,60 @@ export function VidThumbnail({ video, displayAs = "normal", onPress, size, style
         source={{ uri: thumbnailUriWithRefresh }}
         style={[
           styles.thumbnail,
-          displayAs === "selected" ? styles.selected : undefined,
+          displayAs === "selected" ? { borderWidth: 2, borderColor: theme.colors.accent } : undefined,
           displayAs === "unselected" ? { opacity: 0.3 } : undefined,
         ]}
       />
 
+      {/* Badges */}
+      {/* <View style={[styles.topRight, utilStyles.ListRow, { gap: 2 }]}>
+      </View> */}
+      {/* Trim badge */}
+      {video.metadata && isVideoTrimmed(video.metadata) && (
+        <IconBadge
+          style={[
+            {
+              position: "absolute",
+              left: 1,
+              top: 1,
+              borderRadius: 0,
+              borderBottomRightRadius: 9,
+            },
+            displayAs === "selected" && {
+              borderTopWidth: SELECTED_BORDER_WIDTH,
+              borderLeftWidth: SELECTED_BORDER_WIDTH,
+              borderColor: theme.colors.accent,
+            },
+          ]}
+          Icon={({ size, theme }) => <Ionicons name="cut" size={size} color={theme.colors.textOnPrimary} />}
+        />
+      )}
+
       {/* Selected badge */}
       {displayAs === "selected" && (
-        <MyAppText style={styles.selectedIcon} size={13}>
-          ✅
-        </MyAppText>
+        <IconBadge
+          style={[
+            {
+              borderRadius: 0,
+              borderBottomLeftRadius: 9,
+            },
+            styles.topRight,
+          ]}
+          backgroundColor={theme.colors.accent}
+          Icon={({ size, theme }) => <Feather name="check" size={size} color={theme.colors.textOnPrimary} />}
+        />
       )}
+
       <MyAppText style={styles.videoDuration} size={13} weight={600}>
-        {displayDurationFromSecond(video.duration)}
+        {video.metadata && isVideoTrimmed(video.metadata)
+          ? displayDurationFromMilis(video.metadata.trimEndTime - video.metadata.trimStartTime)
+          : displayDurationFromSecond(video.duration)}
       </MyAppText>
     </TouchableOpacity>
   );
 }
+
+const SELECTED_BORDER_WIDTH = 2;
 
 const styles = StyleSheet.create({
   container: {
@@ -108,10 +151,6 @@ const styles = StyleSheet.create({
     width: "100%",
     position: "absolute",
   },
-  selected: {
-    borderWidth: 2,
-    borderColor: "green",
-  },
   notSelected: {
     tintColor: "gray",
   },
@@ -120,9 +159,9 @@ const styles = StyleSheet.create({
     right: 5,
     bottom: 5,
   },
-  selectedIcon: {
+  topRight: {
     position: "absolute",
-    right: 5,
-    top: 4,
+    right: 1,
+    top: 1,
   },
 });
