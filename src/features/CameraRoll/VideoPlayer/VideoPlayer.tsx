@@ -1,4 +1,3 @@
-import EvilIcons from "@expo/vector-icons/EvilIcons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as MediaLibrary from "expo-media-library";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -6,10 +5,9 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
-import { LinkIconRoundButton, ThemedButton } from "../../../components/ThemedButton";
+import { ThemedButton } from "../../../components/ThemedButton";
 import { VideoMetadata } from "../../../db/schema";
 import { useVideoTrim } from "../../../hooks/useVideoTrim";
-import { VideoPlayerURI } from "../../../navigation";
 import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
 import { isVideoDayShifted } from "../../../services/dayShift";
 import { getLocalUri } from "../../../services/mediaLocalUri";
@@ -22,10 +20,10 @@ import {
 } from "../../../services/metadata";
 import { doesTrimmedVideoExist, getTrimmedVideoPath, reTrimVideo } from "../../../services/trim";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
+import { PhoneMedia } from "../CameraRoll";
+import { VideoThumbnailBar } from "./VideoThumbnailBar";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
-
-const nextPrevButtonSize = 50;
 
 export function VideoPlayer() {
   const navigation = useNavigation();
@@ -40,8 +38,14 @@ export function VideoPlayer() {
   // todo: show video player error
   // const { status, error } = useEvent(player, "statusChange", { status: player.status });
 
+  // Currently playing video info and metadata
   const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
+
+  // Used to show all videos in the thumbnail bar
+  const [allVideos, setAllVideos] = useState<PhoneMedia[]>([]);
+
+  // Todo: use to show loading state when trimming video
   const [isLoadingTrimmedVideo, setIsLoadingTrimmedVideo] = useState(false);
 
   // Pause video before navigating out
@@ -107,6 +111,21 @@ export function VideoPlayer() {
     }
   }
 
+  async function getAllVideos() {
+    try {
+      const videosInfo = await Promise.all(params.ids.map((videoId) => MediaLibrary.getAssetInfoAsync(videoId)));
+
+      const videos: PhoneMedia[] = videosInfo.map((info) => ({
+        ...info,
+        info,
+      }));
+
+      setAllVideos(videos);
+    } catch (e) {
+      console.error("can't load all videos", e);
+    }
+  }
+
   async function loadVideoSource(info: MediaLibrary.AssetInfo, metadata: VideoMetadata | null) {
     try {
       if (metadata === null || (metadata.trimStartTime === null && metadata.trimEndTime === null)) {
@@ -157,7 +176,8 @@ export function VideoPlayer() {
   // Get video and metadata when selected id change
   useEffect(() => {
     getVideo();
-  }, [params.ids, params.index]);
+    getAllVideos();
+  }, [id, params.ids, params.index]);
 
   // Set page title
   useEffect(() => {
@@ -211,9 +231,6 @@ export function VideoPlayer() {
     await openTrimEditor(videoInfo);
   }
 
-  const hasPreviousVideos = params.index > 0;
-  const hasNextVideos = params.index < params.ids.length - 1;
-
   return (
     <View style={{ display: "flex", height: "100%" }}>
       {/* Video player, taking all the remaining space */}
@@ -225,25 +242,13 @@ export function VideoPlayer() {
 
       {/* <VideoBar player={player} /> */}
 
+      {/* Video thumbnails bar */}
+      <VideoThumbnailBar videos={allVideos} currentIndex={params.index} routeParams={params} />
+
       {/* Toolbar */}
       <View style={styles.toolBar}>
-        {/* Next video of the day button */}
-        {hasPreviousVideos && (
-          <LinkIconRoundButton
-            style={{ alignSelf: "center" }}
-            to={{ screen: VideoPlayerURI, params: { ...params, index: params.index - 1 } }}
-            childProps={{
-              Icon: ({ theme: { colors } }) => (
-                <EvilIcons name="arrow-left" size={nextPrevButtonSize} color={colors.text} />
-              ),
-              size: nextPrevButtonSize + 5,
-            }}
-          />
-        )}
-        {!hasPreviousVideos && <View />}
-
         {/* Select and Trim buttons */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
           {videoInfo && videoMetadata !== undefined && (
             <Pressable onPress={() => toggleSelectVideo(videoInfo, videoMetadata)}>
               <ThemedButton text={videoMetadata?.isSelected ? "Unselect" : "Select"} />
@@ -255,21 +260,6 @@ export function VideoPlayer() {
             </Pressable>
           )}
         </View>
-
-        {/* Previous video of the day button */}
-        {hasNextVideos && (
-          <LinkIconRoundButton
-            style={{ alignSelf: "center" }}
-            to={{ screen: VideoPlayerURI, params: { ...params, index: params.index + 1 } }}
-            childProps={{
-              Icon: ({ theme: { colors } }) => (
-                <EvilIcons name="arrow-right" size={nextPrevButtonSize} color={colors.text} />
-              ),
-              size: nextPrevButtonSize + 5,
-            }}
-          />
-        )}
-        {!hasNextVideos && <View />}
       </View>
       <SafeTabBarZone />
     </View>
@@ -288,7 +278,7 @@ const styles = StyleSheet.create({
     height: 80,
     display: "flex",
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     paddingHorizontal: 10,
   },
 });

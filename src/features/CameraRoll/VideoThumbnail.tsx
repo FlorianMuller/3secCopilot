@@ -3,10 +3,12 @@ import {
   ActivityIndicator,
   GestureResponderEvent,
   Image,
+  StyleProp,
   StyleSheet,
   TouchableOpacity,
   useWindowDimensions,
   View,
+  ViewStyle,
 } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { utilStyles } from "../../utils/utilStyles";
@@ -16,16 +18,18 @@ import { displayDurationFromSecond } from "../../utils/dateTime";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
-  displayHas?: "normal" | "selected" | "unselected";
+  displayAs?: "normal" | "selected" | "unselected";
   onPress?: (event: GestureResponderEvent) => void;
+  size?: number;
+  style?: StyleProp<ViewStyle>;
 }
 
-export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumbnailProps) {
+export function VidThumbnail({ video, displayAs = "normal", onPress, size, style }: VidThumbnailProps) {
   const [thumbnailUri, setThumbnailUri] = useState<string>(getCachedThumbnailUri(video.id));
   const [refreshCount, setRefreshCount] = useState<number>(0);
   const thumbnailUriWithRefresh = thumbnailUri + `?refresh=${refreshCount}`;
   const { width } = useWindowDimensions();
-  const thumbnailSize = width / 5;
+  const thumbnailSize = size ?? width / 5;
 
   useEffect(() => {
     handleThumbnail();
@@ -48,7 +52,17 @@ export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumb
   }
 
   return (
-    <TouchableOpacity style={{ height: thumbnailSize, width: thumbnailSize, padding: 1 }} onPress={onPress}>
+    <TouchableOpacity
+      style={[
+        styles.container,
+        {
+          height: thumbnailSize,
+          width: thumbnailSize,
+        },
+        style,
+      ]}
+      onPress={onPress}
+    >
       {/* Centered spinner (showd if thumbnailUri doesn't exist) */}
       {/* todo: set color from theme */}
       <View style={[utilStyles.hw100, utilStyles.centerVertical]}>
@@ -56,7 +70,7 @@ export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumb
       </View>
 
       {/* Gray background for unselected video */}
-      {displayHas === "unselected" && (
+      {displayAs === "unselected" && (
         <Image source={{ uri: thumbnailUriWithRefresh }} style={[styles.thumbnail, { tintColor: "#2e2e2e" }]} />
       )}
 
@@ -65,13 +79,13 @@ export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumb
         source={{ uri: thumbnailUriWithRefresh }}
         style={[
           styles.thumbnail,
-          displayHas === "selected" ? styles.selected : undefined,
-          displayHas === "unselected" ? { opacity: 0.3 } : undefined,
+          displayAs === "selected" ? styles.selected : undefined,
+          displayAs === "unselected" ? { opacity: 0.3 } : undefined,
         ]}
       />
 
       {/* Selected badge */}
-      {displayHas === "selected" && (
+      {displayAs === "selected" && (
         <MyAppText style={styles.selectedIcon} size={13}>
           ✅
         </MyAppText>
@@ -84,6 +98,11 @@ export function VidThumbnail({ video, displayHas = "normal", onPress }: VidThumb
 }
 
 const styles = StyleSheet.create({
+  container: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   thumbnail: {
     height: "100%",
     width: "100%",
