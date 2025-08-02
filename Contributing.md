@@ -41,3 +41,7 @@ make ios-build
 ```
 
 Then open it in xcode (`make open-xcode`) and run it on a device or simulator.
+
+## Icons
+
+We are using the [Expo icon library](https://icons.expo.fyi/).

@@ -1,13 +1,14 @@
-import { Link, Theme, useTheme } from "@react-navigation/native";
+import { Link, useTheme } from "@react-navigation/native";
 import React, { ComponentType } from "react";
 import { StyleSheet, View, ViewProps } from "react-native";
+import { MyTheme } from "../theme/themes";
 import { MyAppText } from "./text/MyAppText";
 
 // ThemedButton
 // A simple button respecting the app theme
 
 export interface ThemeButtonProps extends ViewProps {
-  Icon?: ComponentType<{ theme: Theme }>;
+  Icon?: ComponentType<{ theme: MyTheme }>;
   text?: string;
 }
 
