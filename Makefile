@@ -1,4 +1,7 @@
 
+##@ Dev
+
+
 .PHONY: run
 run: ## Start the app in developement (work with expo go)
 	npm start
@@ -7,12 +10,12 @@ run: ## Start the app in developement (work with expo go)
 update-migration: ## Update the drizzle migration file. Should be run if drizzle schemas are changed
 	npx drizzle-kit generate
 
-#@ Build
+##@ Build
 
 IOS_DEVICE ?= "iPhone de Florian"
 
 .PHONY: ios-build
-ios-build: ## Build the iOS app
+ios-build: ## Build the iOS app and insall it on IOS_DEVICE
 	npx expo run:ios --device ${IOS_DEVICE}
 
 .PHOMY: xcode-open-workspace
@@ -23,7 +26,7 @@ xcode-open-workspace: ## Open the iOS project in Xcode
 xcode-list-devices: ## List available devices in Xcode
 	xcrun xctrace list devices
 
-#@ Other
+##@ Other
 
 .PHONY: help
 help: ## Display this help.
