@@ -37,6 +37,10 @@ export const myLightTheme: MyTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
+
+    // todo: work on light
+    secondary: DefaultTheme.colors.primary,
+    accent: DefaultTheme.colors.primary,
     textOnPrimary: "white",
   },
   borderRadius: 10,
