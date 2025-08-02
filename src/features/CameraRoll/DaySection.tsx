@@ -36,10 +36,11 @@ export const DaySection = React.memo(function DaySection({ item: { day, videosOf
             <VidThumbnail
               key={vid.id}
               video={vid}
-              displayHas={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "selected" : "unselected") : "normal"}
+              displayAs={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "selected" : "unselected") : "normal"}
               onPress={() => {
                 navigation.navigate(VideoPlayerURI, { day: day.toISOString(), ids: videosIds, index: i });
               }}
+              style={{ padding: 1 }}
             />
           ))}
 

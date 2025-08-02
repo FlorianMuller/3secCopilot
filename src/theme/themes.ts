@@ -11,10 +11,12 @@ export interface MyTheme extends Theme {
 }
 
 // https://www.realtimecolors.com/?colors=f6f0ff-000000-bb8ff2-534a8e-1e47dc&fonts=Inter-Inter
-const darkPrimary = "#bb8ff2";
-const darkSecondary = "#534a8e";
-const darkAccent = "#1e47dc";
-const darkText = "#f6f0ff";
+// https://www.realtimecolors.com/?colors=f6f0ff-000000-ba8cf2-534a8c-6fcaff&fonts=Inter-Inter
+const darkPrimary = "rgb(188, 143, 242)";
+const darkSecondary = "rgb(83, 74, 142)";
+const darkAccent = "rgb(111, 202, 255)";
+const darkText = "rgb(246, 240, 255)";
+
 export const myDarkTheme: MyTheme = {
   ...DarkTheme,
   colors: {
