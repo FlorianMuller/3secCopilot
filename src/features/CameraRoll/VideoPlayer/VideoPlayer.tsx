@@ -18,7 +18,7 @@ import {
   markVideoAsUnselected,
   updateVideoTrimMetadata,
 } from "../../../services/metadata";
-import { doesTrimmedVideoExist, getTrimmedVideoPath, reTrimVideo } from "../../../services/trim";
+import { doesTrimmedVideoExist, getTrimmedVideoPath, isVideoTrimmed, reTrimVideo } from "../../../services/trim";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
 import { PhoneMedia } from "../CameraRoll";
 import { VideoThumbnailBar } from "./VideoThumbnailBar";
@@ -128,7 +128,7 @@ export function VideoPlayer() {
 
   async function loadVideoSource(info: MediaLibrary.AssetInfo, metadata: VideoMetadata | null) {
     try {
-      if (metadata === null || (metadata.trimStartTime === null && metadata.trimEndTime === null)) {
+      if (metadata === null || !isVideoTrimmed(metadata)) {
         // No trim metadata - load original video
         await player.replaceAsync({
           uri: getLocalUri(info),

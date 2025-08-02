@@ -10,7 +10,10 @@ import { displayDate } from "../../utils/dateTime";
 import { PhoneMedia } from "./CameraRoll";
 import { VidThumbnail } from "./VideoThumbnail";
 interface DaySectionProps {
-  item: { day: Date; videosOfTheDay: PhoneMedia[] };
+  item: {
+    day: Date;
+    videosOfTheDay: PhoneMedia[];
+  };
 }
 
 export const DaySection = React.memo(function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {

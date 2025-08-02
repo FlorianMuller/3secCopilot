@@ -41,6 +41,17 @@ export async function doesTrimmedVideoExist(videoId: string): Promise<boolean> {
   return await doesFileExists(trimmedPath);
 }
 
+// Refined type with non-null trims
+type TrimmedVideoMetadata = VideoMetadata & {
+  trimStartTime: number;
+  trimEndTime: number;
+};
+
+// Type guard to check if trim metadata are set
+export function isVideoTrimmed(metadata: VideoMetadata): metadata is TrimmedVideoMetadata {
+  return metadata.trimStartTime !== null && metadata.trimEndTime !== null;
+}
+
 /**
  * Prepares a video for trimming by copying it to a temp location and validating it
  * Returns the temp path where the video is ready for trimming
@@ -109,12 +120,7 @@ export async function cleanupTempVideoFile(videoInfo: MediaLibrary.AssetInfo): P
 }
 
 // Retrim a video with trim metadata
-export async function reTrimVideo(videoInfo: MediaLibrary.AssetInfo, metadata: VideoMetadata): Promise<string> {
-  if (metadata.trimStartTime === null || metadata.trimEndTime === null) {
-    console.error("Invalid trim metadata for video:", videoInfo.id);
-    throw new Error("Invalid trim metadata for video");
-  }
-
+export async function reTrimVideo(videoInfo: MediaLibrary.AssetInfo, metadata: TrimmedVideoMetadata): Promise<string> {
   try {
     // Prepare video for trimming
     const tempPath = await prepareVideoForTrim(videoInfo);
