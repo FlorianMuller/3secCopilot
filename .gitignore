@@ -18,4 +18,5 @@ web-build/
 
 # Dev build
 ios
+ios-dev-build
 android

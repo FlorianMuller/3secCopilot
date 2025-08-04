@@ -10,23 +10,33 @@ run: ## Start the app in developement (work with expo go)
 update-migration: ## Update the drizzle migration file. Should be run if drizzle schemas are changed
 	npx drizzle-kit generate
 
-##@ Build
+##@ Dev Build
 
 IOS_DEVICE ?= "iPhone de Florian"
 
-.PHONY: ios-build
-ios-build: ## Build the iOS app and insall it on IOS_DEVICE
+.PHONY: ios-build-dev
+ios-build-dev: ## Build the iOS app and insall it on IOS_DEVICE
 	npx expo run:ios --device ${IOS_DEVICE}
 
 .PHOMY: xcode-open-workspace
 xcode-open-workspace: ## Open the iOS project in Xcode
 	open ios/3secCopilot.xcworkspace
 
+##@ Build
+
+.PHONY: ios-build-xcode
+ios-build-xcode: ## Build xcode project for production
+	npx expo prebuild --clean
+
+.PHONY: ios-build-ipa
+ios-build-ipa: ## Build the app for production and generate an IPA file
+	npx eas build --platform ios --profile internal --local
+
+##@ Other
+
 .PHONY: ios-list-devices
 xcode-list-devices: ## List available devices in Xcode
 	xcrun xctrace list devices
-
-##@ Other
 
 .PHONY: help
 help: ## Display this help.
