@@ -21,7 +21,10 @@
     "ios": {
       "supportsTablet": true,
       "userInterfaceStyle": "automatic",
-      "bundleIdentifier": "com.fmuller.3secs"
+      "bundleIdentifier": "com.fmuller.3secs",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +36,8 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_MEDIA_LOCATION"
-      ]
+      ],
+      "package": "com.fmuller.x3secs"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -49,6 +53,11 @@
       ],
       "expo-video",
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "9c2f7031-bf09-4aca-bcab-b02914342ee7"
+      }
+    }
   }
 }

@@ -1,7 +1,6 @@
 
 ##@ Dev
 
-
 .PHONY: run
 run: ## Start the app in developement (work with expo go)
 	npm start
@@ -18,25 +17,23 @@ IOS_DEVICE ?= "iPhone de Florian"
 ios-build-dev: ## Build the iOS app and insall it on IOS_DEVICE
 	npx expo run:ios --device ${IOS_DEVICE}
 
-.PHOMY: xcode-open-workspace
-xcode-open-workspace: ## Open the iOS project in Xcode
-	open ios/3secCopilot.xcworkspace
+##@ Dogfood Build
 
-##@ Build
-
-.PHONY: ios-build-xcode
-ios-build-xcode: ## Build xcode project for production
+.PHONY: ios-build-df-xcode
+ios-build-df-xcode: ## Build xcode project for production
 	npx expo prebuild --clean
 
-.PHONY: ios-build-ipa
-ios-build-ipa: ## Build the app for production and generate an IPA file
-	npx eas build --platform ios --profile internal --local
+##@ Build utils
 
-##@ Other
+.PHOMY: xcode-open-workspace
+xcode-open-workspace: ## Open the iOS project in Xcode
+	open ios/3secsCopilot.xcworkspace
 
 .PHONY: ios-list-devices
 xcode-list-devices: ## List available devices in Xcode
 	xcrun xctrace list devices
+
+##@ Other
 
 .PHONY: help
 help: ## Display this help.
