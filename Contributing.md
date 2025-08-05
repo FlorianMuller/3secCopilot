@@ -16,6 +16,10 @@ If you update the schemas defined in [schema.ts](src/db/schema.ts), the `make up
 2. In the terminal, press `shift + m`
 3. Select "Open expo-drizzle-studio-plugin"
 
+## Icons
+
+We are using the [Expo icon library](https://icons.expo.fyi/).
+
 ## Updgrade Expo SDK version
 
 If the Expo sdk used by the Expo Go app is updated, the Expo sdk used in this app should be updated to continue previewing it with the Expo Go app.
@@ -31,17 +35,39 @@ Follow the [Expo documentation on upgrading](https://docs.expo.dev/workflow/upgr
     ```shell
     npx expo install --fix
     ```
-## Expo developpment build
+
+## Build
+
+### Expo developpment build
 
 This app is using expo devlopment build to run the app on real devices and be able to use native modules (that don't work in Expo go).
 
 To create the ios build:
 ```sh
-make ios-build
+make ios-build-dev
 ```
 
-Then open it in xcode (`make open-xcode`) and run it on a device or simulator.
+You can select a device with the `IOS_DEVICE` environment variable, or open the Xcode project with `make xcode-open-workspace` and select a device there.
 
-## Icons
+### Dogfooding build
 
-We are using the [Expo icon library](https://icons.expo.fyi/).
+Create xcode project
+```sh
+make ios-build-df-xcode
+```
+Open it
+```sh
+make xcode-open-workspace
+```
+
+Create an archive with `Product > Archive`.
+The archive (`.xcarchive`) will be in `~/Library/Developer/Xcode/Archives/<date>/...`
+
+Then, transform the archive to an `.ipa` file:
+
+```sh
+scripts/xcarchiveToIpa.sh <path_to_xcarchive>
+```
+
+The ipa will be created on your desktop as `3secsCopilot.ipa`.
+Just open it in the AltStore app on your iOS device to install it.
