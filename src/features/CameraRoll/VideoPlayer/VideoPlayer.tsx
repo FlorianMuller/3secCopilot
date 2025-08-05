@@ -13,7 +13,7 @@ import { isVideoDayShifted } from "../../../services/dayShift";
 import { getLocalUri } from "../../../services/mediaLocalUri";
 import preferences from "../../../services/preferences";
 import {
-  getVideoMetadata,
+  getVideosMetadtaByIds,
   markVideoAsSelected,
   markVideoAsUnselected,
   updateVideoTrimMetadata,
@@ -38,15 +38,26 @@ export function VideoPlayer() {
   // todo: show video player error
   // const { status, error } = useEvent(player, "statusChange", { status: player.status });
 
-  // Currently playing video info and metadata
-  const [videoInfo, setVideoInfo] = useState<MediaLibrary.AssetInfo>();
-  const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>();
-
-  // Used to show all videos in the thumbnail bar
+  // All videos data (info + metadata)
   const [allVideos, setAllVideos] = useState<PhoneMedia[]>([]);
+
+  // Currently playing video info and metadata (derived from allVideos using index)
+  const videoInfo = allVideos[params.index]?.info;
+  const videoMetadata = allVideos[params.index]?.metadata || null;
 
   // Todo: use to show loading state when trimming video
   const [isLoadingTrimmedVideo, setIsLoadingTrimmedVideo] = useState(false);
+
+  // Helper function to update metadata for a specific video
+  const updateVideoMetadataInState = (videoId: string, newMetadata: VideoMetadata) => {
+    setAllVideos(prevVideos => 
+      prevVideos.map(video => 
+        video.id === videoId 
+          ? { ...video, metadata: newMetadata }
+          : video
+      )
+    );
+  };
 
   // Pause video before navigating out
   useEffect(() => {
@@ -76,7 +87,7 @@ export function VideoPlayer() {
           result.endTime
         );
         if (updatedMetadata) {
-          setVideoMetadata(updatedMetadata);
+          updateVideoMetadataInState(result.videoId, updatedMetadata);
           console.log("Trim metadata saved to database");
 
           // Reload video source to show the trimmed video
@@ -96,33 +107,30 @@ export function VideoPlayer() {
     },
   });
 
-  async function getVideo() {
+  async function getAllVideosWithMetadata() {
     try {
-      const [info, metadata] = await Promise.all([MediaLibrary.getAssetInfoAsync(id), getVideoMetadata(id)]);
-
-      setVideoInfo(info);
-      setVideoMetadata(metadata);
-      console.log("metadata", metadata);
-
-      await loadVideoSource(info, metadata);
-      player.play();
-    } catch (e) {
-      console.error("can't load video", e);
-    }
-  }
-
-  async function getAllVideos() {
-    try {
-      const videosInfo = await Promise.all(params.ids.map((videoId) => MediaLibrary.getAssetInfoAsync(videoId)));
+      const [videosInfo, videosMetadata] = await Promise.all([
+        Promise.all(params.ids.map((videoId) => MediaLibrary.getAssetInfoAsync(videoId))),
+        getVideosMetadtaByIds(params.ids)
+      ]);
 
       const videos: PhoneMedia[] = videosInfo.map((info) => ({
         ...info,
         info,
+        metadata: videosMetadata[info.id]
       }));
 
       setAllVideos(videos);
+
+      // Load video source for current video
+      const currentVideo = videos[params.index];
+      if (currentVideo?.info) {
+        console.log("metadata", currentVideo.metadata);
+        await loadVideoSource(currentVideo.info, currentVideo.metadata || null);
+        player.play();
+      }
     } catch (e) {
-      console.error("can't load all videos", e);
+      console.error("can't load videos with metadata", e);
     }
   }
 
@@ -173,11 +181,19 @@ export function VideoPlayer() {
     }
   }
 
-  // Get video and metadata when selected id change
+  // Get all videos with metadata when video IDs change
   useEffect(() => {
-    getVideo();
-    getAllVideos();
-  }, [id, params.ids, params.index]);
+    getAllVideosWithMetadata();
+  }, [params.ids]);
+
+  // Load video source when index changes (switching between videos of the same day)
+  useEffect(() => {
+    const currentVideo = allVideos[params.index];
+    if (currentVideo?.info) {
+      loadVideoSource(currentVideo.info, currentVideo.metadata || null);
+      player.play();
+    }
+  }, [params.index, allVideos]);
 
   // Set page title
   useEffect(() => {
@@ -203,7 +219,7 @@ export function VideoPlayer() {
       try {
         const newMetadata = await markVideoAsUnselected(id);
         if (newMetadata != null) {
-          setVideoMetadata(newMetadata);
+          updateVideoMetadataInState(id, newMetadata);
         }
       } catch (e) {
         console.error("error while unselecting video", e);
@@ -213,7 +229,7 @@ export function VideoPlayer() {
       try {
         const newMetadata = await markVideoAsSelected(id, new Date(videoInfo.creationTime), new Date(params.day));
         if (newMetadata != null) {
-          setVideoMetadata(newMetadata);
+          updateVideoMetadataInState(id, newMetadata);
         }
       } catch (e) {
         console.error("error while selecting video", e);
