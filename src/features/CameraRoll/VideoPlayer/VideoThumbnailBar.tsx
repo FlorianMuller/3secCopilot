@@ -5,6 +5,7 @@ import { CameraRollNavigationProp } from "../../../navigation/CameraRollNavigati
 import { VideoPlayerURI } from "../../../navigation";
 import { PhoneMedia } from "../CameraRoll";
 import { VidThumbnail } from "../VideoThumbnail";
+import { utilStyles } from "../../../utils/utilStyles";
 
 interface VideoThumbnailBarProps {
   videos: PhoneMedia[];
@@ -42,37 +43,31 @@ export function VideoThumbnailBar({ videos, currentIndex, routeParams }: VideoTh
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        style={styles.scrollView}
-      >
-        {videos.map((video, index) => {
-          const isActive = index === currentIndex;
-          return (
-            <VidThumbnail
-              key={video.id}
-              video={video}
-              displayAs="normal"
-              size={THUMBNAIL_SIZE}
-              style={[
-                styles.thumbnailButton,
-                isActive && styles.activeThumbnail,
-                isActive && { borderColor: theme.colors.accent },
-                {
-                  borderRadius: theme.borderRadius,
-                  marginHorizontal: THUMBNAIL_MARGIN,
-                },
-              ]}
-              onPress={() => {
-                console.log("Navigating to video", video.id, "at index", index);
-                navigation.navigate(VideoPlayerURI, { ...routeParams, index });
-              }}
-            />
-          );
-        })}
+      <ScrollView ref={scrollViewRef} horizontal showsHorizontalScrollIndicator={false}>
+        <View style={[utilStyles.ListRow, { gap: THUMBNAIL_MARGIN }, styles.scrollContent]}>
+          {videos.map((video, index) => {
+            const isActive = index === currentIndex;
+            return (
+              <VidThumbnail
+                key={video.id}
+                video={video}
+                size={THUMBNAIL_SIZE}
+                style={[
+                  styles.thumbnailButton,
+                  isActive && styles.activeThumbnail,
+                  isActive && { borderColor: theme.colors.accent },
+                  {
+                    borderRadius: theme.borderRadius,
+                  },
+                ]}
+                onPress={() => {
+                  console.log("Navigating to video", video.id, "at index", index);
+                  navigation.navigate(VideoPlayerURI, { ...routeParams, index });
+                }}
+              />
+            );
+          })}
+        </View>
       </ScrollView>
     </View>
   );
@@ -83,18 +78,14 @@ const styles = StyleSheet.create({
     height: THUMBNAIL_SIZE + 16,
     paddingVertical: 8,
   },
-  scrollView: {
-    flex: 1,
-  },
+  scrollView: {},
   scrollContent: {
     paddingHorizontal: 16,
-    alignItems: "center",
   },
   thumbnailButton: {
     overflow: "hidden",
   },
   activeThumbnail: {
-    borderWidth: 3,
-    borderColor: "white",
+    borderWidth: 2,
   },
 });
