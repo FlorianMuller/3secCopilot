@@ -35,6 +35,11 @@ export interface GetThumbnailResult {
 
 // Check if a video thumbnail has already been cached, if not generate it and cached it
 export async function getVideoThumbnail(video: PhoneMedia): Promise<GetThumbnailResult> {
+  const cachedUri = getCachedThumbnailUri(video.id);
+  if (await doesFileExists(cachedUri)) {
+    return { status: "alreadyCached", uri: cachedUri };
+  }
+
   let info = video.info;
   try {
     if (info === undefined) {
@@ -43,11 +48,6 @@ export async function getVideoThumbnail(video: PhoneMedia): Promise<GetThumbnail
   } catch (e) {
     console.error("error while getting video info (to get local uri)", e);
     return { status: "generationFailed", uri: null };
-  }
-
-  const cachedUri = getCachedThumbnailUri(video.id);
-  if (await doesFileExists(cachedUri)) {
-    return { status: "alreadyCached", uri: cachedUri };
   }
 
   // Generating video thumbnail

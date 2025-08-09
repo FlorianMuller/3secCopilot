@@ -1,7 +1,7 @@
 import Feather from "@expo/vector-icons/Feather";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useTheme } from "@react-navigation/native";
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { SubTitle } from "../../components/text/SubTitle";
 import { VideoPlayerURI } from "../../navigation";
@@ -17,7 +17,11 @@ interface DaySectionProps {
 }
 
 export const DaySection = React.memo(function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
+  const theme = useTheme();
   const navigation = useNavigation<CameraRollNavigationProp>();
+
+  const { width } = useWindowDimensions();
+  const thumbnailSize = width / 5;
 
   const reversedVideosOfTheDay = [...videosOfTheDay].reverse();
   const videosIds = reversedVideosOfTheDay.map((vid) => vid.id);
@@ -36,15 +40,17 @@ export const DaySection = React.memo(function DaySection({ item: { day, videosOf
         {/* Video list */}
         {videosOfTheDay.length > 0 &&
           reversedVideosOfTheDay.map((vid, i) => (
-            <VidThumbnail
-              key={vid.id}
-              video={vid}
-              displayAs={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "selected" : "unselected") : "normal"}
-              onPress={() => {
-                navigation.navigate(VideoPlayerURI, { day: day.toISOString(), ids: videosIds, index: i });
-              }}
-              style={{ padding: 1 }}
-            />
+            <View key={vid.id} style={{ padding: 1, width: thumbnailSize, height: thumbnailSize }}>
+              <VidThumbnail
+                video={vid}
+                displayAs={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "normal" : "unselected") : "normal"}
+                onPress={() => {
+                  navigation.navigate(VideoPlayerURI, { day: day.toISOString(), ids: videosIds, index: i });
+                }}
+                style={vid.metadata?.isSelected && { borderWidth: 2, borderColor: theme.colors.accent }}
+                size={thumbnailSize - 20}
+              />
+            </View>
           ))}
 
         {/* No video */}

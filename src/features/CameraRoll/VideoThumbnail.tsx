@@ -23,7 +23,7 @@ import Feather from "@expo/vector-icons/Feather";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
-  displayAs?: "normal" | "selected" | "unselected";
+  displayAs?: "normal" | "unselected";
   onPress?: (event: GestureResponderEvent) => void;
   size?: number;
   style?: StyleProp<ViewStyle>;
@@ -83,31 +83,19 @@ export function VidThumbnail({ video, displayAs = "normal", onPress, size, style
       {/* Thumbnail */}
       <Image
         source={{ uri: thumbnailUriWithRefresh }}
-        style={[
-          styles.thumbnail,
-          displayAs === "selected" ? { borderWidth: 2, borderColor: theme.colors.accent } : undefined,
-          displayAs === "unselected" ? { opacity: 0.3 } : undefined,
-        ]}
+        style={[styles.thumbnail, displayAs === "unselected" ? { opacity: 0.3 } : undefined]}
       />
 
-      {/* Badges */}
-      {/* <View style={[styles.topRight, utilStyles.ListRow, { gap: 2 }]}>
-      </View> */}
       {/* Trim badge */}
       {video.metadata && isVideoTrimmed(video.metadata) && (
         <IconBadge
           style={[
             {
               position: "absolute",
-              left: 1,
-              top: 1,
+              left: 0,
+              top: 0,
               borderRadius: 0,
               borderBottomRightRadius: 9,
-            },
-            displayAs === "selected" && {
-              borderTopWidth: SELECTED_BORDER_WIDTH,
-              borderLeftWidth: SELECTED_BORDER_WIDTH,
-              borderColor: theme.colors.accent,
             },
           ]}
           Icon={({ size, theme }) => <Ionicons name="cut" size={size} color={theme.colors.textOnPrimary} />}
@@ -115,7 +103,7 @@ export function VidThumbnail({ video, displayAs = "normal", onPress, size, style
       )}
 
       {/* Selected badge */}
-      {displayAs === "selected" && (
+      {video.metadata?.isSelected && (
         <IconBadge
           style={[
             {
@@ -161,7 +149,7 @@ const styles = StyleSheet.create({
   },
   topRight: {
     position: "absolute",
-    right: 1,
-    top: 1,
+    right: 0,
+    top: 0,
   },
 });
