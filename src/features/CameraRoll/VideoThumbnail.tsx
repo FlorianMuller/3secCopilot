@@ -14,6 +14,7 @@ import { MyAppText } from "../../components/text/MyAppText";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
 import { getCachedThumbnailUri, getVideoThumbnail } from "./thumbnailService";
+import { ThumbnailPriority } from "../../services/thumbnailQueue";
 import { displayDurationFromMilis, displayDurationFromSecond } from "../../utils/dateTime";
 import { isVideoTrimmed } from "../../services/trim";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -27,9 +28,10 @@ export interface VidThumbnailProps {
   onPress?: (event: GestureResponderEvent) => void;
   size?: number;
   style?: StyleProp<ViewStyle>;
+  isVisible?: boolean;
 }
 
-export function VidThumbnail({ video, displayAs = "normal", onPress, size, style }: VidThumbnailProps) {
+export function VidThumbnail({ video, displayAs = "normal", onPress, size, style, isVisible = true }: VidThumbnailProps) {
   const [thumbnailUri, setThumbnailUri] = useState<string>(getCachedThumbnailUri(video.id));
   const [refreshCount, setRefreshCount] = useState<number>(0);
   const thumbnailUriWithRefresh = thumbnailUri + `?refresh=${refreshCount}`;
@@ -38,20 +40,37 @@ export function VidThumbnail({ video, displayAs = "normal", onPress, size, style
   const theme = useTheme();
 
   useEffect(() => {
-    handleThumbnail();
-  }, [video]);
+    const abortController = new AbortController();
+    
+    handleThumbnail(abortController.signal);
+    
+    return () => {
+      abortController.abort();
+    };
+  }, [video, isVisible]);
 
-  async function handleThumbnail() {
-    const newThumbnailResult = await getVideoThumbnail(video);
+  async function handleThumbnail(signal: AbortSignal) {
+    // Determine priority based on visibility
+    const priority = isVisible ? ThumbnailPriority.HIGH : ThumbnailPriority.LOW;
+    
+    try {
+      const newThumbnailResult = await getVideoThumbnail(video, { priority, signal });
 
-    // Thumnail was generated, we need to refresh the <Image> uri to load the image
-    if (newThumbnailResult.status === "generatedAndCached") {
-      setRefreshCount((oldRefresh) => oldRefresh + 1);
-    }
+      // Check if component was unmounted or request was cancelled
+      if (signal.aborted) return;
 
-    // Cache failed, use uri of generated thumbnail directly
-    if (newThumbnailResult.status === "generatedAndCachedFailed" && newThumbnailResult.uri) {
-      setThumbnailUri(newThumbnailResult.uri);
+      // Thumnail was generated, we need to refresh the <Image> uri to load the image
+      if (newThumbnailResult.status === "generatedAndCached") {
+        setRefreshCount((oldRefresh) => oldRefresh + 1);
+      }
+
+      // Cache failed, use uri of generated thumbnail directly
+      if (newThumbnailResult.status === "generatedAndCachedFailed" && newThumbnailResult.uri) {
+        setThumbnailUri(newThumbnailResult.uri);
+      }
+    } catch (error) {
+      if (signal.aborted) return;
+      console.error("Thumbnail generation error:", error);
     }
 
     // Todo: manage generation failed status (show a 'X', a'?' ?)
@@ -125,8 +144,6 @@ export function VidThumbnail({ video, displayAs = "normal", onPress, size, style
     </TouchableOpacity>
   );
 }
-
-const SELECTED_BORDER_WIDTH = 2;
 
 const styles = StyleSheet.create({
   container: {

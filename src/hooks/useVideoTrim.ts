@@ -3,11 +3,8 @@ import { useEffect, useRef } from "react";
 import { type EventSubscription } from "react-native";
 import { showEditor } from "react-native-video-trim";
 import videoTrim from "react-native-video-trim";
-import {
-  prepareVideoForTrim,
-  finalizeTrimmedVideo,
-  cleanupTempVideoFile,
-} from "../services/trim";
+import { prepareVideoForTrim, finalizeTrimmedVideo } from "../services/trim";
+import { cleanupTempVideo } from "../services/localVideo";
 
 export interface TrimResult {
   outputPath: string;
@@ -33,7 +30,7 @@ export function useVideoTrim(options: UseVideoTrimOptions = {}) {
 
   async function cleanupTempFile() {
     if (currentVideoInfo.current) {
-      await cleanupTempVideoFile(currentVideoInfo.current);
+      await cleanupTempVideo(currentVideoInfo.current);
     }
   }
 

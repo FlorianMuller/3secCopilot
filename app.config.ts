@@ -3,7 +3,7 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 type BuildMode = "dev" | "dogfood";
 
 const getBuildMode = (): BuildMode => {
-  const mode = process.env.EXPO_BUILD_MODE as BuildMode;
+  const mode = process.env.EXPO_BUILD_MODE;
   return mode === "dev" || mode === "dogfood" ? mode : "dev";
 };
 
@@ -73,9 +73,11 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
       return {
         ...baseConfig,
         name: "3secs Copilot (Dev)",
+        slug: "3secsDev",
+        version: "1.0.0-dev",
         ios: {
-          bundleIdentifier: "com.fmuller.3secs.dev",
           ...baseConfig.ios,
+          bundleIdentifier: "com.fmuller.3secsDev",
         },
       };
 
@@ -93,7 +95,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const buildMode = getBuildMode();
   const buildConfig = getConfigForBuildMode(buildMode);
 
-  console.log(`🔧 Building in ${buildMode} mode`);
+  console.log(`🔧 Building in ${buildMode} mode(${buildConfig?.ios?.bundleIdentifier})`);
 
   return {
     ...config,

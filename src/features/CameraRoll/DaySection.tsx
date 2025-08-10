@@ -13,10 +13,11 @@ interface DaySectionProps {
   item: {
     day: Date;
     videosOfTheDay: PhoneMedia[];
+    isVisible: boolean;
   };
 }
 
-export const DaySection = React.memo(function DaySection({ item: { day, videosOfTheDay } }: DaySectionProps) {
+export const DaySection = React.memo(function DaySection({ item: { day, videosOfTheDay, isVisible } }: DaySectionProps) {
   const theme = useTheme();
   const navigation = useNavigation<CameraRollNavigationProp>();
 
@@ -49,6 +50,7 @@ export const DaySection = React.memo(function DaySection({ item: { day, videosOf
                 }}
                 style={vid.metadata?.isSelected && { borderWidth: 2, borderColor: theme.colors.accent }}
                 size={thumbnailSize - 20}
+                isVisible={isVisible}
               />
             </View>
           ))}
