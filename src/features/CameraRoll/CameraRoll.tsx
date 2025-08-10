@@ -2,7 +2,7 @@ import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, unstable_batchedUpdates, View } from "react-native";
+import { FlatList, unstable_batchedUpdates, View, ViewToken } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { VideoMetadata } from "../../db/schema";
 import { getEffectiveDate } from "../../services/dayShift";
@@ -34,6 +34,7 @@ export default function CameraRoll({
   const videoEndCursorRef = useRef<MediaLibrary.AssetRef>();
   const loadingVideoRef = useRef<boolean>(false);
   const [allVideoLoaded, setAllVideoLoaded] = useState<boolean>(false);
+  const [visibleDays, setVisibleDays] = useState<Set<string>>(new Set());
 
   const getVid = async () => {
     if (loadingVideoRef.current || allVideoLoaded) {
@@ -143,6 +144,22 @@ export default function CameraRoll({
     return getDaysBetween(startDate, lastDateToDisplay);
   }, [startDate, endDate, videos, allVideoLoaded, gotVideo]);
 
+  // Handle viewable items changed to track visible days for priority
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const newVisibleDays = new Set<string>();
+    viewableItems.forEach((item) => {
+      if (item.item && typeof item.item === 'object' && 'day' in item.item) {
+        const dayItem = item.item as { day: Date };
+        newVisibleDays.add(dayItem.day.toDateString());
+      }
+    });
+    setVisibleDays(newVisibleDays);
+  }, []);
+
+  const viewabilityConfig = {
+    viewAreaCoveragePercentThreshold: 10, // Consider item visible when 10% is shown
+  };
+
   return (
     <>
       {/* Linear gradient between thumbnails and phone status bar (time, wifi icon...) */}
@@ -160,7 +177,11 @@ export default function CameraRoll({
 
       {gotVideo && (
         <FlatList
-          data={days.map((day) => ({ day, videosOfTheDay: videosByDay[day.toDateString()] || [] }))}
+          data={days.map((day) => ({ 
+            day, 
+            videosOfTheDay: videosByDay[day.toDateString()] || [],
+            isVisible: visibleDays.has(day.toDateString())
+          }))}
           renderItem={(props) => <DaySection {...props} />}
           keyExtractor={({ day }) => day.toDateString()}
           indicatorStyle="white"
@@ -168,6 +189,8 @@ export default function CameraRoll({
           onEndReachedThreshold={300}
           initialNumToRender={20}
           maxToRenderPerBatch={20}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           // To not render fist section under iPhone notch
           // todo: use safe zone component to detect if there's a notch
           ListHeaderComponent={<View style={{ height: 70 }} />}
