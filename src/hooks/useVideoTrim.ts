@@ -23,7 +23,7 @@ export interface UseVideoTrimOptions {
 }
 
 export function useVideoTrim(options: UseVideoTrimOptions = {}) {
-  const { maxDuration = 20, onTrimStart, onTrimComplete, onTrimCancel, onError } = options;
+  const { maxDuration, onTrimStart, onTrimComplete, onTrimCancel, onError } = options;
 
   const listenerSubscription = useRef<Record<string, EventSubscription>>({});
   const currentVideoInfo = useRef<MediaLibrary.AssetInfo | null>(null);
@@ -121,6 +121,7 @@ export function useVideoTrim(options: UseVideoTrimOptions = {}) {
       console.log("Launching trim editor with temp file");
       showEditor(tempPath, {
         maxDuration,
+        minDuration: 0.1,
       });
       console.log("Trim editor launched for video:", tempPath);
 
