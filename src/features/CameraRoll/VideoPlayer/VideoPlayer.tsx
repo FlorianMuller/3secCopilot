@@ -22,6 +22,7 @@ import { doesTrimmedVideoExist, getTrimmedVideoPath, isVideoTrimmed, reTrimVideo
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
 import { PhoneMedia } from "../CameraRoll";
 import { VideoThumbnailBar } from "./VideoThumbnailBar";
+import { cleanupTempVideo, copyVideoToTemp } from "../../../services/localVideo";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -133,8 +134,9 @@ export function VideoPlayer() {
     try {
       if (metadata === null || !isVideoTrimmed(metadata)) {
         // No trim metadata - load original video
+        const tempPath = await copyVideoToTemp(info);
         await player.replaceAsync({
-          uri: getLocalUri(info),
+          uri: tempPath,
         });
         return;
       }
@@ -176,7 +178,14 @@ export function VideoPlayer() {
     }
   }
 
-  // Get all videos with metadata when video IDs change
+  useEffect(() => {
+    console.log("VideoPlayer mounted");
+    return () => {
+      console.log("VideoPlayer unmounted");
+    };
+  }, []);
+
+  // Get all videos with metadata
   useEffect(() => {
     getAllVideosWithMetadata();
   }, [params.ids]);
@@ -188,6 +197,12 @@ export function VideoPlayer() {
       loadVideoSource(currentVideo.info, currentVideo.metadata || null);
       player.play();
     }
+    return () => {
+      // Clean up temporary video file when switching videos
+      if (currentVideo?.info) {
+        cleanupTempVideo(currentVideo.info);
+      }
+    };
   }, [params.index, allVideos]);
 
   // Set page title
