@@ -50,12 +50,8 @@ export function VideoPlayer() {
 
   // Helper function to update metadata for a specific video
   const updateVideoMetadataInState = (videoId: string, newMetadata: VideoMetadata) => {
-    setAllVideos(prevVideos => 
-      prevVideos.map(video => 
-        video.id === videoId 
-          ? { ...video, metadata: newMetadata }
-          : video
-      )
+    setAllVideos((prevVideos) =>
+      prevVideos.map((video) => (video.id === videoId ? { ...video, metadata: newMetadata } : video))
     );
   };
 
@@ -71,7 +67,6 @@ export function VideoPlayer() {
 
   // Video trim functionality
   const { openTrimEditor } = useVideoTrim({
-    maxDuration: 20,
     onTrimComplete: async (result) => {
       console.log("Trim completed:", result);
       try {
@@ -111,13 +106,13 @@ export function VideoPlayer() {
     try {
       const [videosInfo, videosMetadata] = await Promise.all([
         Promise.all(params.ids.map((videoId) => MediaLibrary.getAssetInfoAsync(videoId))),
-        getVideosMetadtaByIds(params.ids)
+        getVideosMetadtaByIds(params.ids),
       ]);
 
       const videos: PhoneMedia[] = videosInfo.map((info) => ({
         ...info,
         info,
-        metadata: videosMetadata[info.id]
+        metadata: videosMetadata[info.id],
       }));
 
       setAllVideos(videos);
