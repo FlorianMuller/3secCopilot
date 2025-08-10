@@ -1,6 +1,6 @@
 import { useNavigation, useTheme } from "@react-navigation/native";
 import { useEffect, useRef } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { CameraRollNavigationProp } from "../../../navigation/CameraRollNavigation";
 import { VideoPlayerURI } from "../../../navigation";
 import { PhoneMedia } from "../CameraRoll";
@@ -26,16 +26,20 @@ export function VideoThumbnailBar({ videos, currentIndex, routeParams }: VideoTh
   const navigation = useNavigation<CameraRollNavigationProp>();
   const scrollViewRef = useRef<ScrollView>(null);
   const theme = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
 
   useEffect(() => {
     if (scrollViewRef.current && videos.length > 0) {
-      const scrollToX = currentIndex * TOTAL_THUMBNAIL_WIDTH - 2.5 * TOTAL_THUMBNAIL_WIDTH;
+      const screenCenter = screenWidth / 2;
+      const thumbnailCenter = currentIndex * TOTAL_THUMBNAIL_WIDTH + THUMBNAIL_SIZE / 2;
+      const scrollToX = thumbnailCenter - screenCenter;
+      
       scrollViewRef.current.scrollTo({
         x: Math.max(0, scrollToX),
         animated: true,
       });
     }
-  }, [currentIndex, videos.length]);
+  }, [currentIndex, videos.length, screenWidth]);
 
   if (videos.length <= 1) {
     return <View style={styles.container} />;
