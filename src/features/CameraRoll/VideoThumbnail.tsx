@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  DimensionValue,
   GestureResponderEvent,
   Image,
   StyleProp,
@@ -26,12 +27,19 @@ export interface VidThumbnailProps {
   video: PhoneMedia;
   displayAs?: "normal" | "unselected";
   onPress?: (event: GestureResponderEvent) => void;
-  size?: number;
+  size?: DimensionValue;
   style?: StyleProp<ViewStyle>;
   isVisible?: boolean;
 }
 
-export function VidThumbnail({ video, displayAs = "normal", onPress, size, style, isVisible = true }: VidThumbnailProps) {
+export function VidThumbnail({
+  video,
+  displayAs = "normal",
+  onPress,
+  size = "100%",
+  style,
+  isVisible = true,
+}: VidThumbnailProps) {
   const [thumbnailUri, setThumbnailUri] = useState<string>(getCachedThumbnailUri(video.id));
   const [refreshCount, setRefreshCount] = useState<number>(0);
   const thumbnailUriWithRefresh = thumbnailUri + `?refresh=${refreshCount}`;
@@ -41,9 +49,9 @@ export function VidThumbnail({ video, displayAs = "normal", onPress, size, style
 
   useEffect(() => {
     const abortController = new AbortController();
-    
+
     handleThumbnail(abortController.signal);
-    
+
     return () => {
       abortController.abort();
     };
@@ -52,7 +60,7 @@ export function VidThumbnail({ video, displayAs = "normal", onPress, size, style
   async function handleThumbnail(signal: AbortSignal) {
     // Determine priority based on visibility
     const priority = isVisible ? ThumbnailPriority.HIGH : ThumbnailPriority.LOW;
-    
+
     try {
       const newThumbnailResult = await getVideoThumbnail(video, { priority, signal });
 
