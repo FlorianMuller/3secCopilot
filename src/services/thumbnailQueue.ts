@@ -9,6 +9,6 @@ export enum ThumbnailPriority {
 // Global thumbnail generation queue with concurrency control
 export const thumbnailQueue = new PQueue({
   concurrency: 3, // Maximum 3 thumbnails generating simultaneously
-  intervalCap: 30, // Maximum 6 thumbnails per interval (prevents iOS resource exhaustion)
+  intervalCap: 10, // Maximum 6 thumbnails per interval (prevents iOS resource exhaustion)
   interval: 1000, // 1 second interval
 });
