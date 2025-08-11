@@ -6,6 +6,8 @@ export interface MyTheme extends Theme {
     secondary: string;
     accent: string;
     textOnPrimary: string;
+    textOnSecondary: string;
+    textOnAccent: string;
   };
   borderRadius: number;
 }
@@ -27,6 +29,8 @@ export const myDarkTheme: MyTheme = {
     accent: darkAccent,
     text: darkText,
     textOnPrimary: darkText,
+    textOnSecondary: darkText,
+    textOnAccent: darkText,
 
     card: pSBC(-0.95, darkSecondary) || "red",
     border: "transparent",
@@ -44,6 +48,8 @@ export const myLightTheme: MyTheme = {
     secondary: DefaultTheme.colors.primary,
     accent: DefaultTheme.colors.primary,
     textOnPrimary: "white",
+    textOnSecondary: "white",
+    textOnAccent: "white",
   },
   borderRadius: 10,
 };

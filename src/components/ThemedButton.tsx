@@ -10,16 +10,28 @@ import { MyAppText } from "./text/MyAppText";
 export interface ThemeButtonProps extends ViewProps {
   Icon?: ComponentType<{ theme: MyTheme }>;
   text?: string;
+  variant?: "filled" | "outline";
+  themeColor?: "primary" | "secondary" | "accent";
 }
 
-export function ThemedButton({ Icon, text, children, ...props }: ThemeButtonProps) {
+export function ThemedButton({ Icon, text, children, variant = "filled", themeColor = "primary", ...props }: ThemeButtonProps) {
   const theme = useTheme();
   const { colors } = theme;
 
+  const isOutline = variant === "outline";
+  
+  // Get colors based on themeColor selection
+  const buttonColor = colors[themeColor];
+  const textOnColor = colors[`textOn${themeColor.charAt(0).toUpperCase() + themeColor.slice(1)}` as keyof typeof colors] as string;
+  
+  const backgroundColor = isOutline ? "transparent" : buttonColor;
+  const textColor = isOutline ? buttonColor : textOnColor;
+  const borderStyle = isOutline ? { borderWidth: 2, borderColor: buttonColor } : {};
+
   return (
-    <View {...props} style={[styles.defaultButton, { backgroundColor: colors.primary, borderRadius: 20 }, props.style]}>
+    <View {...props} style={[styles.defaultButton, { backgroundColor, borderRadius: 20 }, borderStyle, props.style]}>
       {Icon && <Icon theme={theme} />}
-      {text && <MyAppText color={theme.colors.textOnPrimary}>{text}</MyAppText>}
+      {text && <MyAppText color={textColor}>{text}</MyAppText>}
       {children}
     </View>
   );
@@ -63,6 +75,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
   },
   roundButton: {
     borderRadius: 100,

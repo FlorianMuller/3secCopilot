@@ -5,6 +5,7 @@ import { Pressable, View } from "react-native";
 import { MyAppText } from "../../../components/text/MyAppText";
 import { formatBytes } from "../../../utils/formatBytes";
 import { OptionSection } from "../OptionSection";
+import { useTheme } from "@react-navigation/native";
 
 interface CacheDirectory {
   name: string;
@@ -13,6 +14,7 @@ interface CacheDirectory {
 }
 
 export function CacheOptionSection() {
+  const theme = useTheme();
   const [cacheDirectories, setCacheDirectories] = useState<CacheDirectory[]>([]);
   const [totalCacheSize, setTotalCacheSize] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +95,7 @@ export function CacheOptionSection() {
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <MyAppText>Total cache size: {totalSizeDisplay}</MyAppText>
         <Pressable onPress={loadCacheDirectories}>
-          <Feather name="refresh-cw" size={20} color="#007AFF" />
+          <Feather name="refresh-cw" size={20} color={theme.colors.accent} />
         </Pressable>
       </View>
 
