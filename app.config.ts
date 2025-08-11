@@ -11,7 +11,6 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
   const baseConfig: ExpoConfig = {
     name: "3secs Copilot",
     slug: "3secs",
-    scheme: "3secs",
     version: "1.0.0",
     orientation: "portrait" as const,
     icon: "./assets/icon.png",
@@ -62,11 +61,6 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
       "expo-video",
       "expo-sqlite",
     ],
-    extra: {
-      eas: {
-        projectId: "9c2f7031-bf09-4aca-bcab-b02914342ee7",
-      },
-    },
   };
 
   switch (buildMode) {
@@ -75,7 +69,6 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
         ...baseConfig,
         name: "3secs Copilot (Dev)",
         slug: "3secsDev",
-        scheme: "3secsDev",
         version: "1.0.0-dev",
         ios: {
           ...baseConfig.ios,
