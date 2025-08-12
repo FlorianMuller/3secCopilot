@@ -1,4 +1,3 @@
-import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,6 +7,9 @@ import { VideoMetadata } from "../../db/schema";
 import { getEffectiveDate } from "../../services/dayShift";
 import preferences from "../../services/preferences";
 import { getVideosMetadtaByIds } from "../../services/metadata";
+import { getMediaLibraryUpdate } from "../../services/mediaLibrary";
+import { useAppState } from "../../hooks/useAppState";
+import { useNavigationFocus } from "../../hooks/useNavigationFocus";
 import { groupBy } from "../../utils/groupBy";
 import { utilStyles } from "../../utils/utilStyles";
 import { DaySection } from "./DaySection";
@@ -26,15 +28,16 @@ export default function CameraRoll({
   startDate = new Date(),
   endDate = new Date(startDate.getFullYear() - 1, 0), // todo: add a year selector
 }: CameraRollProps) {
-  const navigation = useNavigation();
   const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
   const { dayShift } = preferences.useDayShiftPreference();
 
   const [videos, setVideos] = useState<PhoneMedia[]>([]);
-  const videoEndCursorRef = useRef<MediaLibrary.AssetRef>();
+  const videoEndCursorRef = useRef<MediaLibrary.AssetRef | undefined>(undefined);
   const loadingVideoRef = useRef<boolean>(false);
   const [allVideoLoaded, setAllVideoLoaded] = useState<boolean>(false);
   const [visibleDays, setVisibleDays] = useState<Set<string>>(new Set());
+  const lastCheckRef = useRef<number>(0);
+  const CHECK_COOLDOWN = 500; // 500 ms
 
   const getVid = async () => {
     if (loadingVideoRef.current || allVideoLoaded) {
@@ -98,19 +101,77 @@ export default function CameraRoll({
     }
   }, [videos]);
 
+  const performDifferentialUpdate = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastCheckRef.current < CHECK_COOLDOWN) {
+      // Too frequent - skip this check
+      return;
+    }
+
+    lastCheckRef.current = now;
+
+    try {
+      setTimeout(async () => {
+        console.log("Checking for new videos...");
+        const updateLate = await getMediaLibraryUpdate(
+          videos.map((v) => v.id),
+          startDate,
+          endDate
+        );
+        console.log("updateLate result: ", updateLate);
+      }, 1000);
+      const update = await getMediaLibraryUpdate(
+        videos.map((v) => v.id),
+        startDate,
+        endDate
+      );
+      console.log("update result: ", update);
+
+      if (!update.hasChanges) {
+        // No changes, just refetch metadata
+        refetchMetadata();
+        return;
+      }
+
+      console.log(
+        `Media library changes detected: +${update.addedVideos.length} videos, -${update.removedIds.length} videos`
+      );
+
+      // Apply differential updates
+      unstable_batchedUpdates(() => {
+        setVideos((oldVideos) => {
+          // Remove deleted videos
+          let filteredVideos = oldVideos.filter((v) => !update.removedIds.includes(v.id));
+
+          // Add new videos and sort by creation time (newest first)
+          const updatedVideos = [...filteredVideos, ...update.addedVideos].sort(
+            (a, b) => b.creationTime - a.creationTime
+          );
+
+          return updatedVideos;
+        });
+      });
+    } catch (error) {
+      console.error("Error performing differential update:", error);
+      // Fallback to metadata refetch
+      refetchMetadata();
+    }
+  }, [videos, startDate, endDate, refetchMetadata]);
+
+  // Use AppState hook to detect when app comes back from background
+  useAppState(() => {
+    performDifferentialUpdate();
+  });
+
+  // Use navigation focus hook to detect when page comes into focus
+  useNavigationFocus(() => {
+    performDifferentialUpdate();
+  });
+
   // Fetch video when component mount
   useEffect(() => {
     getVid();
   }, []);
-
-  // Refetch metadata when the page is focused
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
-      refetchMetadata();
-    });
-
-    return unsubscribe;
-  }, [navigation, refetchMetadata]);
 
   function getDaysBetween(start: Date, end: Date) {
     const dates: Date[] = [];
@@ -148,7 +209,7 @@ export default function CameraRoll({
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const newVisibleDays = new Set<string>();
     viewableItems.forEach((item) => {
-      if (item.item && typeof item.item === 'object' && 'day' in item.item) {
+      if (item.item && typeof item.item === "object" && "day" in item.item) {
         const dayItem = item.item as { day: Date };
         newVisibleDays.add(dayItem.day.toDateString());
       }
@@ -177,10 +238,10 @@ export default function CameraRoll({
 
       {gotVideo && (
         <FlatList
-          data={days.map((day) => ({ 
-            day, 
+          data={days.map((day) => ({
+            day,
             videosOfTheDay: videosByDay[day.toDateString()] || [],
-            isVisible: visibleDays.has(day.toDateString())
+            isVisible: visibleDays.has(day.toDateString()),
           }))}
           renderItem={(props) => <DaySection {...props} />}
           keyExtractor={({ day }) => day.toDateString()}
