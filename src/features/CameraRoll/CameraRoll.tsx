@@ -4,12 +4,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FlatList, unstable_batchedUpdates, View, ViewToken } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { VideoMetadata } from "../../db/schema";
-import { getEffectiveDate } from "../../services/dayShift";
-import preferences from "../../services/preferences";
-import { getVideosMetadtaByIds } from "../../services/metadata";
-import { getMediaLibraryUpdate } from "../../services/mediaLibrary";
-import { useAppState } from "../../hooks/useAppState";
 import { useNavigationFocus } from "../../hooks/useNavigationFocus";
+import { getEffectiveDate } from "../../services/dayShift";
+import { useMediaLibraryChanges } from "../../services/mediaLibrary";
+import { getVideosMetadtaByIds } from "../../services/metadata";
+import preferences from "../../services/preferences";
+import { getDaysBetween } from "../../utils/getDaysBetween";
 import { groupBy } from "../../utils/groupBy";
 import { utilStyles } from "../../utils/utilStyles";
 import { DaySection } from "./DaySection";
@@ -25,8 +25,8 @@ export interface CameraRollProps {
 }
 
 export default function CameraRoll({
-  startDate = new Date(),
-  endDate = new Date(startDate.getFullYear() - 1, 0), // todo: add a year selector
+  startDate = new Date(new Date().setHours(23, 59, 59, 999)), // Today at 23:59:59
+  endDate = new Date(new Date().getFullYear(), 0, 1), // January 1st of current year
 }: CameraRollProps) {
   const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
   const { dayShift } = preferences.useDayShiftPreference();
@@ -36,10 +36,14 @@ export default function CameraRoll({
   const loadingVideoRef = useRef<boolean>(false);
   const [allVideoLoaded, setAllVideoLoaded] = useState<boolean>(false);
   const [visibleDays, setVisibleDays] = useState<Set<string>>(new Set());
-  const lastCheckRef = useRef<number>(0);
-  const CHECK_COOLDOWN = 500; // 500 ms
 
-  const getVid = async () => {
+  const gotVideo = videos.length > 0;
+  const lastDateToDisplay = useMemo(
+    () => (allVideoLoaded || videos.length == 0 ? endDate : new Date(videos[videos.length - 1].creationTime)),
+    [allVideoLoaded, endDate, videos]
+  );
+
+  const getVideosNextBatch = async () => {
     if (loadingVideoRef.current || allVideoLoaded) {
       return;
     }
@@ -62,7 +66,7 @@ export default function CameraRoll({
       const vidPage: MediaLibrary.PagedInfo<PhoneMedia> = await MediaLibrary.getAssetsAsync({
         mediaType: "video",
         sortBy: "creationTime",
-        // createdBefore: startDate.getTime(),
+        createdBefore: startDate.getTime(),
         createdAfter: endDate.getTime(),
         first: 100,
         after: videoEndCursorRef.current,
@@ -101,35 +105,21 @@ export default function CameraRoll({
     }
   }, [videos]);
 
-  const performDifferentialUpdate = useCallback(async () => {
-    const now = Date.now();
-    if (now - lastCheckRef.current < CHECK_COOLDOWN) {
-      // Too frequent - skip this check
-      return;
-    }
-
-    lastCheckRef.current = now;
-
-    try {
-      setTimeout(async () => {
-        console.log("Checking for new videos...");
-        const updateLate = await getMediaLibraryUpdate(
-          videos.map((v) => v.id),
-          startDate,
-          endDate
-        );
-        console.log("updateLate result: ", updateLate);
-      }, 1000);
-      const update = await getMediaLibraryUpdate(
-        videos.map((v) => v.id),
-        startDate,
-        endDate
-      );
-      console.log("update result: ", update);
-
+  // Callback to updated videos on media library changes
+  useMediaLibraryChanges(
+    (update) => {
       if (!update.hasChanges) {
         // No changes, just refetch metadata
         refetchMetadata();
+        return;
+      }
+
+      if (!update.hasIncrementalChanges) {
+        console.log("Full media library reload required");
+        // Reset all
+        setVideos([]);
+        setAllVideoLoaded(false);
+        videoEndCursorRef.current = undefined;
         return;
       }
 
@@ -137,57 +127,32 @@ export default function CameraRoll({
         `Media library changes detected: +${update.addedVideos.length} videos, -${update.removedIds.length} videos`
       );
 
-      // Apply differential updates
-      unstable_batchedUpdates(() => {
-        setVideos((oldVideos) => {
-          // Remove deleted videos
-          let filteredVideos = oldVideos.filter((v) => !update.removedIds.includes(v.id));
+      setVideos((oldVideos) => {
+        // Remove deleted videos
+        let filteredVideos = oldVideos.filter((v) => !update.removedIds.includes(v.id));
 
-          // Add new videos and sort by creation time (newest first)
-          const updatedVideos = [...filteredVideos, ...update.addedVideos].sort(
-            (a, b) => b.creationTime - a.creationTime
-          );
+        // Add new videos and sort by creation time (newest first)
+        const updatedVideos = [...filteredVideos, ...update.addedVideos].sort(
+          (a, b) => b.creationTime - a.creationTime
+        );
 
-          return updatedVideos;
-        });
+        return updatedVideos;
       });
-    } catch (error) {
-      console.error("Error performing differential update:", error);
-      // Fallback to metadata refetch
-      refetchMetadata();
-    }
-  }, [videos, startDate, endDate, refetchMetadata]);
-
-  // Use AppState hook to detect when app comes back from background
-  useAppState(() => {
-    performDifferentialUpdate();
-  });
+    },
+    { createdBefore: startDate, createdAfter: lastDateToDisplay }
+  );
 
   // Use navigation focus hook to detect when page comes into focus
   useNavigationFocus(() => {
-    performDifferentialUpdate();
+    refetchMetadata();
   });
 
   // Fetch video when component mount
   useEffect(() => {
-    getVid();
-  }, []);
-
-  function getDaysBetween(start: Date, end: Date) {
-    const dates: Date[] = [];
-    let lastDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    while (lastDate.getTime() >= end.getTime()) {
-      dates.push(lastDate);
-      // new date
-      lastDate = new Date(lastDate);
-      // minus 1 day
-      lastDate.setDate(lastDate.getDate() - 1);
+    if (videos.length == 0 && !allVideoLoaded) {
+      getVideosNextBatch();
     }
-
-    return dates;
-  }
-
-  const gotVideo = videos.length > 0;
+  }, [videos.length]);
 
   const videosByDay = useMemo(
     () =>
@@ -201,9 +166,8 @@ export default function CameraRoll({
     if (!gotVideo) {
       return [];
     }
-    const lastDateToDisplay = allVideoLoaded ? endDate : new Date(videos[videos.length - 1].creationTime);
     return getDaysBetween(startDate, lastDateToDisplay);
-  }, [startDate, endDate, videos, allVideoLoaded, gotVideo]);
+  }, [startDate, lastDateToDisplay, gotVideo]);
 
   // Handle viewable items changed to track visible days for priority
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -246,7 +210,7 @@ export default function CameraRoll({
           renderItem={(props) => <DaySection {...props} />}
           keyExtractor={({ day }) => day.toDateString()}
           indicatorStyle="white"
-          onEndReached={allVideoLoaded ? undefined : getVid}
+          onEndReached={allVideoLoaded ? undefined : getVideosNextBatch}
           onEndReachedThreshold={300}
           initialNumToRender={20}
           maxToRenderPerBatch={20}

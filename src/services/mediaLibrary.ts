@@ -1,45 +1,97 @@
 import * as MediaLibrary from "expo-media-library";
 import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
-import { getVideosMetadtaByIds } from "./metadata";
+import { getVideoMetadata, getVideosMetadtaByIds } from "./metadata";
+import { useEffect } from "react";
+
+const wantedMediaType: MediaLibrary.MediaTypeValue[] = ["video"];
+// todo: add suport for live photos
+// const wantedMediaType: MediaLibrary.MediaTypeValue[] = ["video", "pairedVideo"];
+
+export interface MediaValidityOptions {
+  createdBefore?: Date;
+  createdAfter?: Date;
+}
+
+// Check that:
+// - Asset is a video
+// - Asset creationTime (or asigned time) is in the right range
+// - Asset is not hidden
+export function isAssetWanted(asset: PhoneMedia, options?: MediaValidityOptions): Boolean {
+  const assetDate = asset.metadata?.assignedToDate || new Date(asset.creationTime);
+
+  if (options?.createdBefore && assetDate > options.createdBefore) {
+    return false;
+  }
+
+  if (options?.createdAfter && assetDate < options.createdAfter) {
+    return false;
+  }
+
+  return wantedMediaType.includes(asset.mediaType);
+}
 
 export interface MediaLibraryUpdate {
   addedVideos: PhoneMedia[];
   removedIds: string[];
   hasChanges: boolean;
+  hasIncrementalChanges: boolean; // false if update can't be described by added/removed assets (need full reload)
 }
 
-export const getMediaLibraryUpdate = async (
-  currentVideoIds: string[],
-  startDate: Date,
-  endDate: Date
-): Promise<MediaLibraryUpdate> => {
-  // Get all current video IDs in our date range
-  const allCurrentVideos = await MediaLibrary.getAssetsAsync({
-    mediaType: "video",
-    sortBy: "creationTime",
-    createdAfter: endDate.getTime(),
-    createdBefore: startDate.getTime(),
-    first: currentVideoIds.length || 100, // Use exact count, fallback for empty case
-  });
+export function useMediaLibraryChanges(onUpdate: (update: MediaLibraryUpdate) => void, options?: MediaValidityOptions) {
+  const handleEvent = async (event: MediaLibrary.MediaLibraryAssetsChangeEvent) => {
+    if (!event.hasIncrementalChanges) {
+      onUpdate({
+        addedVideos: [],
+        removedIds: [],
+        hasChanges: true,
+        hasIncrementalChanges: false,
+      });
+      return;
+    }
 
-  const currentIds = new Set(allCurrentVideos.assets.map((v) => v.id));
-  const loadedIds = new Set(currentVideoIds);
+    // Collect all asset IDs and fetch metadata in one call
+    const insertedAssets = event.insertedAssets || [];
+    const deletedAssets = event.deletedAssets || [];
+    // todo: handle updated assets
+    // const updatedAssets = event.updatedAssets || [];
 
-  // Find differences
-  const addedIds = Array.from(currentIds).filter((id) => !loadedIds.has(id));
-  const removedIds = Array.from(loadedIds).filter((id) => !currentIds.has(id));
+    const allAssetIds = [
+      ...insertedAssets.map((v) => v.id),
+      ...deletedAssets.map((v) => v.id),
+      // ...updatedAssets.map((v) => v.id),
+    ];
 
-  // Load full data and metadata for new videos
-  let addedVideos: PhoneMedia[] = [];
-  if (addedIds.length > 0) {
-    const newVideosData = allCurrentVideos.assets.filter((v) => addedIds.includes(v.id));
-    const newMetadata = await getVideosMetadtaByIds(addedIds);
-    addedVideos = newVideosData.map((v) => ({ ...v, metadata: newMetadata[v.id] }));
-  }
+    const allMetadata = await getVideosMetadtaByIds(allAssetIds);
 
-  return {
-    addedVideos,
-    removedIds,
-    hasChanges: addedIds.length > 0 || removedIds.length > 0,
+    const insertedAssetsWithMetadata = insertedAssets.map((v) => ({ ...v, metadata: allMetadata[v.id] }));
+    const deletedAssetsWithMetadata = deletedAssets.map((v) => ({ ...v, metadata: allMetadata[v.id] }));
+    // const updatedAssetsWithMetadata = updatedAssets.map((v) => ({ ...v, metadata: allMetadata[v.id] }));
+
+    // Only keep asset we are interested in (videos)
+    const wantedInsertedAssets = insertedAssetsWithMetadata.filter((a) => isAssetWanted(a, options));
+    const wantedDeletedAssets = deletedAssetsWithMetadata.filter((a) => isAssetWanted(a, options));
+    // const wantedUpdatedAssets = event.updatedAssetsWithMetadata.filter((a) => isAssetWanted(a, options));
+
+    // Extract ids of deleted videos
+    const removedIds = wantedDeletedAssets.map((v) => v.id);
+
+    // todo: handle updated
+    onUpdate({
+      addedVideos: wantedInsertedAssets,
+      removedIds,
+      hasChanges: wantedInsertedAssets.length > 0 || removedIds.length > 0,
+      hasIncrementalChanges: true,
+    });
   };
-};
+
+  // Subscribe to media library changes
+  useEffect(() => {
+    const subscription = MediaLibrary.addListener((event) => {
+      handleEvent(event);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+}
