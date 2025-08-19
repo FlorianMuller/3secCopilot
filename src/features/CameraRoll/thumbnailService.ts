@@ -84,7 +84,7 @@ async function generateThumbnailTask(
         });
         break; // Success, exit loop
       } catch (e) {
-        console.log(`Failed generating thumbnail with direct URI, trying next...`);
+        // Failed generating thumbnail with direct URI, trying next
         continue;
       }
     }

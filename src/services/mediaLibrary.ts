@@ -3,17 +3,46 @@ import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
 import { getVideoMetadata, getVideosMetadtaByIds } from "./metadata";
 import { useEffect } from "react";
 
-const wantedMediaType: MediaLibrary.MediaTypeValue[] = ["video"];
-// todo: add suport for live photos
-// const wantedMediaType: MediaLibrary.MediaTypeValue[] = ["video", "pairedVideo"];
-
 export interface MediaValidityOptions {
   createdBefore?: Date;
   createdAfter?: Date;
 }
 
+export async function extractLivePhotoVideos(photos: MediaLibrary.Asset[]): Promise<PhoneMedia[]> {
+  // Filter for live photos only
+  const livePhotos = photos.filter((photo) => photo.mediaSubtypes && photo.mediaSubtypes.includes("livePhoto"));
+
+  if (livePhotos.length === 0) {
+    return [];
+  }
+
+  // Get asset info for all live photos in parallel
+  const assetInfoPromises = livePhotos.map((photo) =>
+    MediaLibrary.getAssetInfoAsync(photo).catch((error) => {
+      console.warn(`Failed to get paired video for live photo ${photo.id}:`, error);
+      return null;
+    })
+  );
+
+  const assetInfos = await Promise.all(assetInfoPromises);
+
+  // Extract paired videos
+  const livePhotoVideos: PhoneMedia[] = [];
+  for (let i = 0; i < assetInfos.length; i++) {
+    const assetInfo = assetInfos[i];
+    if (assetInfo?.pairedVideoAsset) {
+      livePhotoVideos.push({
+        ...assetInfo.pairedVideoAsset,
+        info: assetInfo,
+      });
+    }
+  }
+
+  return livePhotoVideos;
+}
+
 // Check that:
-// - Asset is a video
+// - Asset is a video or live photo
 // - Asset creationTime (or asigned time) is in the right range
 // - Asset is not hidden
 export function isAssetWanted(asset: PhoneMedia, options?: MediaValidityOptions): Boolean {
@@ -27,7 +56,11 @@ export function isAssetWanted(asset: PhoneMedia, options?: MediaValidityOptions)
     return false;
   }
 
-  return wantedMediaType.includes(asset.mediaType);
+  // Accept videos or live photos
+  return (
+    asset.mediaType === "video" ||
+    (asset.mediaType === "photo" && (asset.mediaSubtypes?.includes("livePhoto") ?? false))
+  );
 }
 
 export interface MediaLibraryUpdate {
