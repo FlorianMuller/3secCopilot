@@ -24,7 +24,7 @@ import { isVideoTrimmed } from "../../services/trim";
 import { displayDurationFromMilis, displayDurationFromSecond } from "../../utils/dateTime";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
-import { getCachedThumbnailUri, getVideoThumbnail } from "./thumbnailService";
+import { getCachedThumbnailUri, getVideoThumbnail } from "../../services/thumbnail";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;

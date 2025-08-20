@@ -1,12 +1,12 @@
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import { PhoneMedia } from "./CameraRoll";
-import { doesFileExists, ensureDirExists, idToFileName } from "../../utils/fileSytem";
-import { getLocalUri } from "../../services/mediaLocalUri";
-import { thumbnailQueue, ThumbnailPriority } from "../../services/thumbnailQueue";
-import { copyVideoToTemp, cleanupTempVideo, cleanLocalUri } from "../../services/localVideo";
-import { isLivePhoto } from "../../services/mediaLibrary";
+import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
+import { doesFileExists, ensureDirExists, idToFileName } from "../utils/fileSytem";
+import { getLocalUri } from "./mediaLocalUri";
+import { thumbnailQueue, ThumbnailPriority } from "./thumbnailQueue";
+import { copyVideoToTemp, cleanupTempVideo, cleanLocalUri } from "./localVideo";
+import { isLivePhoto } from "./mediaLibrary";
 
 export const thumbnailCacheDir = FileSystem.cacheDirectory + "videoThumbnailsCache/";
 
