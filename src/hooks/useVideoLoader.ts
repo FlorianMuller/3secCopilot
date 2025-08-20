@@ -2,7 +2,7 @@ import * as MediaLibrary from "expo-media-library";
 import { useCallback, useRef, useState } from "react";
 import { unstable_batchedUpdates } from "react-native";
 import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
-import { extractLivePhotoVideos, useMediaLibraryChanges } from "../services/mediaLibrary";
+import { useMediaLibraryChanges, isLivePhoto } from "../services/mediaLibrary";
 import { getVideosMetadtaByIds } from "../services/metadata";
 
 export interface UseVideoLoaderProps {
@@ -51,15 +51,13 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
       // Update cursor
       endCursorRef.current = mediaPage.endCursor;
 
-      // Separate videos and photos
-      const regularVideos = mediaPage.assets.filter((asset) => asset.mediaType === "video");
-      const photos = mediaPage.assets.filter((asset) => asset.mediaType === "photo");
+      // Filter to keep only videos and live photos
+      const videosAndLivePhotos = mediaPage.assets.filter(
+        (asset) => asset.mediaType === "video" || isLivePhoto(asset)
+      );
 
-      // Extract live photo videos
-      const livePhotoVideos = await extractLivePhotoVideos(photos);
-
-      // Combine regular videos with live photo videos and sort by creation time
-      const allNewVideos = [...regularVideos, ...livePhotoVideos].sort((a, b) => b.creationTime - a.creationTime);
+      // Sort by creation time (newest first)
+      const allNewVideos = videosAndLivePhotos.sort((a, b) => b.creationTime - a.creationTime);
 
       // Retrieve metadata for all videos
       const newMetadata = await getVideosMetadtaByIds(allNewVideos.map((v) => v.id));

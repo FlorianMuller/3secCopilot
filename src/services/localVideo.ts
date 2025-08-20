@@ -1,11 +1,19 @@
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import { ensureDirExists, idToFileName } from "../utils/fileSytem";
+import { isLivePhoto } from "./mediaLibrary";
 
 export const tempVideoDirectory = FileSystem.cacheDirectory + "tempVideos/";
 
+export function cleanLocalUri(uri: string | undefined): string | undefined {
+  return uri?.split("#")[0];
+}
+
 export function getCleanLocalUri(videoInfo: MediaLibrary.AssetInfo): string | undefined {
-  return videoInfo.localUri?.split("#")[0];
+  const sourceUri = isLivePhoto(videoInfo) 
+    ? videoInfo.pairedVideoAsset?.uri 
+    : videoInfo.localUri;
+  return cleanLocalUri(sourceUri);
 }
 
 export function getFileExtension(videoInfo: MediaLibrary.AssetInfo): string {

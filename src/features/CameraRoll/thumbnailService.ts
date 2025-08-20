@@ -5,7 +5,8 @@ import { PhoneMedia } from "./CameraRoll";
 import { doesFileExists, ensureDirExists, idToFileName } from "../../utils/fileSytem";
 import { getLocalUri } from "../../services/mediaLocalUri";
 import { thumbnailQueue, ThumbnailPriority } from "../../services/thumbnailQueue";
-import { copyVideoToTemp, cleanupTempVideo } from "../../services/localVideo";
+import { copyVideoToTemp, cleanupTempVideo, cleanLocalUri } from "../../services/localVideo";
+import { isLivePhoto } from "../../services/mediaLibrary";
 
 export const thumbnailCacheDir = FileSystem.cacheDirectory + "videoThumbnailsCache/";
 
@@ -30,6 +31,49 @@ async function cacheThumbnail(videoId: string, generatedthumbnailUri: string): P
   return cachedThumbnailUri;
 }
 
+// Copy live photo image to thumbnail cache
+async function cacheLivePhotoThumbnailTask(
+  video: PhoneMedia,
+  { signal }: { signal?: AbortSignal }
+): Promise<GetThumbnailResult> {
+  // Check if task was aborted
+  if (signal?.aborted) {
+    return { status: "generationFailed", uri: null };
+  }
+
+  const info = await getAssetInfo(video);
+  if (!info) {
+    return { status: "generationFailed", uri: null };
+  }
+
+  const cachedThumbnailUri = getCachedThumbnailUri(video.id);
+
+  // For live photos, use the photo's localUri (not the paired video)
+  const photoUri = cleanLocalUri(info.localUri);
+
+  if (!photoUri) {
+    console.error("Live photo has no local URI");
+    return { status: "generationFailed", uri: null };
+  }
+
+  // Check if task was aborted
+  if (signal?.aborted) {
+    return { status: "generationFailed", uri: null };
+  }
+
+  try {
+    await ensureDirExists(thumbnailCacheDir);
+    await FileSystem.copyAsync({
+      from: photoUri,
+      to: cachedThumbnailUri,
+    });
+    return { status: "generatedAndCached", uri: cachedThumbnailUri };
+  } catch (e) {
+    console.error("Error copying live photo to thumbnail cache:", e);
+    return { status: "generationFailed", uri: null };
+  }
+}
+
 export interface GetThumbnailResult {
   uri: string | null;
   status: "alreadyCached" | "generatedAndCached" | "generatedAndCachedFailed" | "generationFailed";
@@ -38,6 +82,20 @@ export interface GetThumbnailResult {
 export interface ThumbnailOptions {
   priority?: ThumbnailPriority;
   signal?: AbortSignal;
+}
+
+// Common function to get asset info from PhoneMedia
+async function getAssetInfo(video: PhoneMedia): Promise<MediaLibrary.AssetInfo | null> {
+  let info = video.info;
+  try {
+    if (info === undefined) {
+      info = await MediaLibrary.getAssetInfoAsync(video.id);
+    }
+    return info;
+  } catch (e) {
+    console.error("error while getting video info (to get local uri)", e);
+    return null;
+  }
 }
 
 // Internal function to generate thumbnail (runs in queue)
@@ -50,13 +108,8 @@ async function generateThumbnailTask(
     return { status: "generationFailed", uri: null };
   }
 
-  let info = video.info;
-  try {
-    if (info === undefined) {
-      info = await MediaLibrary.getAssetInfoAsync(video.id);
-    }
-  } catch (e) {
-    console.error("error while getting video info (to get local uri)", e);
+  const info = await getAssetInfo(video);
+  if (!info) {
     return { status: "generationFailed", uri: null };
   }
 
@@ -138,7 +191,24 @@ export async function getVideoThumbnail(
     return { status: "alreadyCached", uri: cachedUri };
   }
 
-  // Queue the thumbnail generation with priority
+  // Handle live photos differently - copy the photo directly instead of generating thumbnail
+  if (isLivePhoto(video)) {
+    try {
+      const result = await thumbnailQueue.add(({ signal }) => cacheLivePhotoThumbnailTask(video, { signal }), {
+        priority: options.priority ?? ThumbnailPriority.NORMAL,
+        signal: options.signal,
+      });
+      return result ?? { status: "generationFailed", uri: null };
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        return { status: "generationFailed", uri: null };
+      }
+      console.error("error in live photo thumbnail queue", e, "for video:", video?.id);
+      return { status: "generationFailed", uri: null };
+    }
+  }
+
+  // Queue the thumbnail generation with priority for regular videos
   try {
     const result = await thumbnailQueue.add(({ signal }) => generateThumbnailTask(video, { signal }), {
       priority: options.priority ?? ThumbnailPriority.NORMAL,

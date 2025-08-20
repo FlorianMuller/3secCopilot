@@ -1,3 +1,7 @@
+import Feather from "@expo/vector-icons/Feather";
+import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useTheme } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,17 +15,15 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+import { IconBadge } from "../../components/IconBadge";
 import { MyAppText } from "../../components/text/MyAppText";
+import { isLivePhoto } from "../../services/mediaLibrary";
+import { ThumbnailPriority } from "../../services/thumbnailQueue";
+import { isVideoTrimmed } from "../../services/trim";
+import { displayDurationFromMilis, displayDurationFromSecond } from "../../utils/dateTime";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
 import { getCachedThumbnailUri, getVideoThumbnail } from "./thumbnailService";
-import { ThumbnailPriority } from "../../services/thumbnailQueue";
-import { displayDurationFromMilis, displayDurationFromSecond } from "../../utils/dateTime";
-import { isVideoTrimmed } from "../../services/trim";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useTheme } from "@react-navigation/native";
-import { IconBadge } from "../../components/IconBadge";
-import Feather from "@expo/vector-icons/Feather";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
@@ -145,9 +147,13 @@ export function VidThumbnail({
       )}
 
       <MyAppText style={styles.videoDuration} size={13} weight={600}>
-        {video.metadata && isVideoTrimmed(video.metadata)
-          ? displayDurationFromMilis(video.metadata.trimEndTime - video.metadata.trimStartTime)
-          : displayDurationFromSecond(video.duration)}
+        {isLivePhoto(video) ? (
+          <FontAwesome6 name="photo-film" size={13} color="white" />
+        ) : video.metadata && isVideoTrimmed(video.metadata) ? (
+          displayDurationFromMilis(video.metadata.trimEndTime - video.metadata.trimStartTime)
+        ) : (
+          displayDurationFromSecond(video.duration)
+        )}
       </MyAppText>
     </TouchableOpacity>
   );

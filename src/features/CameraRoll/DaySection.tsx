@@ -1,14 +1,18 @@
 import Feather from "@expo/vector-icons/Feather";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useNavigation, useTheme } from "@react-navigation/native";
-import React from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { SubTitle } from "../../components/text/SubTitle";
+import { ThemedButton } from "../../components/ThemedButton";
 import { VideoPlayerURI } from "../../navigation";
 import { CameraRollNavigationProp } from "../../navigation/CameraRollNavigation";
+import { isLivePhoto } from "../../services/mediaLibrary";
 import { displayDate } from "../../utils/dateTime";
 import { PhoneMedia } from "./CameraRoll";
 import { VidThumbnail } from "./VideoThumbnail";
+
 interface DaySectionProps {
   item: {
     day: Date;
@@ -22,14 +26,23 @@ export const DaySection = React.memo(function DaySection({
 }: DaySectionProps) {
   const theme = useTheme();
   const navigation = useNavigation<CameraRollNavigationProp>();
+  const [showLivePhotos, setShowLivePhotos] = useState(false);
 
   const { width } = useWindowDimensions();
   const thumbnailSize = width / 5;
 
-  const reversedVideosOfTheDay = [...videosOfTheDay].reverse();
+  // Filter videos: show live photos by default if no regular videos, otherwise respect toggle
+  const regularVideos = videosOfTheDay.filter((v) => !isLivePhoto(v));
+  const hasRegularVideos = regularVideos.length > 0;
+
+  const displayedVideos = showLivePhotos || !hasRegularVideos ? videosOfTheDay : regularVideos;
+
+  const reversedVideosOfTheDay = [...displayedVideos].reverse();
   const videosIds = reversedVideosOfTheDay.map((vid) => vid.id);
 
   const dayHasAVideoSelected = videosOfTheDay.some((v) => v.metadata?.isSelected);
+  const hasLivePhotos = videosOfTheDay.some((v) => isLivePhoto(v));
+  const showToggleButton = hasRegularVideos && hasLivePhotos;
 
   return (
     <View style={styles.dateSection} key={day.getTime()}>
@@ -37,6 +50,21 @@ export const DaySection = React.memo(function DaySection({
         {!dayHasAVideoSelected && <Feather name="circle" size={15} color="white" />}
         {dayHasAVideoSelected && <Feather name="check-circle" size={15} color="white" />}
         <SubTitle>{displayDate(day)}</SubTitle>
+
+        {/* Live Photos Toggle Button */}
+        {showToggleButton && (
+          <Pressable onPress={() => setShowLivePhotos(!showLivePhotos)} style={styles.livePhotosToggle}>
+            <ThemedButton
+              Icon={({ iconProps }) => (
+                <MaterialCommunityIcons name={showLivePhotos ? "image-outline" : "image-off-outline"} {...iconProps} />
+              )}
+              text="Live"
+              size={14}
+              variant={showLivePhotos ? "filled" : "outline"}
+              themeColor={showLivePhotos ? "primary" : "secondary"}
+            />
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.thumbnailList}>
@@ -76,6 +104,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
+    marginBottom: 10,
+  },
+  livePhotosToggle: {
+    marginLeft: "auto",
   },
   thumbnailList: {
     display: "flex",
