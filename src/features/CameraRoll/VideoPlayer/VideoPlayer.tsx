@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as MediaLibrary from "expo-media-library";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -10,19 +11,20 @@ import { VideoMetadata } from "../../../db/schema";
 import { useVideoTrim } from "../../../hooks/useVideoTrim";
 import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
 import { isVideoDayShifted } from "../../../services/dayShift";
+import { cleanupTempVideo, copyVideoToTemp } from "../../../services/localVideo";
 import { getLocalUri } from "../../../services/mediaLocalUri";
-import preferences from "../../../services/preferences";
 import {
   getVideosMetadtaByIds,
   markVideoAsSelected,
   markVideoAsUnselected,
   updateVideoTrimMetadata,
 } from "../../../services/metadata";
+import preferences from "../../../services/preferences";
 import { doesTrimmedVideoExist, getTrimmedVideoPath, isVideoTrimmed, reTrimVideo } from "../../../services/trim";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
 import { PhoneMedia } from "../CameraRoll";
 import { VideoThumbnailBar } from "./VideoThumbnailBar";
-import { cleanupTempVideo, copyVideoToTemp } from "../../../services/localVideo";
+import Feather from "@expo/vector-icons/Feather";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -133,7 +135,7 @@ export function VideoPlayer() {
   async function loadVideoSource(info: MediaLibrary.AssetInfo, metadata: VideoMetadata | null) {
     try {
       if (metadata === null || !isVideoTrimmed(metadata)) {
-        // No trim metadata - load original video
+        // No trim metadata - load original video (or live photo paired video)
         const tempPath = await copyVideoToTemp(info);
         await player.replaceAsync({
           uri: tempPath,
@@ -275,14 +277,31 @@ export function VideoPlayer() {
       <View style={styles.toolBar}>
         {/* Select and Trim buttons */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
-          {videoInfo && videoMetadata !== undefined && (
+          {/* Select button */}
+          {videoInfo && (
             <Pressable onPress={() => toggleSelectVideo(videoInfo, videoMetadata)}>
-              <ThemedButton text={videoMetadata?.isSelected ? "Unselect" : "Select"} />
+              <ThemedButton
+                text="Select"
+                Icon={({ iconProps }) => (
+                  <Feather name={videoMetadata?.isSelected ? "check-circle" : "circle"} {...iconProps} />
+                )}
+                size={20}
+                variant={videoMetadata?.isSelected ? "filled" : "outline"}
+                style={{ width: 130 }}
+              />
             </Pressable>
           )}
+
+          {/* Trim button */}
           {videoInfo && (
             <Pressable onPress={launchTrimEditor}>
-              <ThemedButton text="Trim" />
+              <ThemedButton
+                text="Trim"
+                Icon={({ iconProps }) => <Ionicons name="cut" {...iconProps} />}
+                size={20}
+                variant="outline"
+                style={{ width: 130 }}
+              />
             </Pressable>
           )}
         </View>
