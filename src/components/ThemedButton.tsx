@@ -37,7 +37,6 @@ export function ThemedButton({
 
   const backgroundColor = isOutline ? "transparent" : buttonColor;
   const textColor = isOutline ? buttonColor : textOnColor;
-  const borderStyle = isOutline ? { borderWidth: 2, borderColor: buttonColor } : {};
 
   return (
     <View
@@ -46,12 +45,13 @@ export function ThemedButton({
         styles.defaultButton,
         {
           backgroundColor,
-          borderRadius: size * 1.25,
+          borderRadius: 10,
           paddingHorizontal: size * 0.5,
           paddingVertical: size * 0.3,
           gap: size * 0.4,
+          borderWidth: size * 0.1,
+          borderColor: buttonColor,
         },
-        borderStyle,
         props.style,
       ]}
     >
