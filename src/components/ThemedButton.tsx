@@ -8,30 +8,67 @@ import { MyAppText } from "./text/MyAppText";
 // A simple button respecting the app theme
 
 export interface ThemeButtonProps extends ViewProps {
-  Icon?: ComponentType<{ theme: MyTheme }>;
+  Icon?: ComponentType<{ theme: MyTheme; iconProps: { color: string; size: number } }>;
   text?: string;
   variant?: "filled" | "outline";
   themeColor?: "primary" | "secondary" | "accent";
+  size?: number;
 }
 
-export function ThemedButton({ Icon, text, children, variant = "filled", themeColor = "primary", ...props }: ThemeButtonProps) {
+export function ThemedButton({
+  Icon,
+  text,
+  children,
+  variant = "filled",
+  themeColor = "primary",
+  size = 16,
+  ...props
+}: ThemeButtonProps) {
   const theme = useTheme();
   const { colors } = theme;
 
   const isOutline = variant === "outline";
-  
+
   // Get colors based on themeColor selection
   const buttonColor = colors[themeColor];
-  const textOnColor = colors[`textOn${themeColor.charAt(0).toUpperCase() + themeColor.slice(1)}` as keyof typeof colors] as string;
-  
+  const textOnColor = colors[
+    `textOn${themeColor.charAt(0).toUpperCase() + themeColor.slice(1)}` as keyof typeof colors
+  ] as string;
+
   const backgroundColor = isOutline ? "transparent" : buttonColor;
   const textColor = isOutline ? buttonColor : textOnColor;
   const borderStyle = isOutline ? { borderWidth: 2, borderColor: buttonColor } : {};
 
   return (
-    <View {...props} style={[styles.defaultButton, { backgroundColor, borderRadius: 20 }, borderStyle, props.style]}>
-      {Icon && <Icon theme={theme} />}
-      {text && <MyAppText color={textColor}>{text}</MyAppText>}
+    <View
+      {...props}
+      style={[
+        styles.defaultButton,
+        {
+          backgroundColor,
+          borderRadius: size * 1.25,
+          paddingHorizontal: size * 0.5,
+          paddingVertical: size * 0.3,
+          gap: size * 0.4,
+        },
+        borderStyle,
+        props.style,
+      ]}
+    >
+      {Icon && (
+        <Icon
+          theme={theme}
+          iconProps={{
+            color: textColor,
+            size: size * 0.9,
+          }}
+        />
+      )}
+      {text && (
+        <MyAppText color={textColor} size={size}>
+          {text}
+        </MyAppText>
+      )}
       {children}
     </View>
   );
@@ -70,7 +107,6 @@ export const LinkIconRoundButton = LinkWrapper(RoundIconButton);
 
 const styles = StyleSheet.create({
   defaultButton: {
-    padding: 10,
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
