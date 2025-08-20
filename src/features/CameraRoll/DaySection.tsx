@@ -21,6 +21,10 @@ interface DaySectionProps {
   };
 }
 
+function showVideoByDefault(video: PhoneMedia) {
+  return !isLivePhoto(video) || video.metadata?.isSelected;
+}
+
 export const DaySection = React.memo(function DaySection({
   item: { day, videosOfTheDay, isVisible },
 }: DaySectionProps) {
@@ -31,18 +35,19 @@ export const DaySection = React.memo(function DaySection({
   const { width } = useWindowDimensions();
   const thumbnailSize = width / 5;
 
+  const defaultVideos = videosOfTheDay.filter(showVideoByDefault);
+  const hasDefaultVideos = defaultVideos.length > 0;
+  const hasLivePhotos = videosOfTheDay.some((v) => !showVideoByDefault(v));
+
   // Filter videos: show live photos by default if no regular videos, otherwise respect toggle
-  const regularVideos = videosOfTheDay.filter((v) => !isLivePhoto(v));
-  const hasRegularVideos = regularVideos.length > 0;
+  const displayedVideos = showLivePhotos || !hasDefaultVideos ? videosOfTheDay : defaultVideos;
 
-  const displayedVideos = showLivePhotos || !hasRegularVideos ? videosOfTheDay : regularVideos;
-
+  // Reorder videos
   const reversedVideosOfTheDay = [...displayedVideos].reverse();
   const videosIds = reversedVideosOfTheDay.map((vid) => vid.id);
 
   const dayHasAVideoSelected = videosOfTheDay.some((v) => v.metadata?.isSelected);
-  const hasLivePhotos = videosOfTheDay.some((v) => isLivePhoto(v));
-  const showToggleButton = hasRegularVideos && hasLivePhotos;
+  const showToggleButton = hasDefaultVideos && hasLivePhotos;
 
   return (
     <View style={styles.dateSection} key={day.getTime()}>
