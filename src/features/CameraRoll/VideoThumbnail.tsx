@@ -1,6 +1,7 @@
 import Feather from "@expo/vector-icons/Feather";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
@@ -146,6 +147,14 @@ export function VidThumbnail({
         />
       )}
 
+      {/* Gradient background to see duration text on white */}
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.5)"]}
+        style={styles.durationRadialBackground}
+        start={{ x: 0.8, y: 0.5 }}
+        end={{ x: 1, y: 1 }}
+      />
+
       <MyAppText style={styles.videoDuration} size={13} weight={600}>
         {isLivePhoto(video) ? (
           <FontAwesome6 name="photo-film" size={13} color="white" />
@@ -172,6 +181,11 @@ const styles = StyleSheet.create({
   },
   notSelected: {
     tintColor: "gray",
+  },
+  durationRadialBackground: {
+    position: "absolute",
+    height: "100%",
+    width: "100%",
   },
   videoDuration: {
     position: "absolute",
