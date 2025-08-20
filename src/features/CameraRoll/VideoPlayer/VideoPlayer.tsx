@@ -36,7 +36,6 @@ export function VideoPlayer() {
 
   const player = useVideoPlayer({}, (player) => {
     player.audioMixingMode = "duckOthers";
-    player.timeUpdateEventInterval = 0.01;
   });
   // todo: show video player error
   // const { status, error } = useEvent(player, "statusChange", { status: player.status });
@@ -68,6 +67,17 @@ export function VideoPlayer() {
     return unsubscribe;
   }, [navigation, player]);
 
+  // Play video automatically after it loads
+  useEffect(() => {
+    const unsubscribe = player.addListener("sourceLoad", () => {
+      player.play();
+    });
+
+    return () => {
+      unsubscribe.remove();
+    };
+  }, [player]);
+
   // Video trim functionality
   const { openTrimEditor } = useVideoTrim({
     onTrimComplete: async (result) => {
@@ -91,7 +101,6 @@ export function VideoPlayer() {
           // Reload video source to show the trimmed video
           if (result.videoId === id) {
             await loadVideoSource(videoInfo, updatedMetadata);
-            player.play();
           }
         }
       } catch (error) {
@@ -125,7 +134,6 @@ export function VideoPlayer() {
       if (currentVideo?.info) {
         console.log("metadata", currentVideo.metadata);
         await loadVideoSource(currentVideo.info, currentVideo.metadata || null);
-        player.play();
       }
     } catch (e) {
       console.error("can't load videos with metadata", e);
@@ -197,7 +205,6 @@ export function VideoPlayer() {
     const currentVideo = allVideos[params.index];
     if (currentVideo?.info) {
       loadVideoSource(currentVideo.info, currentVideo.metadata || null);
-      player.play();
     }
     return () => {
       // Clean up temporary video file when switching videos
