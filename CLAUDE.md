@@ -133,3 +133,5 @@ npx drizzle-kit generate
 - Prettier configured for code formatting
 - Consistent file naming and component structure
 - Clear separation of concerns between UI, business logic, and data layers
+
+- When error handling in helper / reusable functions, do not catch the errors, let the caller do it

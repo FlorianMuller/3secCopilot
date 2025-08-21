@@ -13,12 +13,8 @@ import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigati
 import { isVideoDayShifted } from "../../../services/dayShift";
 import { cleanupTempVideo, copyVideoToTemp } from "../../../services/localVideo";
 import { getLocalUri } from "../../../services/mediaLocalUri";
-import {
-  getVideosMetadtaByIds,
-  markVideoAsSelected,
-  markVideoAsUnselected,
-  updateVideoTrimMetadata,
-} from "../../../services/metadata";
+import { getVideosMetadtaByIds, updateVideoTrimMetadata } from "../../../services/metadata";
+import { toggleVideoSelection } from "../../../services/videoSelection";
 import preferences from "../../../services/preferences";
 import { doesTrimmedVideoExist, getTrimmedVideoPath, isVideoTrimmed, reTrimVideo } from "../../../services/trim";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
@@ -44,6 +40,7 @@ export function VideoPlayer() {
   const [allVideos, setAllVideos] = useState<PhoneMedia[]>([]);
 
   // Currently playing video info and metadata (derived from allVideos using index)
+  const videoAsset = allVideos[params.index];
   const videoInfo = allVideos[params.index]?.info;
   const videoMetadata = allVideos[params.index]?.metadata || null;
 
@@ -232,27 +229,14 @@ export function VideoPlayer() {
     });
   }, [params.day, videoInfo, dayShift]);
 
-  async function toggleSelectVideo(videoInfo: MediaLibrary.AssetInfo, videoMetadata: VideoMetadata | null) {
-    if (videoMetadata?.isSelected) {
-      console.log("Unselecting video");
-      try {
-        const newMetadata = await markVideoAsUnselected(id);
-        if (newMetadata != null) {
-          updateVideoMetadataInState(id, newMetadata);
-        }
-      } catch (e) {
-        console.error("error while unselecting video", e);
+  async function handleToggleSelectVideo() {
+    try {
+      const newMetadata = await toggleVideoSelection(videoAsset, videoMetadata, new Date(params.day));
+      if (newMetadata) {
+        updateVideoMetadataInState(id, newMetadata);
       }
-    } else {
-      console.log("Selecting video");
-      try {
-        const newMetadata = await markVideoAsSelected(id, new Date(videoInfo.creationTime), new Date(params.day));
-        if (newMetadata != null) {
-          updateVideoMetadataInState(id, newMetadata);
-        }
-      } catch (e) {
-        console.error("error while selecting video", e);
-      }
+    } catch (e) {
+      console.error("error while toggling video selection", e);
     }
   }
 
@@ -286,7 +270,7 @@ export function VideoPlayer() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
           {/* Select button */}
           {videoInfo && (
-            <Pressable onPress={() => toggleSelectVideo(videoInfo, videoMetadata)}>
+            <Pressable onPress={handleToggleSelectVideo}>
               <ThemedButton
                 text="Select"
                 Icon={({ iconProps }) => (

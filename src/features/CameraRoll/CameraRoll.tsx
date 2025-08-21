@@ -120,7 +120,7 @@ export default function CameraRoll({
             videosOfTheDay: videosByDay[day.toDateString()] || [],
             isVisible: visibleDays.has(day.toDateString()),
           }))}
-          renderItem={(props) => <DaySection {...props} />}
+          renderItem={(props) => <DaySection {...props} onMetadataUpdate={refetchMetadata} />}
           keyExtractor={({ day }) => day.toDateString()}
           indicatorStyle="white"
           onEndReached={allVideoLoaded ? undefined : handleLoadNextBatch}
