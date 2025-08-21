@@ -30,6 +30,7 @@ export interface VidThumbnailProps {
   video: PhoneMedia;
   displayAs?: "normal" | "unselected";
   onPress?: (event: GestureResponderEvent) => void;
+  onLongPress?: ((event: GestureResponderEvent) => void) | undefined;
   size?: DimensionValue;
   style?: StyleProp<ViewStyle>;
   isVisible?: boolean;
@@ -39,6 +40,7 @@ export function VidThumbnail({
   video,
   displayAs = "normal",
   onPress,
+  onLongPress,
   size = "100%",
   style,
   isVisible = true,
@@ -98,6 +100,7 @@ export function VidThumbnail({
         style,
       ]}
       onPress={onPress}
+      onLongPress={onLongPress}
     >
       {/* Centered spinner (shown only if thumbnailUri doesn't exist) */}
       {/* todo: set color from theme */}

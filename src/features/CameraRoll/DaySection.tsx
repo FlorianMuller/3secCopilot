@@ -88,6 +88,11 @@ export const DaySection = React.memo(function DaySection({
                   onPress={() => {
                     navigation.navigate(VideoPlayerURI, { day: day.toISOString(), ids: videosIds, index: i });
                   }}
+                  /**
+                   * Defining `onLongPress` to avoid accidental firing of button
+                   * see: https://github.com/nandorojo/zeego/issues/145
+                   */
+                  onLongPress={() => {}}
                   style={vid.metadata?.isSelected && { borderWidth: 2, borderColor: theme.colors.accent }}
                   isVisible={isVisible}
                 />
