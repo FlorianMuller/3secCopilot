@@ -3,6 +3,7 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useNavigation, useTheme } from "@react-navigation/native";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import * as ContextMenu from "zeego/context-menu";
 import { MyAppText } from "../../components/text/MyAppText";
 import { SubTitle } from "../../components/text/SubTitle";
 import { ThemedButton } from "../../components/ThemedButton";
@@ -77,15 +78,37 @@ export const DaySection = React.memo(function DaySection({
         {videosOfTheDay.length > 0 &&
           reversedVideosOfTheDay.map((vid, i) => (
             <View key={vid.id} style={{ padding: 1, width: thumbnailSize, height: thumbnailSize }}>
-              <VidThumbnail
-                video={vid}
-                displayAs={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "normal" : "unselected") : "normal"}
-                onPress={() => {
-                  navigation.navigate(VideoPlayerURI, { day: day.toISOString(), ids: videosIds, index: i });
-                }}
-                style={vid.metadata?.isSelected && { borderWidth: 2, borderColor: theme.colors.accent }}
-                isVisible={isVisible}
-              />
+              <ContextMenu.Root>
+                <ContextMenu.Trigger>
+                  <VidThumbnail
+                    video={vid}
+                    displayAs={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "normal" : "unselected") : "normal"}
+                    onPress={() => {
+                      navigation.navigate(VideoPlayerURI, { day: day.toISOString(), ids: videosIds, index: i });
+                    }}
+                    style={vid.metadata?.isSelected && { borderWidth: 2, borderColor: theme.colors.accent }}
+                    isVisible={isVisible}
+                  />
+                </ContextMenu.Trigger>
+                <ContextMenu.Content>
+                  <ContextMenu.Item key={"Select"}>
+                    <ContextMenu.ItemTitle>Select</ContextMenu.ItemTitle>
+                    <ContextMenu.ItemIcon
+                      ios={{
+                        name: "checkmark",
+                      }}
+                    />
+                  </ContextMenu.Item>
+                  <ContextMenu.Item key={"Move to an other day"}>
+                    <ContextMenu.ItemTitle>Move to an other day</ContextMenu.ItemTitle>
+                    <ContextMenu.ItemIcon
+                      ios={{
+                        name: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                      }}
+                    />
+                  </ContextMenu.Item>
+                </ContextMenu.Content>
+              </ContextMenu.Root>
             </View>
           ))}
 
