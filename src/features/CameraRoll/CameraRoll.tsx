@@ -30,7 +30,7 @@ export default function CameraRoll({
 }: CameraRollProps) {
   const { dayShift } = preferences.useDayShiftPreference();
   const { ensurePermission } = useMediaLibraryPermissions();
-  const { videos, allVideoLoaded, loadNextBatch, refetchMetadata, resetVideoLoader } = useVideoLoader({
+  const { videos, allVideoLoaded, loadNextBatch, refetchMetadata, updateVideosMetadata } = useVideoLoader({
     startDate,
     endDate,
   });
@@ -98,6 +98,10 @@ export default function CameraRoll({
     viewAreaCoveragePercentThreshold: 10, // Consider item visible when 10% is shown
   };
 
+  const handleSingleMetadataUpdate = (videoId: string, metadata: VideoMetadata) => {
+    updateVideosMetadata({ [videoId]: metadata });
+  };
+
   return (
     <>
       {/* Linear gradient between thumbnails and phone status bar (time, wifi icon...) */}
@@ -120,7 +124,7 @@ export default function CameraRoll({
             videosOfTheDay: videosByDay[day.toDateString()] || [],
             isVisible: visibleDays.has(day.toDateString()),
           }))}
-          renderItem={(props) => <DaySection {...props} onMetadataUpdate={refetchMetadata} />}
+          renderItem={(props) => <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} />}
           keyExtractor={({ day }) => day.toDateString()}
           indicatorStyle="white"
           onEndReached={allVideoLoaded ? undefined : handleLoadNextBatch}

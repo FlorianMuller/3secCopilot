@@ -21,7 +21,7 @@ interface DaySectionProps {
     videosOfTheDay: PhoneMedia[];
     isVisible: boolean;
   };
-  onMetadataUpdate?: () => void;
+  onMetadataUpdate?: (videoId: string, metadata: VideoMetadata) => void;
 }
 
 function showVideoByDefault(video: PhoneMedia) {
@@ -81,7 +81,7 @@ export const DaySection = React.memo(function DaySection({
         {videosOfTheDay.length > 0 &&
           reversedVideosOfTheDay.map((vid, i) => (
             <View key={vid.id} style={{ padding: 1, width: thumbnailSize, height: thumbnailSize }}>
-              <VideoActionMenu video={vid} dayContext={day} onMetadataUpdate={() => onMetadataUpdate?.()}>
+              <VideoActionMenu video={vid} dayContext={day} onMetadataUpdate={onMetadataUpdate}>
                 <VidThumbnail
                   video={vid}
                   displayAs={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "normal" : "unselected") : "normal"}

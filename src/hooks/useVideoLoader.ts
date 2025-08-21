@@ -1,6 +1,7 @@
 import * as MediaLibrary from "expo-media-library";
 import { useCallback, useRef, useState } from "react";
 import { unstable_batchedUpdates } from "react-native";
+import { VideoMetadata } from "../db/schema";
 import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
 import { useMediaLibraryChanges, isLivePhoto } from "../services/mediaLibrary";
 import { getVideosMetadtaByIds } from "../services/metadata";
@@ -16,6 +17,7 @@ export interface UseVideoLoaderReturn {
   allVideoLoaded: boolean;
   loadNextBatch: () => Promise<void>;
   refetchMetadata: () => Promise<void>;
+  updateVideosMetadata: (updates: Record<string, VideoMetadata>) => void;
   resetVideoLoader: () => void;
 }
 
@@ -92,6 +94,15 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
     }
   }, [videos]);
 
+  const updateVideosMetadata = useCallback((updates: Record<string, VideoMetadata>) => {
+    setVideos((oldVideos) => 
+      oldVideos.map((video) => {
+        const updatedMetadata = updates[video.id];
+        return updatedMetadata ? { ...video, metadata: updatedMetadata } : video;
+      })
+    );
+  }, []);
+
   const resetVideoLoader = useCallback(() => {
     setVideos([]);
     setAllVideoLoaded(false);
@@ -138,6 +149,7 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
     allVideoLoaded,
     loadNextBatch,
     refetchMetadata,
+    updateVideosMetadata,
     resetVideoLoader,
   };
 }

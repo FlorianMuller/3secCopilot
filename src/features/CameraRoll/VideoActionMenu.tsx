@@ -8,14 +8,14 @@ interface VideoActionMenuProps {
   children: React.ReactNode;
   video: PhoneMedia;
   dayContext: Date;
-  onMetadataUpdate: (videoId: string, metadata: VideoMetadata) => void;
+  onMetadataUpdate?: (videoId: string, metadata: VideoMetadata) => void;
 }
 
 export const VideoActionMenu = ({ children, video, dayContext, onMetadataUpdate }: VideoActionMenuProps) => {
   const handleSelectVideo = async () => {
     try {
       const newMetadata = await toggleVideoSelection(video, video.metadata || null, dayContext);
-      if (newMetadata) {
+      if (newMetadata && onMetadataUpdate) {
         onMetadataUpdate(video.id, newMetadata);
       }
     } catch (e) {
