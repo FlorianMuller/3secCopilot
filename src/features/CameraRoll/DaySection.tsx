@@ -12,6 +12,7 @@ import { isLivePhoto } from "../../services/mediaLibrary";
 import { displayDate } from "../../utils/dateTime";
 import { PhoneMedia } from "./CameraRoll";
 import { VidThumbnail } from "./VideoThumbnail";
+import { Button, ContextMenu, Picker } from "@expo/ui/swift-ui";
 
 interface DaySectionProps {
   item: {
@@ -77,15 +78,25 @@ export const DaySection = React.memo(function DaySection({
         {videosOfTheDay.length > 0 &&
           reversedVideosOfTheDay.map((vid, i) => (
             <View key={vid.id} style={{ padding: 1, width: thumbnailSize, height: thumbnailSize }}>
-              <VidThumbnail
-                video={vid}
-                displayAs={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "normal" : "unselected") : "normal"}
-                onPress={() => {
-                  navigation.navigate(VideoPlayerURI, { day: day.toISOString(), ids: videosIds, index: i });
-                }}
-                style={vid.metadata?.isSelected && { borderWidth: 2, borderColor: theme.colors.accent }}
-                isVisible={isVisible}
-              />
+              <ContextMenu activationMethod="longPress">
+                <ContextMenu.Items>
+                  <Button systemImage="person.crop.circle.badge.xmark" onPress={() => console.log("Pressed1")}>
+                    Hello
+                  </Button>
+                </ContextMenu.Items>
+                <ContextMenu.Trigger>
+                  <VidThumbnail
+                    video={vid}
+                    displayAs={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "normal" : "unselected") : "normal"}
+                    onPress={() => {
+                      navigation.navigate(VideoPlayerURI, { day: day.toISOString(), ids: videosIds, index: i });
+                    }}
+                    style={vid.metadata?.isSelected && { borderWidth: 2, borderColor: theme.colors.accent }}
+                    isVisible={isVisible}
+                  />
+                  {/* <View style={{ height: thumbnailSize, width: thumbnailSize, backgroundColor: "red" }}></View> */}
+                </ContextMenu.Trigger>
+              </ContextMenu>
             </View>
           ))}
 
