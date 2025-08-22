@@ -13,7 +13,7 @@ import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigati
 import { isVideoDayShifted } from "../../../services/dayShift";
 import { cleanupTempVideo, copyVideoToTemp } from "../../../services/localVideo";
 import { getLocalUri } from "../../../services/mediaLocalUri";
-import { getVideosMetadtaByIds, updateVideoTrimMetadata } from "../../../services/metadata";
+import { getVideosMetadtaByIds } from "../../../services/metadata";
 import { toggleVideoSelection } from "../../../services/videoSelection";
 import preferences from "../../../services/preferences";
 import { doesTrimmedVideoExist, getTrimmedVideoPath, isVideoTrimmed, reTrimVideo } from "../../../services/trim";
@@ -78,31 +78,17 @@ export function VideoPlayer() {
   // Video trim functionality
   const { openTrimEditor } = useVideoTrim({
     onTrimComplete: async (result) => {
-      console.log("Trim completed:", result);
       try {
-        if (!videoInfo) {
-          console.error("Video info not available for trim metadata save");
-          return;
-        }
+        // Update local state with the metadata from the hook
+        updateVideoMetadataInState(result.metadata.videoId, result.metadata);
 
-        const updatedMetadata = await updateVideoTrimMetadata(
-          result.videoId,
-          new Date(videoInfo.creationTime),
-          result.startTime,
-          result.endTime
-        );
-        if (updatedMetadata) {
-          updateVideoMetadataInState(result.videoId, updatedMetadata);
-          console.log("Trim metadata saved to database");
-
-          // Reload video source to show the trimmed video
-          if (result.videoId === id) {
-            await loadVideoSource(videoInfo, updatedMetadata);
-          }
+        // Reload video source to show the trimmed video
+        if (result.metadata.videoId === id && videoInfo) {
+          await loadVideoSource(videoInfo, result.metadata);
         }
       } catch (error) {
         // todo: Show user-friendly error message
-        console.error("Failed to save trim metadata:", error);
+        console.error("Failed to update video after trim:", error);
       }
     },
     onError: (error) => {

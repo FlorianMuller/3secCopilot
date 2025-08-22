@@ -3,6 +3,8 @@ import * as ContextMenu from "zeego/context-menu";
 import { VideoMetadata } from "../../db/schema";
 import { PhoneMedia } from "./CameraRoll";
 import { toggleVideoSelection } from "../../services/videoSelection";
+import { useVideoTrim } from "../../hooks/useVideoTrim";
+import * as MediaLibrary from "expo-media-library";
 
 interface VideoActionMenuProps {
   children: React.ReactNode;
@@ -23,6 +25,27 @@ export const VideoActionMenu = ({ children, video, dayContext, onMetadataUpdate 
     }
   };
 
+  const { openTrimEditor } = useVideoTrim({
+    onTrimComplete: (result) => {
+      if (onMetadataUpdate) {
+        onMetadataUpdate(result.metadata.videoId, result.metadata);
+      }
+    },
+    onError: () => {
+      // Todo: show error toast/alert
+    },
+  });
+  const handleTrimVideo = async () => {
+    try {
+      if (video.info === undefined) {
+        video.info = await MediaLibrary.getAssetInfoAsync(video.id);
+      }
+      await openTrimEditor(video.info);
+    } catch (e) {
+      console.error("Error opening video trimmer:", e);
+    }
+  };
+
   const isSelected = video.metadata?.isSelected;
 
   return (
@@ -37,14 +60,24 @@ export const VideoActionMenu = ({ children, video, dayContext, onMetadataUpdate 
             }}
           />
         </ContextMenu.Item>
-        <ContextMenu.Item key={"Move to an other day"}>
+        <ContextMenu.Item key={"Trim"} onSelect={handleTrimVideo}>
+          <ContextMenu.ItemTitle>Trim</ContextMenu.ItemTitle>
+          <ContextMenu.ItemIcon
+            ios={{
+              name: "scissors",
+            }}
+          />
+        </ContextMenu.Item>
+
+        {/* Future action */}
+        {/* <ContextMenu.Item key={"Move to an other day"}>
           <ContextMenu.ItemTitle>Move to an other day</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
               name: "clock.arrow.trianglehead.counterclockwise.rotate.90",
             }}
           />
-        </ContextMenu.Item>
+        </ContextMenu.Item> */}
       </ContextMenu.Content>
     </ContextMenu.Root>
   );

@@ -1,17 +1,15 @@
 import * as MediaLibrary from "expo-media-library";
 import { useEffect, useRef } from "react";
 import { type EventSubscription } from "react-native";
-import { showEditor } from "react-native-video-trim";
-import videoTrim from "react-native-video-trim";
-import { prepareVideoForTrim, finalizeTrimmedVideo } from "../services/trim";
+import videoTrim, { showEditor } from "react-native-video-trim";
+import { VideoMetadata } from "../db/schema";
 import { cleanupTempVideo } from "../services/localVideo";
+import { updateVideoTrimMetadata } from "../services/metadata";
+import { finalizeTrimmedVideo, prepareVideoForTrim } from "../services/trim";
 
 export interface TrimResult {
   outputPath: string;
-  startTime: number;
-  endTime: number;
-  duration: number;
-  videoId: string;
+  metadata: VideoMetadata;
 }
 
 export interface UseVideoTrimOptions {
@@ -27,6 +25,7 @@ export function useVideoTrim(options: UseVideoTrimOptions = {}) {
 
   const listenerSubscription = useRef<Record<string, EventSubscription>>({});
   const currentVideoInfo = useRef<MediaLibrary.AssetInfo | null>(null);
+  const isActive = useRef(false);
 
   async function cleanupTempFile() {
     if (currentVideoInfo.current) {
@@ -34,35 +33,52 @@ export function useVideoTrim(options: UseVideoTrimOptions = {}) {
     }
   }
 
+  async function cleanUp() {
+    await cleanupTempFile();
+    currentVideoInfo.current = null;
+    isActive.current = false;
+  }
+
   // Setup event listeners
   useEffect(() => {
-    listenerSubscription.current.onLoad = videoTrim.onLoad(({ duration }) =>
-      console.log("Video trim onLoad", duration)
-    );
+    listenerSubscription.current.onLoad = videoTrim.onLoad(({ duration }) => {
+      if (!isActive.current) return;
+      console.log("Video trim onLoad", duration);
+    });
 
     listenerSubscription.current.onStartTrimming = videoTrim.onStartTrimming(() => {
+      if (!isActive.current) return;
       console.log("Video trim onStartTrimming");
       onTrimStart?.();
     });
 
     listenerSubscription.current.onCancelTrimming = videoTrim.onCancelTrimming(async () => {
+      if (!isActive.current) return;
       console.log("Video trim onCancelTrimming");
-      await cleanupTempFile();
       onTrimCancel?.();
+      await cleanUp();
     });
 
     listenerSubscription.current.onCancel = videoTrim.onCancel(async () => {
+      if (!isActive.current) return;
       console.log("Video trim onCancel");
-      await cleanupTempFile();
       onTrimCancel?.();
+      await cleanUp();
     });
 
-    listenerSubscription.current.onHide = videoTrim.onHide(() => console.log("Video trim onHide"));
+    listenerSubscription.current.onHide = videoTrim.onHide(() => {
+      if (!isActive.current) return;
+      console.log("Video trim onHide");
+    });
 
-    listenerSubscription.current.onShow = videoTrim.onShow(() => console.log("Video trim onShow"));
+    listenerSubscription.current.onShow = videoTrim.onShow(() => {
+      if (!isActive.current) return;
+      console.log("Video trim onShow");
+    });
 
     listenerSubscription.current.onFinishTrimming = videoTrim.onFinishTrimming(
       async ({ outputPath, startTime, endTime, duration }) => {
+        if (!isActive.current) return;
         console.log(
           "Video trim onFinishTrimming",
           `outputPath: ${outputPath}, startTime: ${startTime}, endTime: ${endTime}, duration: ${duration}`
@@ -73,27 +89,35 @@ export function useVideoTrim(options: UseVideoTrimOptions = {}) {
             // Move trimmed video to permanent location
             const permanentPath = await finalizeTrimmedVideo(outputPath, currentVideoInfo.current.id);
 
-            onTrimComplete?.({
-              outputPath: permanentPath,
+            // Save trim metadata to database
+            const updatedMetadata = await updateVideoTrimMetadata(
+              currentVideoInfo.current.id,
+              new Date(currentVideoInfo.current.creationTime),
               startTime,
-              endTime,
-              duration,
-              videoId: currentVideoInfo.current.id,
-            });
+              endTime
+            );
+
+            if (updatedMetadata) {
+              onTrimComplete?.({
+                outputPath: permanentPath,
+                metadata: updatedMetadata,
+              });
+            }
           } catch (error) {
             console.error("Failed to move trimmed video:", error);
             onError?.({ message: `Failed to save trimmed video: ${error}` });
           }
         }
 
-        await cleanupTempFile();
+        await cleanUp();
       }
     );
 
     listenerSubscription.current.onError = videoTrim.onError(async ({ message, errorCode }) => {
+      if (!isActive.current) return;
       console.log("Video trim onError", `message: ${message}, errorCode: ${errorCode}`);
-      await cleanupTempFile();
       onError?.({ message, errorCode });
+      await cleanUp();
     });
 
     return () => {
@@ -113,6 +137,7 @@ export function useVideoTrim(options: UseVideoTrimOptions = {}) {
     try {
       // Store current video info for later use
       currentVideoInfo.current = videoInfo;
+      isActive.current = true;
 
       // Prepare video for trimming
       const tempPath = await prepareVideoForTrim(videoInfo);
