@@ -41,7 +41,8 @@
     "react-native-screens": "~4.11.1",
     "react-native-video-trim": "^5.0.2",
     "typescript": "~5.8.3",
-    "zeego": "^3.0.6"
+    "zeego": "^3.0.6",
+    "@react-native-community/datetimepicker": "8.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.9",
