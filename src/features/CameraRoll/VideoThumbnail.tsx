@@ -1,8 +1,9 @@
+import Entypo from "@expo/vector-icons/Entypo";
 import Feather from "@expo/vector-icons/Feather";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,12 +20,13 @@ import {
 import { IconBadge } from "../../components/IconBadge";
 import { MyAppText } from "../../components/text/MyAppText";
 import { isLivePhoto } from "../../services/mediaLibrary";
+import { getCachedThumbnailUri, getVideoThumbnail } from "../../services/thumbnail";
 import { ThumbnailPriority } from "../../services/thumbnailQueue";
 import { isVideoTrimmed } from "../../services/trim";
+import { hasVideoBeenMoved } from "../../services/videoDatetime";
 import { displayDurationFromMilis, displayDurationFromSecond } from "../../utils/dateTime";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
-import { getCachedThumbnailUri, getVideoThumbnail } from "../../services/thumbnail";
 
 export interface VidThumbnailProps {
   video: PhoneMedia;
@@ -135,6 +137,23 @@ export function VidThumbnail({
         />
       )}
 
+      {/* Datetime edited badge */}
+      {hasVideoBeenMoved(video) && (
+        <IconBadge
+          style={[
+            {
+              position: "absolute",
+              left: 0,
+              bottom: 0,
+              borderRadius: 0,
+              borderTopRightRadius: 9,
+            },
+          ]}
+          backgroundColor={theme.colors.secondary}
+          Icon={({ size, theme }) => <Entypo name="back-in-time" size={size} color={theme.colors.textOnSecondary} />}
+        />
+      )}
+
       {/* Selected badge */}
       {video.metadata?.isSelected && (
         <IconBadge
@@ -146,7 +165,7 @@ export function VidThumbnail({
             styles.topRight,
           ]}
           backgroundColor={theme.colors.accent}
-          Icon={({ size, theme }) => <Feather name="check" size={size} color={theme.colors.textOnPrimary} />}
+          Icon={({ size, theme }) => <Feather name="check" size={size} color={theme.colors.textOnAccent} />}
         />
       )}
 
