@@ -1,6 +1,6 @@
 import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
 
-export function getVideoDaetime(video: PhoneMedia): Date {
+export function getVideoDatetime(video: PhoneMedia): Date {
   return video.metadata?.assignedToDate ? new Date(video.metadata.assignedToDate) : new Date(video.creationTime);
 }
 

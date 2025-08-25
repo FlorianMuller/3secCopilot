@@ -7,7 +7,7 @@ import { useDynamicBottomSheet } from "../contexts/DynamicBottomSheetContext";
 import { VideoMetadata } from "../db/schema";
 import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
 import { changeVideoDate } from "../services/metadata";
-import { getVideoDaetime } from "../services/videoDatetime";
+import { getVideoDatetime } from "../services/videoDatetime";
 import { MyAppText } from "../components/text/MyAppText";
 
 interface UseVideoDatetimeEditorProps {
@@ -22,7 +22,7 @@ export function useVideoDatetimeEditor({ onDateChange, onError }: UseVideoDateti
   const openDatetimeEditor = useCallback(
     (video: PhoneMedia) => {
       const DatetimeEditorModal = () => {
-        const videoCurrentDate = getVideoDaetime(video);
+        const videoCurrentDate = getVideoDatetime(video);
         const [selectedDate, setSelectedDate] = useState(videoCurrentDate);
 
         const handleReset = async () => {
