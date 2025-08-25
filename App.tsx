@@ -13,6 +13,7 @@ import { db, expoSqliteDb } from "./src/db/db";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
 import { myDarkTheme, myLightTheme } from "./src/theme/themes";
+import { DynamicBottomSheetProvider } from "./src/contexts/DynamicBottomSheetContext";
 
 const Tab = createBottomTabNavigator();
 
@@ -23,44 +24,46 @@ interface AppTabsProps {
 function AppTabs({ theme }: AppTabsProps) {
   return (
     <NavigationContainer theme={theme === "dark" ? myDarkTheme : myLightTheme}>
-      <Tab.Navigator
-        initialRouteName="CameraRollTab"
-        screenOptions={{
-          headerShown: false,
-        }}
-        tabBar={(props) => <FloatingTabBar {...props} />}
-      >
-        <Tab.Screen
-          name="CameraRollTab"
-          component={gestureHandlerRootHOC(CameraRollNavigation)}
-          options={{
-            title: "Videos",
-            tabBarIcon: ({ focused, color, size }) => (
-              <Ionicons name={focused ? "images" : "images-outline"} size={size} color={color} />
-            ),
+      <DynamicBottomSheetProvider>
+        <Tab.Navigator
+          initialRouteName="CameraRollTab"
+          screenOptions={{
+            headerShown: false,
           }}
-        />
-        <Tab.Screen
-          name="Preview"
-          component={gestureHandlerRootHOC(memo(() => <View></View>))}
-          options={{
-            title: "Preview",
-            tabBarIcon: ({ focused, color, size }) => (
-              <Ionicons name={focused ? "play-circle" : "play-circle-outline"} size={size} color={color} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="OptionsTab"
-          component={gestureHandlerRootHOC(OptionsNavigation)}
-          options={{
-            title: "Settings",
-            tabBarIcon: ({ focused, color, size }) => (
-              <Ionicons name={focused ? "cog" : "cog-outline"} size={size} color={color} />
-            ),
-          }}
-        />
-      </Tab.Navigator>
+          tabBar={(props) => <FloatingTabBar {...props} />}
+        >
+          <Tab.Screen
+            name="CameraRollTab"
+            component={gestureHandlerRootHOC(CameraRollNavigation)}
+            options={{
+              title: "Videos",
+              tabBarIcon: ({ focused, color, size }) => (
+                <Ionicons name={focused ? "images" : "images-outline"} size={size} color={color} />
+              ),
+            }}
+          />
+          <Tab.Screen
+            name="Preview"
+            component={gestureHandlerRootHOC(memo(() => <View></View>))}
+            options={{
+              title: "Preview",
+              tabBarIcon: ({ focused, color, size }) => (
+                <Ionicons name={focused ? "play-circle" : "play-circle-outline"} size={size} color={color} />
+              ),
+            }}
+          />
+          <Tab.Screen
+            name="OptionsTab"
+            component={gestureHandlerRootHOC(OptionsNavigation)}
+            options={{
+              title: "Settings",
+              tabBarIcon: ({ focused, color, size }) => (
+                <Ionicons name={focused ? "cog" : "cog-outline"} size={size} color={color} />
+              ),
+            }}
+          />
+        </Tab.Navigator>
+      </DynamicBottomSheetProvider>
     </NavigationContainer>
   );
 }
