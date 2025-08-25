@@ -10,5 +10,13 @@ export function hasVideoBeenMoved(video: PhoneMedia): boolean {
   }
   const originalDate = new Date(video.creationTime);
   const assignedDate = video.metadata.assignedToDate;
-  return originalDate.getTime() !== new Date(assignedDate).getTime();
+
+  // Check that datetime are the same (ignoring miliseconds)
+  return !(
+    originalDate.getFullYear() === assignedDate.getFullYear() &&
+    originalDate.getMonth() === assignedDate.getMonth() &&
+    originalDate.getDate() === assignedDate.getDate() &&
+    originalDate.getHours() === assignedDate.getHours() &&
+    originalDate.getMinutes() === assignedDate.getMinutes()
+  );
 }

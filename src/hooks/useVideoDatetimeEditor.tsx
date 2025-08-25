@@ -8,6 +8,7 @@ import { VideoMetadata } from "../db/schema";
 import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
 import { changeVideoDate } from "../services/metadata";
 import { getVideoDaetime } from "../services/videoDatetime";
+import { MyAppText } from "../components/text/MyAppText";
 
 interface UseVideoDatetimeEditorProps {
   onDateChange?: (metadata: VideoMetadata) => void;
@@ -24,9 +25,17 @@ export function useVideoDatetimeEditor({ onDateChange, onError }: UseVideoDateti
         const videoCurrentDate = getVideoDaetime(video);
         const [selectedDate, setSelectedDate] = useState(videoCurrentDate);
 
+        const handleReset = async () => {
+          handleChange(new Date(video.creationTime));
+        };
+
         const handleConfirm = async () => {
+          handleChange(selectedDate);
+        };
+
+        const handleChange = async (newDate: Date) => {
           try {
-            const newMetadata = await changeVideoDate(video.id, new Date(video.creationTime), selectedDate);
+            const newMetadata = await changeVideoDate(video.id, new Date(video.creationTime), newDate);
             closeBottomSheet();
             if (newMetadata && onDateChange) {
               onDateChange(newMetadata);
@@ -49,12 +58,15 @@ export function useVideoDatetimeEditor({ onDateChange, onError }: UseVideoDateti
               onChange={(_, newDate) => newDate && setSelectedDate(newDate)}
             />
             <Pressable onPress={handleConfirm}>
-              <ThemedButton
-                text="Move"
-                // Icon={({ iconProps }) => <MaterialIcons name="update" {...iconProps} />}
-                style={{ marginTop: 20, width: 300 }}
-                size={20}
-              />
+              <ThemedButton text="Move" style={{ marginTop: 20, width: 300 }} size={20} />
+              <Pressable onPress={handleReset}>
+                <ThemedButton
+                  text={`Reset to ${new Date(video.creationTime).toLocaleDateString()}`}
+                  style={{ marginTop: 20, width: 300 }}
+                  size={16}
+                  variant="outline"
+                />
+              </Pressable>
             </Pressable>
           </View>
         );
