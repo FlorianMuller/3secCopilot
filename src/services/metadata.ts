@@ -94,6 +94,18 @@ export async function updateVideoTrimMetadata(
   });
 }
 
+export async function changeVideoDate(
+  videoId: string,
+  videoOriginalDate: Date,
+  newAssignedDate: Date
+): Promise<SelectVideoMetadata | null> {
+  return upsertVideoMetadata({
+    videoId,
+    videoOriginalDate,
+    assignedToDate: newAssignedDate,
+  });
+}
+
 // Util function to only return one videoMetadata from a list where
 // they should only be at most one videoMetadata in it.
 function returnOneMetadata(metaList: SelectVideoMetadata[]): SelectVideoMetadata | null {

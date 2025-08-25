@@ -4,6 +4,7 @@ import { VideoMetadata } from "../../db/schema";
 import { PhoneMedia } from "./CameraRoll";
 import { toggleVideoSelection } from "../../services/videoSelection";
 import { useVideoTrim } from "../../hooks/useVideoTrim";
+import { useVideoDatetimeEditor } from "../../hooks/useVideoDatetimeEditor";
 import * as MediaLibrary from "expo-media-library";
 
 interface VideoActionMenuProps {
@@ -35,6 +36,19 @@ export const VideoActionMenu = ({ children, video, dayContext, onMetadataUpdate 
       // Todo: show error toast/alert
     },
   });
+
+  const { openDatetimeEditor } = useVideoDatetimeEditor({
+    onDateChange: (newMetadata) => {
+      if (onMetadataUpdate) {
+        onMetadataUpdate(video.id, newMetadata);
+      }
+    },
+    onError: (error) => {
+      // Todo: show error toast/alert
+      console.error("Error changing video date:", error);
+    },
+  });
+
   const handleTrimVideo = async () => {
     try {
       if (video.info === undefined) {
@@ -69,15 +83,14 @@ export const VideoActionMenu = ({ children, video, dayContext, onMetadataUpdate 
           />
         </ContextMenu.Item>
 
-        {/* Future action */}
-        {/* <ContextMenu.Item key={"Move to an other day"}>
-          <ContextMenu.ItemTitle>Move to an other day</ContextMenu.ItemTitle>
+        <ContextMenu.Item key={"Move to an other day"} onSelect={() => openDatetimeEditor(video)}>
+          <ContextMenu.ItemTitle>Move to another day</ContextMenu.ItemTitle>
           <ContextMenu.ItemIcon
             ios={{
               name: "clock.arrow.trianglehead.counterclockwise.rotate.90",
             }}
           />
-        </ContextMenu.Item> */}
+        </ContextMenu.Item>
       </ContextMenu.Content>
     </ContextMenu.Root>
   );
