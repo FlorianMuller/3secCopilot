@@ -10,14 +10,13 @@ import * as MediaLibrary from "expo-media-library";
 interface VideoActionMenuProps {
   children: React.ReactNode;
   video: PhoneMedia;
-  dayContext: Date;
   onMetadataUpdate?: (videoId: string, metadata: VideoMetadata) => void;
 }
 
-export const VideoActionMenu = ({ children, video, dayContext, onMetadataUpdate }: VideoActionMenuProps) => {
+export const VideoActionMenu = ({ children, video, onMetadataUpdate }: VideoActionMenuProps) => {
   const handleSelectVideo = async () => {
     try {
-      const newMetadata = await toggleVideoSelection(video, video.metadata || null, dayContext);
+      const newMetadata = await toggleVideoSelection(video, video.metadata || null);
       if (newMetadata && onMetadataUpdate) {
         onMetadataUpdate(video.id, newMetadata);
       }

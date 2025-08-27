@@ -1,4 +1,6 @@
+import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as MediaLibrary from "expo-media-library";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -14,13 +16,12 @@ import { isVideoDayShifted } from "../../../services/dayShift";
 import { cleanupTempVideo, copyVideoToTemp } from "../../../services/localVideo";
 import { getLocalUri } from "../../../services/mediaLocalUri";
 import { getVideosMetadtaByIds } from "../../../services/metadata";
-import { toggleVideoSelection } from "../../../services/videoSelection";
 import preferences from "../../../services/preferences";
 import { doesTrimmedVideoExist, getTrimmedVideoPath, isVideoTrimmed, reTrimVideo } from "../../../services/trim";
+import { toggleVideoSelection } from "../../../services/videoSelection";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
 import { PhoneMedia } from "../CameraRoll";
 import { VideoThumbnailBar } from "./VideoThumbnailBar";
-import Feather from "@expo/vector-icons/Feather";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -217,7 +218,7 @@ export function VideoPlayer() {
 
   async function handleToggleSelectVideo() {
     try {
-      const newMetadata = await toggleVideoSelection(videoAsset, videoMetadata, new Date(params.day));
+      const newMetadata = await toggleVideoSelection(videoAsset, videoMetadata);
       if (newMetadata) {
         updateVideoMetadataInState(id, newMetadata);
       }

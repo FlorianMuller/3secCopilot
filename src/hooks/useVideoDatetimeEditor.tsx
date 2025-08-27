@@ -26,14 +26,14 @@ export function useVideoDatetimeEditor({ onDateChange, onError }: UseVideoDateti
         const [selectedDate, setSelectedDate] = useState(videoCurrentDate);
 
         const handleReset = async () => {
-          handleChange(new Date(video.creationTime));
+          handleChange(null);
         };
 
         const handleConfirm = async () => {
           handleChange(selectedDate);
         };
 
-        const handleChange = async (newDate: Date) => {
+        const handleChange = async (newDate: Date | null) => {
           try {
             const newMetadata = await changeVideoDate(video.id, new Date(video.creationTime), newDate);
             closeBottomSheet();

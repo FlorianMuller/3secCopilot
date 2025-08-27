@@ -4,8 +4,7 @@ import { markVideoAsSelected, markVideoAsUnselected } from "./metadata";
 
 export async function toggleVideoSelection(
   video: MediaLibrary.Asset,
-  videoMetadata: VideoMetadata | null,
-  dayContext: Date
+  videoMetadata: VideoMetadata | null
 ): Promise<VideoMetadata | null> {
   if (videoMetadata?.isSelected) {
     console.log("Unselecting video");
@@ -17,7 +16,7 @@ export async function toggleVideoSelection(
   }
 
   console.log("Selecting video");
-  const newMetadata = await markVideoAsSelected(video.id, new Date(video.creationTime), dayContext);
+  const newMetadata = await markVideoAsSelected(video.id, new Date(video.creationTime));
   if (!newMetadata) {
     console.error("Failed to select video: service returned null");
   }

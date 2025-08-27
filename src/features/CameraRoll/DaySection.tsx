@@ -81,7 +81,7 @@ export const DaySection = React.memo(function DaySection({
         {videosOfTheDay.length > 0 &&
           reversedVideosOfTheDay.map((vid, i) => (
             <View key={vid.id} style={{ padding: 1, width: thumbnailSize, height: thumbnailSize }}>
-              <VideoActionMenu video={vid} dayContext={day} onMetadataUpdate={onMetadataUpdate}>
+              <VideoActionMenu video={vid} onMetadataUpdate={onMetadataUpdate}>
                 <VidThumbnail
                   video={vid}
                   displayAs={dayHasAVideoSelected ? (vid.metadata?.isSelected ? "normal" : "unselected") : "normal"}

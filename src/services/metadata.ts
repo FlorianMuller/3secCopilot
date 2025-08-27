@@ -1,19 +1,9 @@
 import { eq, inArray } from "drizzle-orm";
-import { SelectVideoMetadata, videosMetadataTable } from "../db/schema";
+import { InsertVideoMetadata, SelectVideoMetadata, videosMetadataTable } from "../db/schema";
 import { db } from "../db/db";
 import { groupByUnique } from "../utils/groupBy";
 
-type VideoMetadataUpsertData = {
-  videoId: string;
-  videoOriginalDate: Date;
-  assignedToDate?: Date;
-  isSelected?: boolean;
-  trimStartTime?: number;
-  trimEndTime?: number;
-  isHidden?: boolean;
-};
-
-async function upsertVideoMetadata(data: VideoMetadataUpsertData): Promise<SelectVideoMetadata | null> {
+async function upsertVideoMetadata(data: InsertVideoMetadata): Promise<SelectVideoMetadata | null> {
   const { videoId, videoOriginalDate, ...updateFields } = data;
 
   // Remove undefined values to avoid overwriting with null
@@ -42,13 +32,11 @@ async function upsertVideoMetadata(data: VideoMetadataUpsertData): Promise<Selec
 
 export async function markVideoAsSelected(
   videoId: string,
-  videoOriginalDate: Date,
-  selectedForDate?: Date
+  videoOriginalDate: Date
 ): Promise<SelectVideoMetadata | null> {
   return upsertVideoMetadata({
     videoId,
     videoOriginalDate,
-    assignedToDate: selectedForDate,
     isSelected: true,
     isHidden: false,
   });
@@ -97,7 +85,7 @@ export async function updateVideoTrimMetadata(
 export async function changeVideoDate(
   videoId: string,
   videoOriginalDate: Date,
-  newAssignedDate: Date
+  newAssignedDate: Date | null
 ): Promise<SelectVideoMetadata | null> {
   return upsertVideoMetadata({
     videoId,
