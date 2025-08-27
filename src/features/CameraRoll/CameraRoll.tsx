@@ -9,6 +9,7 @@ import { useNavigationFocus } from "../../hooks/useNavigationFocus";
 import { useVideoLoader } from "../../hooks/useVideoLoader";
 import { getEffectiveDate } from "../../services/dayShift";
 import preferences from "../../services/preferences";
+import { getVideoDatetime } from "../../services/videoDatetime";
 import { getDaysBetween } from "../../utils/getDaysBetween";
 import { groupBy } from "../../utils/groupBy";
 import { utilStyles } from "../../utils/utilStyles";
@@ -69,9 +70,7 @@ export default function CameraRoll({
 
   const videosByDay = useMemo(
     () =>
-      groupBy(videos, (v) =>
-        getEffectiveDate(new Date(v.creationTime), dayShift || { hour: 0, minute: 0 }).toDateString()
-      ),
+      groupBy(videos, (v) => getEffectiveDate(getVideoDatetime(v), dayShift || { hour: 0, minute: 0 }).toDateString()),
     [videos, dayShift]
   );
 
