@@ -148,12 +148,23 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
   }, [videos]);
 
   const updateVideosMetadata = useCallback((updates: Record<string, VideoMetadata>) => {
-    setVideos((oldVideos) =>
-      (oldVideos || []).map((video) => {
+    setVideos((oldVideos) => {
+      const updatedVideos = (oldVideos || []).map((video) => {
         const updatedMetadata = updates[video.id];
         return updatedMetadata ? { ...video, metadata: updatedMetadata } : video;
-      })
-    );
+      });
+      
+      // Check if any assignedToDate was updated, if so resort by effective date
+      const hasAssignedDateUpdate = Object.values(updates).some(metadata => 
+        metadata.assignedToDate !== undefined
+      );
+      
+      if (hasAssignedDateUpdate) {
+        return updatedVideos.sort((a, b) => getVideoDatetime(b).getTime() - getVideoDatetime(a).getTime());
+      }
+      
+      return updatedVideos;
+    });
   }, []);
 
   const resetVideoLoader = useCallback(() => {
