@@ -61,10 +61,10 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
 
       // Filter current batch to only videos/live photos
       const wantedAssets = mediaPage.assets.filter((asset) => isAssetWanted(asset));
-      
+
       // Get metadata for all videos in this batch to check for assignedToDate
       const batchMetadata = await getVideosMetadtaByIds(wantedAssets.map((v) => v.id));
-      
+
       // Filter out videos that have assignedToDate (they'll be handled separately)
       const currentBatchVideos = wantedAssets.filter((asset) => {
         const metadata = batchMetadata[asset.id];
@@ -81,12 +81,6 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
         newLastDateToDisplay,
         currentLastDateToDisplay ?? startDate
       );
-      // console.log("assignedDateMetadata", assignedDateMetadata);
-      // console.log(
-      //   `from ${currentLastDateToDisplay ?? startDate} to ${newLastDateToDisplay}, found ${
-      //     Object.keys(assignedDateMetadata).length
-      //   } videos with assigned date`
-      // );
       const assignedDateVideoIds = Object.keys(assignedDateMetadata);
 
       // Step 3: Get additional videos that aren't in current batch AND aren't already loaded
@@ -153,16 +147,14 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
         const updatedMetadata = updates[video.id];
         return updatedMetadata ? { ...video, metadata: updatedMetadata } : video;
       });
-      
+
       // Check if any assignedToDate was updated, if so resort by effective date
-      const hasAssignedDateUpdate = Object.values(updates).some(metadata => 
-        metadata.assignedToDate !== undefined
-      );
-      
+      const hasAssignedDateUpdate = Object.values(updates).some((metadata) => metadata.assignedToDate !== undefined);
+
       if (hasAssignedDateUpdate) {
         return updatedVideos.sort((a, b) => getVideoDatetime(b).getTime() - getVideoDatetime(a).getTime());
       }
-      
+
       return updatedVideos;
     });
   }, []);
