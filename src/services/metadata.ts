@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import { InsertVideoMetadata, SelectVideoMetadata, videosMetadataTable } from "../db/schema";
 import { db } from "../db/db";
 import { groupByUnique } from "../utils/groupBy";
@@ -64,6 +64,24 @@ export async function getVideosMetadtaByIds(videoIds: string[]): Promise<Record<
     .select()
     .from(videosMetadataTable)
     .where(inArray(videosMetadataTable.videoId, videoIds));
+
+  return groupByUnique(metadataList, (m) => m.videoId);
+}
+
+export async function getVideosWithAssignedDateInRange(
+  createdAfter: Date,
+  createdBefore: Date
+): Promise<Record<string, SelectVideoMetadata>> {
+  const metadataList = await db
+    .select()
+    .from(videosMetadataTable)
+    .where(
+      and(
+        isNotNull(videosMetadataTable.assignedToDate),
+        gte(videosMetadataTable.assignedToDate, createdAfter),
+        lte(videosMetadataTable.assignedToDate, createdBefore)
+      )
+    );
 
   return groupByUnique(metadataList, (m) => m.videoId);
 }

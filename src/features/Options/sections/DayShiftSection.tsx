@@ -21,7 +21,7 @@ export function DayShiftSection() {
   return (
     <OptionSection
       title="Day shift"
-      description="As we sometimes live and go to bed past midnight, this option allow you to assign video past midnight and until the chosen hour to the previous day"
+      description="As we sometimes live and go to bed past midnight, this option allows you to assign videos past midnight and until the chosen hour to the previous day"
       Icon={({ theme: { colors } }) => <Feather name="moon" size={29} color={colors.text} />}
     >
       {dayShift !== undefined && (

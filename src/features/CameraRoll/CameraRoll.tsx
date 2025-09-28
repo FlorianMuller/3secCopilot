@@ -31,18 +31,15 @@ export default function CameraRoll({
 }: CameraRollProps) {
   const { dayShift } = preferences.useDayShiftPreference();
   const { ensurePermission } = useMediaLibraryPermissions();
-  const { videos, allVideoLoaded, loadNextBatch, refetchMetadata, updateVideosMetadata } = useVideoLoader({
-    startDate,
-    endDate,
-  });
+  const { videos, allVideoLoaded, lastDateToDisplay, loadNextBatch, refetchMetadata, updateVideosMetadata } =
+    useVideoLoader({
+      startDate,
+      endDate,
+    });
 
   const [visibleDays, setVisibleDays] = useState<Set<string>>(new Set());
 
-  const gotVideo = videos.length > 0;
-  const lastDateToDisplay = useMemo(
-    () => (allVideoLoaded || videos.length == 0 ? endDate : new Date(videos[videos.length - 1].creationTime)),
-    [allVideoLoaded, endDate, videos]
-  );
+  const videoLoading = videos === undefined;
 
   const handleLoadNextBatch = async () => {
     // Check we have the right permission first
@@ -63,23 +60,23 @@ export default function CameraRoll({
 
   // Fetch video when component mount
   useEffect(() => {
-    if (videos.length == 0 && !allVideoLoaded) {
-      handleLoadNextBatch();
-    }
-  }, [videos.length]);
+    handleLoadNextBatch();
+  }, []);
 
   const videosByDay = useMemo(
     () =>
-      groupBy(videos, (v) => getEffectiveDate(getVideoDatetime(v), dayShift || { hour: 0, minute: 0 }).toDateString()),
+      groupBy(videos || [], (v) =>
+        getEffectiveDate(getVideoDatetime(v), dayShift || { hour: 0, minute: 0 }).toDateString()
+      ),
     [videos, dayShift]
   );
 
   const days = useMemo(() => {
-    if (!gotVideo) {
+    if (lastDateToDisplay === undefined) {
       return [];
     }
     return getDaysBetween(startDate, lastDateToDisplay);
-  }, [startDate, lastDateToDisplay, gotVideo]);
+  }, [startDate, lastDateToDisplay]);
 
   // Handle viewable items changed to track visible days for priority
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -101,6 +98,14 @@ export default function CameraRoll({
     updateVideosMetadata({ [videoId]: metadata });
   };
 
+  if (videoLoading) {
+    return (
+      <View style={[utilStyles.centerVertical, utilStyles.hw100]}>
+        <MyAppText>loading videos...</MyAppText>
+      </View>
+    );
+  }
+
   return (
     <>
       {/* Linear gradient between thumbnails and phone status bar (time, wifi icon...) */}
@@ -110,33 +115,25 @@ export default function CameraRoll({
         style={{ width: "100%", height: 80, position: "absolute", zIndex: 100 }}
       />
 
-      {!gotVideo && (
-        <View style={[utilStyles.centerVertical, utilStyles.hw100]}>
-          <MyAppText>loading videos...</MyAppText>
-        </View>
-      )}
-
-      {gotVideo && (
-        <FlatList
-          data={days.map((day) => ({
-            day,
-            videosOfTheDay: videosByDay[day.toDateString()] || [],
-            isVisible: visibleDays.has(day.toDateString()),
-          }))}
-          renderItem={(props) => <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} />}
-          keyExtractor={({ day }) => day.toDateString()}
-          indicatorStyle="white"
-          onEndReached={allVideoLoaded ? undefined : handleLoadNextBatch}
-          onEndReachedThreshold={300}
-          initialNumToRender={20}
-          maxToRenderPerBatch={20}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          // To not render fist section under iPhone notch
-          // todo: use safe zone component to detect if there's a notch
-          ListHeaderComponent={<View style={{ height: 70 }} />}
-        />
-      )}
+      <FlatList
+        data={days.map((day) => ({
+          day,
+          videosOfTheDay: videosByDay[day.toDateString()] || [],
+          isVisible: visibleDays.has(day.toDateString()),
+        }))}
+        renderItem={(props) => <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} />}
+        keyExtractor={({ day }) => day.toDateString()}
+        indicatorStyle="white"
+        onEndReached={allVideoLoaded ? undefined : handleLoadNextBatch}
+        onEndReachedThreshold={300}
+        initialNumToRender={20}
+        maxToRenderPerBatch={20}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        // To not render fist section under iPhone notch
+        // todo: use safe zone component to detect if there's a notch
+        ListHeaderComponent={<View style={{ height: 70 }} />}
+      />
     </>
   );
 }
