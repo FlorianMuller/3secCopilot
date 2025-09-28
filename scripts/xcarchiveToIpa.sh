@@ -6,7 +6,8 @@ set -euo pipefail
 ARCHIVE_PATH=$1
 
 # Output .ipa path
-OUTPUT_IPA_PATH="$HOME/Desktop/3secsCopilot.ipa"
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+OUTPUT_IPA_PATH="$HOME/Desktop/side store/builds/3secsCopilot-${DATE}.ipa"
 
 # Derived paths
 APP_PATH="$ARCHIVE_PATH/Products/Applications"

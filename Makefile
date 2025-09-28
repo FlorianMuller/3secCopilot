@@ -15,8 +15,9 @@ IOS_DEVICE ?= "iPhone de Florian"
 
 .PHONY: ios-build-dev
 ios-build-dev: export EXPO_BUILD_MODE ?= dev
+ios-build-dev: export OPTIONS ?= --device ${IOS_DEVICE}
 ios-build-dev: ## Build the iOS app and insall it on IOS_DEVICE
-	npx expo run:ios --device ${IOS_DEVICE}
+	npx expo run:ios ${OPTIONS}
 
 ##@ Dogfood Build
 
