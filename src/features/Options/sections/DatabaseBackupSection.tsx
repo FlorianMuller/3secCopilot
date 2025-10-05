@@ -3,12 +3,17 @@ import { useTheme } from "@react-navigation/native";
 import { useState } from "react";
 import { Alert, Pressable } from "react-native";
 import { ThemedButton } from "../../../components/ThemedButton";
-import { exportAndShareDatabase, selectAndImportDatabase } from "../../../services/databaseBackup";
+import {
+  exportAndShareDatabase,
+  exportAndShareSqliteDatabase,
+  selectAndImportDatabase,
+} from "../../../services/databaseBackup";
 import { OptionSection } from "../OptionSection";
 
 export function DatabaseBackupSection() {
   const theme = useTheme();
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingSqlite, setIsExportingSqlite] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
   async function handleExport() {
@@ -20,6 +25,18 @@ export function DatabaseBackupSection() {
       Alert.alert("Export Failed", "Failed to export database. Please try again.");
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function handleExportSqlite() {
+    try {
+      setIsExportingSqlite(true);
+      await exportAndShareSqliteDatabase();
+    } catch (error) {
+      console.error("SQLite export error:", error);
+      Alert.alert("Export Failed", "Failed to export SQLite database. Please try again.");
+    } finally {
+      setIsExportingSqlite(false);
     }
   }
 
@@ -70,6 +87,20 @@ export function DatabaseBackupSection() {
           themeColor="primary"
           text={isImporting ? "Importing..." : "Import Database"}
           Icon={({ theme }) => <Feather name="download" size={20} color={theme.colors.primary} />}
+        />
+      </Pressable>
+
+      {/* Export SQLite Button */}
+      <Pressable
+        onPress={handleExportSqlite}
+        disabled={isExportingSqlite}
+        style={[isExportingSqlite && { opacity: 0.6 }]}
+      >
+        <ThemedButton
+          variant="outline"
+          themeColor="primary"
+          text={isExportingSqlite ? "Exporting..." : "Export SQLite File"}
+          Icon={({ theme }) => <Feather name="hard-drive" size={20} color={theme.colors.primary} />}
         />
       </Pressable>
     </OptionSection>

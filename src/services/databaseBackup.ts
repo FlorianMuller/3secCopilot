@@ -2,7 +2,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { DateTime } from "luxon";
-import { db } from "../db/db";
+import { db, expoSqliteDbPath } from "../db/db";
 import { preferencesTable, videosMetadataTable } from "../db/schema";
 
 export interface DatabaseBackup {
@@ -70,6 +70,47 @@ export async function exportAndShareDatabase(): Promise<boolean> {
     console.error("Error exporting database:", error);
     throw error;
   }
+}
+
+export async function exportAndShareSqliteDatabase(): Promise<boolean> {
+  if (!FileSystem.documentDirectory) {
+    throw new Error("Document directory is not available on this platform");
+  }
+
+  let dbSourcePath = expoSqliteDbPath;
+  let dbInfo = await FileSystem.getInfoAsync(dbSourcePath);
+
+  if (!dbInfo.exists) {
+    const fallbackPath = `${FileSystem.documentDirectory}SQLite/db.db`;
+    const fallbackInfo = await FileSystem.getInfoAsync(fallbackPath);
+
+    if (fallbackInfo.exists) {
+      dbSourcePath = fallbackPath;
+      dbInfo = fallbackInfo;
+    }
+  }
+
+  if (!dbInfo.exists) {
+    throw new Error("SQLite database file not found");
+  }
+
+  const timestamp = DateTime.now().toFormat("yyyy-MM-dd_HH-mm-ss");
+  const tempDbFilename = `3sec-copilot-sqlite_${timestamp}.db`;
+  const tempDbPath = `${FileSystem.cacheDirectory}${tempDbFilename}`;
+
+  await FileSystem.copyAsync({ from: dbSourcePath, to: tempDbPath });
+
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error("Sharing is not available on this device");
+  }
+
+  await Sharing.shareAsync(tempDbPath, {
+    mimeType: "application/vnd.sqlite3",
+    dialogTitle: "Export 3sec Copilot SQLite Database",
+  });
+
+  await FileSystem.deleteAsync(tempDbPath, { idempotent: true });
+  return true;
 }
 
 async function restoreDatabaseFromBackup(backup: DatabaseBackup): Promise<void> {
