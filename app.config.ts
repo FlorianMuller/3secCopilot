@@ -60,6 +60,15 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
       ],
       "expo-video",
       "expo-sqlite",
+      [
+        "expo-build-properties",
+        {
+          ios: {
+            // Needed by `react-native-zip-archive`
+            deploymentTarget: "15.5",
+          },
+        },
+      ],
     ],
   };
 

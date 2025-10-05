@@ -2,6 +2,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { DateTime } from "luxon";
+import { zip } from "react-native-zip-archive";
 import { db, expoSqliteDbPath } from "../db/db";
 import { preferencesTable, videosMetadataTable } from "../db/schema";
 
@@ -111,6 +112,36 @@ export async function exportAndShareSqliteDatabase(): Promise<boolean> {
 
   await FileSystem.deleteAsync(tempDbPath, { idempotent: true });
   return true;
+}
+
+export async function exportAndShareAppFileSystem(): Promise<boolean> {
+  if (!FileSystem.documentDirectory) {
+    throw new Error("Document directory is not available on this platform");
+  }
+
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error("Sharing is not available on this device");
+  }
+
+  const timestamp = DateTime.now().toFormat("yyyy-MM-dd_HH-mm-ss");
+  const zipFilename = `3sec-copilot-files_${timestamp}.zip`;
+  const zipPath = `${FileSystem.cacheDirectory}${zipFilename}`;
+  const sourcePath = stripFileScheme(FileSystem.documentDirectory);
+  const targetPath = stripFileScheme(zipPath);
+
+  await zip(sourcePath, targetPath);
+
+  await Sharing.shareAsync(zipPath, {
+    mimeType: "application/zip",
+    dialogTitle: "Export 3sec Copilot Files",
+  });
+
+  await FileSystem.deleteAsync(zipPath, { idempotent: true });
+  return true;
+}
+
+function stripFileScheme(path: string): string {
+  return path.replace(/^file:\/\//, "");
 }
 
 async function restoreDatabaseFromBackup(backup: DatabaseBackup): Promise<void> {

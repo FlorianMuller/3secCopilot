@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Alert, Pressable } from "react-native";
 import { ThemedButton } from "../../../components/ThemedButton";
 import {
+  exportAndShareAppFileSystem,
   exportAndShareDatabase,
   exportAndShareSqliteDatabase,
   selectAndImportDatabase,
@@ -14,6 +15,7 @@ export function DatabaseBackupSection() {
   const theme = useTheme();
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingSqlite, setIsExportingSqlite] = useState(false);
+  const [isExportingAppFiles, setIsExportingAppFiles] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
   async function handleExport() {
@@ -37,6 +39,18 @@ export function DatabaseBackupSection() {
       Alert.alert("Export Failed", "Failed to export SQLite database. Please try again.");
     } finally {
       setIsExportingSqlite(false);
+    }
+  }
+
+  async function handleExportAppFiles() {
+    try {
+      setIsExportingAppFiles(true);
+      await exportAndShareAppFileSystem();
+    } catch (error) {
+      console.error("App files export error:", error);
+      Alert.alert("Export Failed", "Failed to export app files. Please try again.");
+    } finally {
+      setIsExportingAppFiles(false);
     }
   }
 
@@ -101,6 +115,20 @@ export function DatabaseBackupSection() {
           themeColor="primary"
           text={isExportingSqlite ? "Exporting..." : "Export SQLite File"}
           Icon={({ theme }) => <Feather name="hard-drive" size={20} color={theme.colors.primary} />}
+        />
+      </Pressable>
+
+      {/* Export App Files Button */}
+      <Pressable
+        onPress={handleExportAppFiles}
+        disabled={isExportingAppFiles}
+        style={[isExportingAppFiles && { opacity: 0.6 }]}
+      >
+        <ThemedButton
+          variant="outline"
+          themeColor="primary"
+          text={isExportingAppFiles ? "Exporting..." : "Export App Files"}
+          Icon={({ theme }) => <Feather name="archive" size={20} color={theme.colors.primary} />}
         />
       </Pressable>
     </OptionSection>
