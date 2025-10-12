@@ -84,10 +84,10 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
       const assignedDateVideoIds = Object.keys(assignedDateMetadata);
 
       // Step 3: Get additional videos that aren't in current batch AND aren't already loaded
-      const mediaLibraryVideoIds = new Set(mediaPage.assets.map((v) => v.id));
+      const currentBatchVideoIds = new Set(currentBatchVideos.map((v) => v.id));
       const existingVideoIds = new Set((videos || []).map((v) => v.id));
       const additionalVideoIds = assignedDateVideoIds.filter(
-        (id) => !mediaLibraryVideoIds.has(id) && !existingVideoIds.has(id)
+        (id) => !currentBatchVideoIds.has(id) && !existingVideoIds.has(id)
       );
 
       const additionalVideosPromises = additionalVideoIds.map(async (id) => {
