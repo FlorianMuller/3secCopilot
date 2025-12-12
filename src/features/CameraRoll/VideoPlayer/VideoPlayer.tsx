@@ -1,13 +1,15 @@
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as MediaLibrary from "expo-media-library";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
+import { MyAppText } from "../../../components/text/MyAppText";
 import { ThemedButton } from "../../../components/ThemedButton";
 import { VideoMetadata } from "../../../db/schema";
 import { useVideoTrim } from "../../../hooks/useVideoTrim";
@@ -22,6 +24,8 @@ import { toggleVideoSelection } from "../../../services/videoSelection";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
 import { PhoneMedia } from "../CameraRoll";
 import { VideoThumbnailBar } from "./VideoThumbnailBar";
+import BottomSheet from "@gorhom/bottom-sheet";
+import { VideoMetadataEditor } from "./VideoMetadataEditor";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -47,6 +51,9 @@ export function VideoPlayer() {
 
   // Todo: use to show loading state when trimming video
   const [isLoadingTrimmedVideo, setIsLoadingTrimmedVideo] = useState(false);
+
+  // Bottom sheet ref for metadata editor
+  const metadataEditorRef = useRef<BottomSheet>(null);
 
   // Helper function to update metadata for a specific video
   const updateVideoMetadataInState = (videoId: string, newMetadata: VideoMetadata) => {
@@ -237,14 +244,37 @@ export function VideoPlayer() {
     await openTrimEditor(videoInfo);
   }
 
+  function openMetadataEditor() {
+    player.pause();
+    metadataEditorRef.current?.expand();
+  }
+
   return (
     <View style={{ display: "flex", height: "100%" }}>
       {/* Video player, taking all the remaining space */}
-      <VideoView
-        // nativeControls={false}
-        style={[styles.video]}
-        player={player}
-      />
+      <View style={{ position: "relative", flexGrow: 1 }}>
+        <VideoView
+          // nativeControls={false}
+          style={[styles.video]}
+          player={player}
+        />
+
+        {/* Video metadata overlay */}
+        {(videoMetadata?.title || videoMetadata?.description) && (
+          <View style={styles.metadataOverlay}>
+            {videoMetadata.title && (
+              <MyAppText style={styles.metadataTitle} size={18}>
+                {videoMetadata.title}
+              </MyAppText>
+            )}
+            {videoMetadata.description && (
+              <MyAppText style={styles.metadataDescription} size={14}>
+                {videoMetadata.description}
+              </MyAppText>
+            )}
+          </View>
+        )}
+      </View>
 
       {/* <VideoBar player={player} /> */}
 
@@ -265,7 +295,7 @@ export function VideoPlayer() {
                 )}
                 size={20}
                 variant={videoMetadata?.isSelected ? "filled" : "outline"}
-                style={{ width: 130 }}
+                style={{ width: 100 }}
               />
             </Pressable>
           )}
@@ -278,24 +308,65 @@ export function VideoPlayer() {
                 Icon={({ iconProps }) => <Ionicons name="cut" {...iconProps} />}
                 size={20}
                 variant="outline"
-                style={{ width: 130 }}
+                style={{ width: 100 }}
+              />
+            </Pressable>
+          )}
+
+          {/* Edit metadata button */}
+          {videoInfo && (
+            <Pressable onPress={openMetadataEditor}>
+              <ThemedButton
+                text="Info"
+                Icon={({ iconProps }) => <MaterialCommunityIcons name="information-outline" {...iconProps} />}
+                size={20}
+                variant="outline"
+                style={{ width: 100 }}
               />
             </Pressable>
           )}
         </View>
       </View>
       <SafeTabBarZone />
+
+      {/* Video metadata editor bottom sheet */}
+      {videoInfo && (
+        <VideoMetadataEditor
+          ref={metadataEditorRef}
+          videoId={id}
+          videoOriginalDate={new Date(videoInfo.creationTime)}
+          metadata={videoMetadata}
+          onMetadataUpdate={(newMetadata) => updateVideoMetadataInState(id, newMetadata)}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   video: {
-    flexGrow: 1,
+    flex: 1,
     borderColor: "white",
     borderWidth: 3,
     borderRadius: 10,
     margin: 20,
+  },
+  metadataOverlay: {
+    position: "absolute",
+    bottom: 30,
+    left: 30,
+    right: 30,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    padding: 12,
+    borderRadius: 8,
+    gap: 4,
+  },
+  metadataTitle: {
+    fontWeight: "bold",
+    color: "white",
+  },
+  metadataDescription: {
+    color: "rgba(255, 255, 255, 0.9)",
   },
   toolBar: {
     height: 80,
