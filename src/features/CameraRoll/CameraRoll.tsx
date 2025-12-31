@@ -20,14 +20,11 @@ export interface PhoneMedia extends MediaLibrary.Asset {
 }
 
 export interface CameraRollProps {
-  startDate?: Date;
-  endDate?: Date;
+  startDate: Date;
+  endDate: Date;
 }
 
-export default function CameraRoll({
-  startDate = new Date(new Date().setHours(23, 59, 59, 999)), // Today at 23:59:59
-  endDate = new Date(new Date().getFullYear(), 0, 1), // January 1st of current year
-}: CameraRollProps) {
+export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
   const { dayShift } = preferences.useDayShiftPreference();
   const { ensurePermission } = useMediaLibraryPermissions();
   const { videos, allVideoLoaded, lastDateToDisplay, loadNextBatch, refetchMetadata, updateVideosMetadata } =
