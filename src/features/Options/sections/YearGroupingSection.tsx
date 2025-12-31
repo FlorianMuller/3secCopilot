@@ -5,8 +5,6 @@ import { SegmentedControl } from "../../../components/SegmentedControl";
 import preferences from "../../../services/preferences";
 import { OptionLine } from "../OptionLine";
 import { OptionSection } from "../OptionSection";
-import { YearGroupingMode } from "./YearGrouping";
-import { MyAppText } from "../../../components/text/MyAppText";
 
 export function YearGroupingSection() {
   const { yearGroupingMode, saveYearGroupingMode } = preferences.useYearGroupingModePreference();
