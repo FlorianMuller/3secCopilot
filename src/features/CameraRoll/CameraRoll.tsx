@@ -1,4 +1,3 @@
-import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, View, ViewToken } from "react-native";
@@ -107,33 +106,24 @@ export default function CameraRoll({
   }
 
   return (
-    <>
-      {/* Linear gradient between thumbnails and phone status bar (time, wifi icon...) */}
-      {/* Todo: compute dynamically status bar size */}
-      <LinearGradient
-        colors={["rgba(0, 0, 0, 0.6)", "rgba(0, 0, 0, 0)"]}
-        style={{ width: "100%", height: 80, position: "absolute", zIndex: 100 }}
-      />
-
-      <FlatList
-        data={days.map((day) => ({
-          day,
-          videosOfTheDay: videosByDay[day.toDateString()] || [],
-          isVisible: visibleDays.has(day.toDateString()),
-        }))}
-        renderItem={(props) => <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} />}
-        keyExtractor={({ day }) => day.toDateString()}
-        indicatorStyle="white"
-        onEndReached={allVideoLoaded ? undefined : handleLoadNextBatch}
-        onEndReachedThreshold={300}
-        initialNumToRender={20}
-        maxToRenderPerBatch={20}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        // To not render fist section under iPhone notch
-        // todo: use safe zone component to detect if there's a notch
-        ListHeaderComponent={<View style={{ height: 70 }} />}
-      />
-    </>
+    <FlatList
+      data={days.map((day) => ({
+        day,
+        videosOfTheDay: videosByDay[day.toDateString()] || [],
+        isVisible: visibleDays.has(day.toDateString()),
+      }))}
+      renderItem={(props) => <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} />}
+      keyExtractor={({ day }) => day.toDateString()}
+      indicatorStyle="white"
+      onEndReached={allVideoLoaded ? undefined : handleLoadNextBatch}
+      onEndReachedThreshold={300}
+      initialNumToRender={20}
+      maxToRenderPerBatch={20}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
+      // To not render fist section under iPhone notch
+      // todo: use safe zone component to detect if there's a notch
+      ListHeaderComponent={<View style={{ height: 70 }} />}
+    />
   );
 }
