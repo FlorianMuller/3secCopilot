@@ -31,6 +31,8 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
       bundleIdentifier: "com.fmuller.3secs",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        UIFileSharingEnabled: true,
+        LSSupportsOpeningDocumentsInPlace: true,
       },
     },
     android: {
