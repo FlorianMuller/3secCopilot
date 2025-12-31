@@ -6,6 +6,7 @@ import preferences from "../../../services/preferences";
 import { OptionLine } from "../OptionLine";
 import { OptionSection } from "../OptionSection";
 import { YearGroupingMode } from "./YearGrouping";
+import { MyAppText } from "../../../components/text/MyAppText";
 
 export function YearGroupingSection() {
   const { yearGroupingMode, saveYearGroupingMode } = preferences.useYearGroupingModePreference();
@@ -30,20 +31,18 @@ export function YearGroupingSection() {
             />
           </OptionLine>
 
-          {yearGroupingMode === "age" && birthdayDate !== undefined && (
-            <OptionLine label="Your birthday">
-              <DateTimePicker
-                value={birthdayDate || new Date()}
-                mode="date"
-                display="default"
-                onChange={(_, selectedDate) => {
-                  if (selectedDate) {
-                    saveBirthdayDate(selectedDate);
-                  }
-                }}
-              />
-            </OptionLine>
-          )}
+          <OptionLine label="Your birthday">
+            <DateTimePicker
+              value={birthdayDate || new Date()}
+              mode="date"
+              display="default"
+              onChange={(_, selectedDate) => {
+                if (selectedDate) {
+                  saveBirthdayDate(selectedDate);
+                }
+              }}
+            />
+          </OptionLine>
         </View>
       )}
     </OptionSection>
