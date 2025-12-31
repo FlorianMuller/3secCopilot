@@ -12,6 +12,7 @@ import { FloatingTabBar } from "./src/components/MyTabBar";
 import { db, expoSqliteDb } from "./src/db/db";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
+import { Preview } from "./src/features/Preview/Preview";
 import { myDarkTheme, myLightTheme } from "./src/theme/themes";
 import { DynamicBottomSheetProvider } from "./src/contexts/DynamicBottomSheetContext";
 
@@ -44,7 +45,7 @@ function AppTabs({ theme }: AppTabsProps) {
           />
           <Tab.Screen
             name="Preview"
-            component={gestureHandlerRootHOC(memo(() => <View></View>))}
+            component={gestureHandlerRootHOC(Preview)}
             options={{
               title: "Preview",
               tabBarIcon: ({ focused, color, size }) => (
