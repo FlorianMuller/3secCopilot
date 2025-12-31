@@ -1,2 +1,2 @@
-export type YearGroupingMode = "calendar" | "birthday";
-export const yearGroupingModes = ["calendar", "birthday"] as const;
+export type YearGroupingMode = "calendar" | "age";
+export const yearGroupingModes = ["calendar", "age"] as const;

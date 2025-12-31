@@ -1,15 +1,13 @@
 import Feather from "@expo/vector-icons/Feather";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
-import { useTheme } from "@react-navigation/native";
-import { StyleSheet, View } from "react-native";
-import { MyAppText } from "../../../components/text/MyAppText";
+import { View } from "react-native";
+import { SegmentedControl } from "../../../components/SegmentedControl";
 import preferences from "../../../services/preferences";
+import { OptionLine } from "../OptionLine";
 import { OptionSection } from "../OptionSection";
 import { YearGroupingMode } from "./YearGrouping";
 
 export function YearGroupingSection() {
-  const theme = useTheme();
   const { yearGroupingMode, saveYearGroupingMode } = preferences.useYearGroupingModePreference();
   const { birthdayDate, saveBirthdayDate } = preferences.useBirthdayDatePreference();
 
@@ -20,56 +18,34 @@ export function YearGroupingSection() {
       Icon={({ theme: { colors } }) => <Feather name="calendar" size={25} color={colors.text} />}
     >
       {yearGroupingMode !== undefined && (
-        <View style={{ gap: 50 }}>
-          <View>
-            <MyAppText size={16} weight={600} style={{ marginBottom: 8 }}>
-              Grouping mode
-            </MyAppText>
-            <Picker
-              style={styles.picker}
+        <View style={{ gap: 20 }}>
+          <OptionLine label="Grouping mode">
+            <SegmentedControl
+              options={[
+                { label: "Calendar", value: "calendar" },
+                { label: "Age", value: "age" },
+              ]}
               selectedValue={yearGroupingMode}
-              onValueChange={(itemValue) => saveYearGroupingMode(itemValue as YearGroupingMode)}
-            >
-              <Picker.Item label="Calendar" value="calendar" color={theme.colors.text} />
-              <Picker.Item label="Birthday" value="birthday" color={theme.colors.text} />
-            </Picker>
-          </View>
+              onValueChange={saveYearGroupingMode}
+            />
+          </OptionLine>
 
-          {yearGroupingMode === "birthday" && (
-            <View
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <MyAppText size={16} weight={600} style={{ marginBottom: 8 }}>
-                Your birthday
-              </MyAppText>
-              {birthdayDate !== undefined && (
-                <DateTimePicker
-                  value={birthdayDate || new Date()}
-                  mode="date"
-                  display="default"
-                  onChange={(_, selectedDate) => {
-                    if (selectedDate) {
-                      saveBirthdayDate(selectedDate);
-                    }
-                  }}
-                />
-              )}
-            </View>
+          {yearGroupingMode === "age" && birthdayDate !== undefined && (
+            <OptionLine label="Your birthday">
+              <DateTimePicker
+                value={birthdayDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={(_, selectedDate) => {
+                  if (selectedDate) {
+                    saveBirthdayDate(selectedDate);
+                  }
+                }}
+              />
+            </OptionLine>
           )}
         </View>
       )}
     </OptionSection>
   );
 }
-
-const styles = StyleSheet.create({
-  picker: {
-    // height: 120,
-    // backgroundColor: "red",
-  },
-});
