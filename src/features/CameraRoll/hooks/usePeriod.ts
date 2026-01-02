@@ -48,12 +48,16 @@ function computeCalendarYearPeriods(lastYear = 1990): Period[] {
   const currentYear = new Date().getFullYear();
   const periods: Period[] = [];
 
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
   for (const i of Array(currentYear - lastYear + 1).keys()) {
     const year = currentYear - i;
+
     periods.push({
       id: `calendar-${year}`,
       label: year.toString(),
-      startDate: new Date(year, 11, 31, 23, 59, 59, 999),
+      startDate: year === currentYear ? todayEnd : new Date(year, 11, 31, 23, 59, 59, 999),
       endDate: new Date(currentYear - i, 0, 1),
     });
   }
@@ -65,23 +69,33 @@ function computeAgeYearPeriods(birthdayDate: Date): Period[] {
   const currentAge = getAge(birthdayDate);
   const periods: Period[] = [];
 
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
   for (const i of Array(currentAge + 1).keys()) {
     const age = currentAge - i;
+    const birthdayYear = birthdayDate.getFullYear() + age;
+
+    // Start camera roll on day before next birthday
+    const realStartDate = new Date(birthdayDate);
+    realStartDate.setFullYear(birthdayDate.getFullYear() + age + 1);
+    realStartDate.setDate(realStartDate.getDate() - 1);
+    realStartDate.setHours(23, 59, 59, 59);
+
+    // Do not start period in the future
+    const startDate = new Date(Math.min(realStartDate.getTime(), todayEnd.getTime()));
 
     // End camera roll on birthday
     const endDate = new Date(birthdayDate);
     endDate.setFullYear(birthdayDate.getFullYear() + age);
     endDate.setHours(0, 0, 0, 0);
 
-    // Start camera roll on day before next birthday
-    const startDate = new Date(birthdayDate);
-    startDate.setFullYear(birthdayDate.getFullYear() + age + 1);
-    startDate.setDate(startDate.getDate() - 1);
-    startDate.setHours(23, 0, 0, 0);
-
     periods.push({
       id: `age-${age}`,
-      label: age >= 2 ? `${age} ans` : `${age} an`,
+      label:
+        age >= 2
+          ? `${age} ans (${birthdayYear} - ${birthdayYear + 1})`
+          : `${age} an (${birthdayYear} - ${birthdayYear + 1})`,
       startDate,
       endDate,
     });
