@@ -98,10 +98,7 @@ function computeAgeYearPeriods(birthdayDate: Date): Period[] {
 
     periods.push({
       id: `age-${age}`,
-      label:
-        age >= 2
-          ? `${age} ans (${birthdayYear} - ${birthdayYear + 1})`
-          : `${age} an (${birthdayYear} - ${birthdayYear + 1})`,
+      label: age >= 2 ? `${age} ans` : `${age} an`,
       startDate,
       endDate,
     });
