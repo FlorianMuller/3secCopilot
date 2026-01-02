@@ -11,8 +11,8 @@ export type Period = {
 };
 
 export function usePeriod() {
-  const { yearGroupingMode } = preferences.useYearGroupingModePreference();
-  const { birthdayDate } = preferences.useBirthdayDatePreference();
+  const { yearGroupingMode } = preferences.useYearGroupingModePreference({ refetchOnFocus: true });
+  const { birthdayDate } = preferences.useBirthdayDatePreference({ refetchOnFocus: true });
 
   const periods: Period[] | undefined = computePeriods(yearGroupingMode, birthdayDate);
 
@@ -20,8 +20,14 @@ export function usePeriod() {
   const selectedPeriod = periods?.find((p) => p.id === selectedPeriodId);
 
   useEffect(() => {
-    // If no period selected, select the first one
-    if (periods !== undefined && selectedPeriodId === undefined && periods.length > 0) {
+    if (
+      // If we have periods
+      periods !== undefined &&
+      periods.length > 0 &&
+      // And no period selected or selected period not found anymore
+      (selectedPeriodId === undefined || periods.findIndex((p) => p.id === selectedPeriodId) === -1)
+    ) {
+      // Select the first period by default
       setSelectedPeriodId(periods[0].id);
     }
   }, [periods, selectedPeriodId]);

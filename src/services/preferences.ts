@@ -1,10 +1,11 @@
 import { eq } from "drizzle-orm";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { db } from "../db/db";
 import { preferencesTable } from "../db/schema";
 import { DayShiftTime } from "../features/Options/sections/DayShiftSection";
 import { capitalize } from "../utils/capitalize";
 import { YearGroupingMode, yearGroupingModes } from "../features/Options/sections/YearGrouping";
+import { useNavigationFocus } from "../hooks/useNavigationFocus";
 
 // ----------------------------------------------------------------------------------------------------
 // Generic preference function
@@ -33,17 +34,21 @@ export async function deletePreference(key: string): Promise<void> {
 // ----------------------------------------------------------------------------------------------------
 // Helper to create specific preference function
 
+interface PreferenceHookOptions {
+  refetchOnFocus?: boolean;
+}
+
 type GetPreferenceFunction<T> = () => Promise<T | null>;
 type GetPreferenceFunctionWithDefault<T> = () => Promise<T>;
 type SetPreferenceFunction<T> = (value: T) => Promise<void>;
 type DeletePreferenceFunction = () => Promise<void>;
 
-type PreferenceHook<K extends string, T> = () => {
+type PreferenceHook<K extends string, T> = (options?: PreferenceHookOptions) => {
   [P in K | `save${Capitalize<K>}`]: P extends `save${Capitalize<K>}`
     ? (newValue: T) => Promise<void>
     : undefined | T | null;
 };
-type PreferenceHookWithDefault<K extends string, T> = () => {
+type PreferenceHookWithDefault<K extends string, T> = (options?: PreferenceHookOptions) => {
   [P in K | `save${Capitalize<K>}`]: P extends `save${Capitalize<K>}` ? (newValue: T) => Promise<void> : undefined | T;
 };
 
@@ -108,22 +113,26 @@ function createPreferencesFunctions<K extends string, T>(
     return prefValue;
   };
   const deleteValue: DeletePreferenceFunction = () => deletePreference(key);
-  const usePreferenceHook = () => {
+  const usePreferenceHook = (options?: PreferenceHookOptions) => {
     const [preference, setPreference] = useState<T | null>();
 
-    async function retrievePreference() {
+    const retrievePreference = useCallback(async () => {
       const val = await getValue();
       setPreference(val);
-    }
+    }, []);
+
+    const savePreference = useCallback(async (newValue: T) => {
+      await saveValue(newValue);
+      setPreference(newValue);
+    }, []);
 
     useEffect(() => {
       retrievePreference();
     }, []);
 
-    async function savePreference(newValue: T) {
-      await saveValue(newValue);
-      setPreference(newValue);
-    }
+    useNavigationFocus(
+      options?.refetchOnFocus ? retrievePreference : undefined
+    );
 
     return {
       [key]: preference === null && defaultValue !== undefined ? defaultValue : preference,
