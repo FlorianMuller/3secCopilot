@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import * as DropdownMenu from "zeego/dropdown-menu";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { MyAppText } from "../../components/text/MyAppText";
 import { Period } from "./hooks/usePeriod";
 
@@ -10,12 +12,24 @@ interface PeriodSelectorProps {
 }
 
 export function PeriodSelector({ periods, selectedPeriod, onSelectPeriod }: PeriodSelectorProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <View style={styles.container}>
-      <DropdownMenu.Root>
+      <DropdownMenu.Root
+        onOpenChange={setIsOpen}
+        // @ts-expect-error - onOpenWillChange exists at runtime on iOS but not in type definitions
+        onOpenWillChange={setIsOpen}
+      >
         <DropdownMenu.Trigger>
           <View style={styles.trigger}>
-            <MyAppText weight={600}>{selectedPeriod.label}</MyAppText>
+            <MyAppText weight={800}>{selectedPeriod.label}</MyAppText>
+            <MaterialCommunityIcons
+              name={isOpen ? "chevron-up" : "chevron-down"}
+              size={20}
+              color="white"
+              style={styles.icon}
+            />
           </View>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content>
@@ -41,9 +55,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   trigger: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: "rgba(0, 0, 0, 0.7)", // Semi-transparent background
+  },
+  icon: {
+    marginTop: 1, // Fine-tune vertical alignment
   },
 });
