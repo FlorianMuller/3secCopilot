@@ -4,6 +4,7 @@ import { DayShiftSection } from "./sections/DayShiftSection";
 import { YearGroupingSection } from "./sections/YearGroupingSection";
 import { CacheOptionSection } from "./sections/CacheOptionSection";
 import { DatabaseBackupSection } from "./sections/DatabaseBackupSection";
+import { BuildInfoSection } from "./sections/BuildInfoSection";
 import { SafeTabBarZone } from "../../components/SafeTabBarZone";
 
 export function Options() {
@@ -21,6 +22,8 @@ export function Options() {
         <DatabaseBackupSection />
 
         <CacheOptionSection />
+
+        <BuildInfoSection />
 
         <SafeTabBarZone />
       </View>

@@ -15,6 +15,12 @@ Types of changes:
 - Security -> in case of vulnerabilities. 
 -->
 
+## [0.0.4] - 2026-02-26
+
+### Added
+
+- Option section to display app version and build info (commit and date)
+
 ## [0.0.3] - 2026-01-03
 
 ### Added
