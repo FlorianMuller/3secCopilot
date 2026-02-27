@@ -1,4 +1,5 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
+import { execSync } from "child_process";
 
 type BuildMode = "dev" | "dogfood";
 
@@ -7,11 +8,40 @@ const getBuildMode = (): BuildMode => {
   return mode === "dev" || mode === "dogfood" ? mode : "dev";
 };
 
-const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
+const getGitTag = (required: boolean): string => {
+  try {
+    return execSync("git describe --tags --exact-match HEAD").toString().trim();
+  } catch {
+    if (required) {
+      throw new Error(
+        "Build failed: no git tag found on the current commit. Tag the commit before building in dogfood mode."
+      );
+    }
+    return "dev";
+  }
+};
+
+const getBuildMetadata = (version: string) => {
+  let gitCommitHash = "unknown";
+  try {
+    gitCommitHash = execSync("git rev-parse --short HEAD").toString().trim();
+  } catch {
+    // Fallback for non-git environments
+  }
+
+  return {
+    gitCommitHash,
+    buildTimestamp: new Date().toISOString(),
+    buildMode: getBuildMode(),
+    version,
+  };
+};
+
+const getConfigForBuildMode = (buildMode: BuildMode, version: string): ExpoConfig => {
   const baseConfig: ExpoConfig = {
     name: "3secs Copilot",
     slug: "3secs",
-    version: "1.0.0",
+    version,
     orientation: "portrait" as const,
     icon: "./assets/icon.png",
     newArchEnabled: true,
@@ -31,6 +61,8 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
       bundleIdentifier: "com.fmuller.3secs",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        UIFileSharingEnabled: true,
+        LSSupportsOpeningDocumentsInPlace: true,
       },
     },
     android: {
@@ -61,6 +93,7 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
       "expo-video",
       "expo-sqlite",
     ],
+    extra: getBuildMetadata(version),
   };
 
   switch (buildMode) {
@@ -69,7 +102,6 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
         ...baseConfig,
         name: "3secs Copilot (Dev)",
         slug: "3secsDev",
-        version: "1.0.0-dev",
         ios: {
           ...baseConfig.ios,
           bundleIdentifier: "com.fmuller.3secsDev",
@@ -88,7 +120,8 @@ const getConfigForBuildMode = (buildMode: BuildMode): ExpoConfig => {
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const buildMode = getBuildMode();
-  const buildConfig = getConfigForBuildMode(buildMode);
+  const version = getGitTag(buildMode === "dogfood");
+  const buildConfig = getConfigForBuildMode(buildMode, version);
 
   console.log(`🔧 Building in ${buildMode} mode(${buildConfig?.ios?.bundleIdentifier})`);
 

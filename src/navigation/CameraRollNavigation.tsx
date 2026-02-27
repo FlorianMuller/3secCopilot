@@ -2,6 +2,7 @@ import { createNativeStackNavigator, NativeStackNavigationProp } from "@react-na
 import { CameraRollURI, VideoPlayerURI } from ".";
 import CameraRoll from "../features/CameraRoll/CameraRoll";
 import { VideoPlayer } from "../features/CameraRoll/VideoPlayer/VideoPlayer";
+import { CameraRollPage } from "../features/CameraRoll/CameraRollPage";
 
 export type CameraRollStackParamList = {
   [CameraRollURI]: undefined;
@@ -16,7 +17,7 @@ const CameraRollStack = createNativeStackNavigator<CameraRollStackParamList>();
 export function CameraRollNavigation() {
   return (
     <CameraRollStack.Navigator initialRouteName={CameraRollURI} screenOptions={{ headerShown: true }}>
-      <CameraRollStack.Screen name={CameraRollURI} component={CameraRoll} options={{ headerShown: false }} />
+      <CameraRollStack.Screen name={CameraRollURI} component={CameraRollPage} options={{ headerShown: false }} />
       <CameraRollStack.Screen name={VideoPlayerURI} component={VideoPlayer} />
     </CameraRollStack.Navigator>
   );

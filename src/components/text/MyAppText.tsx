@@ -2,7 +2,7 @@ import { useTheme } from "@react-navigation/native";
 import { PropsWithChildren } from "react";
 import { StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
 
-interface MyAppTextProps {
+export interface MyAppTextProps {
   size?: number;
   color?: string;
   style?: StyleProp<ViewStyle>;

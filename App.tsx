@@ -1,19 +1,19 @@
-import "./src/utils/polyfills";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer } from "@react-navigation/native";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
-import { memo } from "react";
 import { Text, useColorScheme, View } from "react-native";
 import { gestureHandlerRootHOC, GestureHandlerRootView } from "react-native-gesture-handler";
 import migrations from "./drizzle/migrations";
 import { FloatingTabBar } from "./src/components/MyTabBar";
+import { DynamicBottomSheetProvider } from "./src/contexts/DynamicBottomSheetContext";
 import { db, expoSqliteDb } from "./src/db/db";
+import { Preview } from "./src/features/Preview/Preview";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
 import { myDarkTheme, myLightTheme } from "./src/theme/themes";
-import { DynamicBottomSheetProvider } from "./src/contexts/DynamicBottomSheetContext";
+import "./src/utils/polyfills";
 
 const Tab = createBottomTabNavigator();
 
@@ -44,7 +44,7 @@ function AppTabs({ theme }: AppTabsProps) {
           />
           <Tab.Screen
             name="Preview"
-            component={gestureHandlerRootHOC(memo(() => <View></View>))}
+            component={gestureHandlerRootHOC(Preview)}
             options={{
               title: "Preview",
               tabBarIcon: ({ focused, color, size }) => (
