@@ -242,7 +242,7 @@ export function VideoPlayer() {
       {/* Video player, taking all the remaining space */}
       <VideoView
         // nativeControls={false}
-        style={[styles.video]}
+        style={styles.video}
         player={player}
       />
 

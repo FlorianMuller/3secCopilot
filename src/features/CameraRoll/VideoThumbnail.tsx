@@ -47,7 +47,7 @@ export function VidThumbnail({
   style,
   isVisible = true,
 }: VidThumbnailProps) {
-  const [thumbnailUri, setThumbnailUri] = useState<string>(getCachedThumbnailUri(video.id));
+  const [thumbnailUri, setThumbnailUri] = useState<string>(() => getCachedThumbnailUri(video.id));
   const [refreshCount, setRefreshCount] = useState<number>(0);
   const thumbnailUriWithRefresh = thumbnailUri + `?refresh=${refreshCount}`;
   const { width } = useWindowDimensions();
@@ -124,15 +124,13 @@ export function VidThumbnail({
       {/* Trim badge */}
       {video.metadata && isVideoTrimmed(video.metadata) && (
         <IconBadge
-          style={[
-            {
-              position: "absolute",
-              left: 0,
-              top: 0,
-              borderRadius: 0,
-              borderBottomRightRadius: 9,
-            },
-          ]}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            borderRadius: 0,
+            borderBottomRightRadius: 9,
+          }}
           Icon={({ size, theme }) => <Ionicons name="cut" size={size} color={theme.colors.textOnPrimary} />}
         />
       )}
@@ -140,15 +138,13 @@ export function VidThumbnail({
       {/* Datetime edited badge */}
       {hasVideoBeenMoved(video) && (
         <IconBadge
-          style={[
-            {
-              position: "absolute",
-              left: 0,
-              bottom: 0,
-              borderRadius: 0,
-              borderTopRightRadius: 9,
-            },
-          ]}
+          style={{
+            position: "absolute",
+            left: 0,
+            bottom: 0,
+            borderRadius: 0,
+            borderTopRightRadius: 9,
+          }}
           backgroundColor={theme.colors.secondary}
           Icon={({ size, theme }) => <Entypo name="back-in-time" size={size} color={theme.colors.textOnSecondary} />}
         />

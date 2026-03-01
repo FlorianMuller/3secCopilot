@@ -54,7 +54,7 @@ export function DatabaseBackupSection() {
       Icon={({ theme: { colors } }) => <Feather name="database" size={25} color={colors.text} />}
     >
       {/* Export Button */}
-      <Pressable onPress={handleExport} disabled={isExporting} style={[isExporting && { opacity: 0.6 }]}>
+      <Pressable onPress={handleExport} disabled={isExporting} style={isExporting ? { opacity: 0.6 } : undefined}>
         <ThemedButton
           variant="outline"
           themeColor="primary"
@@ -64,7 +64,7 @@ export function DatabaseBackupSection() {
       </Pressable>
 
       {/* Import Button */}
-      <Pressable onPress={handleImport} disabled={isImporting} style={[isImporting && { opacity: 0.6 }]}>
+      <Pressable onPress={handleImport} disabled={isImporting} style={isImporting ? { opacity: 0.6 } : undefined}>
         <ThemedButton
           variant="outline"
           themeColor="primary"
