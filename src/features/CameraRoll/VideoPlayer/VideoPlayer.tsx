@@ -255,7 +255,7 @@ export function VideoPlayer() {
       <View style={{ position: "relative", flexGrow: 1 }}>
         <VideoView
           // nativeControls={false}
-          style={[styles.video]}
+          style={styles.video}
           player={player}
         />
 

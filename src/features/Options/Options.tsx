@@ -15,7 +15,7 @@ export function Options() {
 
         <DayShiftSection />
 
-        <MyAppText size={20} weight={700} style={[{ marginLeft: 5, marginTop: 20 }]}>
+        <MyAppText size={20} weight={700} style={{ marginLeft: 5, marginTop: 20 }}>
           Advanced
         </MyAppText>
 

@@ -90,9 +90,19 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
     viewAreaCoveragePercentThreshold: 10, // Consider item visible when 10% is shown
   };
 
-  const handleSingleMetadataUpdate = (videoId: string, metadata: VideoMetadata) => {
-    updateVideosMetadata({ [videoId]: metadata });
-  };
+  const handleSingleMetadataUpdate = useCallback(
+    (videoId: string, metadata: VideoMetadata) => {
+      updateVideosMetadata({ [videoId]: metadata });
+    },
+    [updateVideosMetadata]
+  );
+
+  const renderItem = useCallback(
+    (props: { item: { day: Date; videosOfTheDay: PhoneMedia[]; isVisible: boolean } }) => (
+      <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} />
+    ),
+    [handleSingleMetadataUpdate]
+  );
 
   if (videoLoading) {
     return (
@@ -109,7 +119,7 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
         videosOfTheDay: videosByDay[day.toDateString()] || [],
         isVisible: visibleDays.has(day.toDateString()),
       }))}
-      renderItem={(props) => <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} />}
+      renderItem={renderItem}
       keyExtractor={({ day }) => day.toDateString()}
       indicatorStyle="white"
       onEndReached={allVideoLoaded ? undefined : handleLoadNextBatch}
