@@ -1,11 +1,11 @@
 import { useTheme } from "@react-navigation/native";
 import { PropsWithChildren } from "react";
-import { StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from "react-native";
+import { StyleProp, Text, TextStyle } from "react-native";
 
 export interface MyAppTextProps {
   size?: number;
   color?: string;
-  style?: StyleProp<ViewStyle>;
+  style?: StyleProp<TextStyle>;
   italic?: boolean;
   weight?: TextStyle["fontWeight"];
 }
