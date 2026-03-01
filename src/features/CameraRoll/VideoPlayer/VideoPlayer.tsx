@@ -294,7 +294,7 @@ export function VideoPlayer() {
 
             {/* Video metadata overlay */}
             {(videoMetadata?.title || videoMetadata?.description) && (
-              <View style={styles.metadataOverlay}>
+              <View style={styles.metadataOverlay} pointerEvents="none">
                 {videoMetadata.title && (
                   <MyAppText style={styles.metadataTitle} size={15}>
                     {videoMetadata.title}
