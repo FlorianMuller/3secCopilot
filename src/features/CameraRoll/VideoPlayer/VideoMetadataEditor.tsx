@@ -1,7 +1,7 @@
 import BottomSheet, { BottomSheetBackdrop, BottomSheetTextInput, BottomSheetView } from "@gorhom/bottom-sheet";
 import { useTheme } from "@react-navigation/native";
 import React, { forwardRef, useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Keyboard, Pressable, StyleSheet, View } from "react-native";
 import { MyAppText } from "../../../components/text/MyAppText";
 import { ThemedButton } from "../../../components/ThemedButton";
 import { VideoMetadata } from "../../../db/schema";
@@ -31,6 +31,7 @@ export const VideoMetadataEditor = forwardRef<BottomSheet, VideoMetadataEditorPr
     }, [metadata]);
 
     const handleSave = async () => {
+      Keyboard.dismiss();
       try {
         setIsSaving(true);
         const updatedMetadata = await updateVideoTitleAndDescription(
@@ -107,11 +108,7 @@ export const VideoMetadataEditor = forwardRef<BottomSheet, VideoMetadataEditorPr
                 Description
               </MyAppText>
               <BottomSheetTextInput
-                style={[
-                  styles.input,
-                  styles.textArea,
-                  { backgroundColor: colors.background, color: colors.text },
-                ]}
+                style={[styles.input, styles.textArea, { backgroundColor: colors.background, color: colors.text }]}
                 value={description}
                 onChangeText={setDescription}
                 placeholder="Add a description..."
