@@ -1,6 +1,5 @@
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as MediaLibrary from "expo-media-library";
@@ -27,6 +26,7 @@ import { PhoneMedia } from "../CameraRoll";
 import { VideoThumbnailBar } from "./VideoThumbnailBar";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { VideoMetadataEditor } from "./VideoMetadataEditor";
+import { VideoPlayerMenu } from "./VideoPlayerMenu";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -348,18 +348,8 @@ export function VideoPlayer() {
             </Pressable>
           )}
 
-          {/* Edit metadata button */}
-          {videoInfo && (
-            <Pressable onPress={openMetadataEditor}>
-              <ThemedButton
-                text="Info"
-                Icon={({ iconProps }) => <MaterialCommunityIcons name="information-outline" {...iconProps} />}
-                size={20}
-                variant="outline"
-                style={{ width: 100 }}
-              />
-            </Pressable>
-          )}
+          {/* More options menu */}
+          {videoInfo && <VideoPlayerMenu onEditMetadata={openMetadataEditor} />}
         </View>
       </View>
       <SafeTabBarZone />
