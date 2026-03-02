@@ -15,6 +15,12 @@ export interface VideoMetadataEditorProps {
   onMetadataUpdate: (metadata: VideoMetadata) => void;
 }
 
+// Not using dynamic bottom sheet hook (got implementation at src/hooks/useVideoMetadataEditor.tsx)
+// because `BottomSheetTextInput` make `BottomSheetModel` crash when keyboard open and it try to
+// resize it. Had to use a `BottomSheet` instead.
+// see: https://github.com/gorhom/react-native-bottom-sheet/issues/1602
+// Todo: replace `VideoMetadataEditor` with `useVideoMetadataEditor` once bug has been fixed (try
+// to update `@gorhom/bottom-sheet` with reanimated to latest version and check if bug is still present)
 export const VideoMetadataEditor = forwardRef<BottomSheet, VideoMetadataEditorProps>(
   ({ videoId, videoOriginalDate, metadata, onMetadataUpdate }, ref) => {
     const theme = useTheme();
@@ -58,6 +64,7 @@ export const VideoMetadataEditor = forwardRef<BottomSheet, VideoMetadataEditorPr
     };
 
     const handleCancel = () => {
+      Keyboard.dismiss();
       // Reset to original values
       setTitle(metadata?.title || "");
       setDescription(metadata?.description || "");
