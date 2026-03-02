@@ -22,6 +22,10 @@ export const videosMetadataTable = sqliteTable(
     trimStartTime: int(),
     trimEndTime: int(),
 
+    // User-provided metadata
+    title: text(),
+    description: text(),
+
     // Other
     isHidden: int({ mode: "boolean" }).default(false).notNull(),
   },

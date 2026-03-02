@@ -4,10 +4,12 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as MediaLibrary from "expo-media-library";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useState } from "react";
+import { useEventListener } from "expo";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
+import { MyAppText } from "../../../components/text/MyAppText";
 import { ThemedButton } from "../../../components/ThemedButton";
 import { VideoMetadata } from "../../../db/schema";
 import { useVideoTrim } from "../../../hooks/useVideoTrim";
@@ -22,6 +24,9 @@ import { toggleVideoSelection } from "../../../services/videoSelection";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
 import { PhoneMedia } from "../CameraRoll";
 import { VideoThumbnailBar } from "./VideoThumbnailBar";
+import BottomSheet from "@gorhom/bottom-sheet";
+import { VideoMetadataEditor } from "./VideoMetadataEditor";
+import { VideoPlayerMenu } from "./VideoPlayerMenu";
 
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
@@ -34,8 +39,6 @@ export function VideoPlayer() {
   const player = useVideoPlayer({}, (player) => {
     player.audioMixingMode = "duckOthers";
   });
-  // todo: show video player error
-  // const { status, error } = useEvent(player, "statusChange", { status: player.status });
 
   // All videos data (info + metadata)
   const [allVideos, setAllVideos] = useState<PhoneMedia[]>([]);
@@ -47,6 +50,37 @@ export function VideoPlayer() {
 
   // Todo: use to show loading state when trimming video
   const [isLoadingTrimmedVideo, setIsLoadingTrimmedVideo] = useState(false);
+
+  // Bottom sheet ref for metadata editor
+  const metadataEditorRef = useRef<BottomSheet>(null);
+
+  // Container size for video dimension calculation
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  // Track the video dimensions actually loaded in the player via the sourceLoad event.
+  // This ensures the VideoView keeps the previous video's size until the new source
+  // has fully loaded — preventing a flash when switching between different aspect ratios.
+  const [loadedVideoDimensions, setLoadedVideoDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  useEventListener(player, "sourceLoad", () => {
+    if (videoInfo?.width && videoInfo?.height) {
+      setLoadedVideoDimensions({ width: videoInfo.width, height: videoInfo.height });
+    }
+  });
+
+  const videoSize = useMemo(() => {
+    if (!containerSize.width || !containerSize.height) return null;
+    if (!loadedVideoDimensions) {
+      return { width: containerSize.width, height: containerSize.height };
+    }
+    const videoAspect = loadedVideoDimensions.width / loadedVideoDimensions.height;
+    const containerAspect = containerSize.width / containerSize.height;
+    if (videoAspect > containerAspect) {
+      return { width: containerSize.width, height: containerSize.width / videoAspect };
+    } else {
+      return { width: containerSize.height * videoAspect, height: containerSize.height };
+    }
+  }, [loadedVideoDimensions, containerSize]);
 
   // Helper function to update metadata for a specific video
   const updateVideoMetadataInState = (videoId: string, newMetadata: VideoMetadata) => {
@@ -237,14 +271,45 @@ export function VideoPlayer() {
     await openTrimEditor(videoInfo);
   }
 
+  function openMetadataEditor() {
+    player.pause();
+    metadataEditorRef.current?.expand();
+  }
+
   return (
     <View style={{ display: "flex", height: "100%" }}>
       {/* Video player, taking all the remaining space */}
-      <VideoView
-        // nativeControls={false}
-        style={styles.video}
-        player={player}
-      />
+      <View
+        style={{ flex: 1, justifyContent: "center", alignItems: "center", overflow: "hidden" }}
+        onLayout={(e) => setContainerSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+      >
+        {videoSize && (
+          // <></>
+          <View style={{ position: "relative", width: videoSize.width, height: videoSize.height }}>
+            <VideoView
+              // nativeControls={false}
+              style={styles.video}
+              player={player}
+            />
+
+            {/* Video metadata overlay */}
+            {(videoMetadata?.title || videoMetadata?.description) && (
+              <View style={styles.metadataOverlay} pointerEvents="none">
+                {videoMetadata.title && (
+                  <MyAppText style={styles.metadataTitle} size={15}>
+                    {videoMetadata.title}
+                  </MyAppText>
+                )}
+                {videoMetadata.description && (
+                  <MyAppText style={styles.metadataDescription} size={8}>
+                    {videoMetadata.description}
+                  </MyAppText>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+      </View>
 
       {/* <VideoBar player={player} /> */}
 
@@ -265,7 +330,7 @@ export function VideoPlayer() {
                 )}
                 size={20}
                 variant={videoMetadata?.isSelected ? "filled" : "outline"}
-                style={{ width: 130 }}
+                style={{ width: 100 }}
               />
             </Pressable>
           )}
@@ -278,24 +343,52 @@ export function VideoPlayer() {
                 Icon={({ iconProps }) => <Ionicons name="cut" {...iconProps} />}
                 size={20}
                 variant="outline"
-                style={{ width: 130 }}
+                style={{ width: 100 }}
               />
             </Pressable>
           )}
+
+          {/* More options menu */}
+          {videoInfo && <VideoPlayerMenu onEditMetadata={openMetadataEditor} />}
         </View>
       </View>
       <SafeTabBarZone />
+
+      {/* Video metadata editor bottom sheet */}
+      {videoInfo && (
+        <VideoMetadataEditor
+          ref={metadataEditorRef}
+          videoId={id}
+          videoOriginalDate={new Date(videoInfo.creationTime)}
+          metadata={videoMetadata}
+          onMetadataUpdate={(newMetadata) => updateVideoMetadataInState(id, newMetadata)}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   video: {
-    flexGrow: 1,
-    borderColor: "white",
-    borderWidth: 3,
+    flex: 1,
     borderRadius: 10,
-    margin: 20,
+  },
+  metadataOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 5,
+    gap: 2,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+  },
+  metadataTitle: {
+    fontWeight: "bold",
+    color: "white",
+  },
+  metadataDescription: {
+    color: "rgba(255, 255, 255, 0.8)",
   },
   toolBar: {
     height: 80,

@@ -15,6 +15,14 @@ Types of changes:
 - Security -> in case of vulnerabilities. 
 -->
 
+## [Unreleased]
+
+## [0.0.5] - 2026-03-02
+
+### Added
+
+- Option to add title and description to videos on VideoPlayer screen
+
 ## [0.0.4] - 2026-02-26
 
 ### Added
