@@ -1,0 +1,94 @@
+name: Dogfood build
+
+# Build an unsigned IPA on every version tag and publish it as a GitHub Release.
+# The IPA is intentionally left unsigned: SideStore re-signs it on-device at install
+# time with the user's free Apple ID, so no Apple Developer account / secrets are needed.
+on:
+  push:
+    tags:
+      - "*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build (must point at a commit)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dogfood-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    env:
+      EXPO_BUILD_MODE: dogfood
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          # Full history + tags so app.config.ts can resolve the version via
+          # `git describe --tags --exact-match HEAD`.
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild iOS project (dogfood)
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build app (unsigned)
+        run: |
+          xcodebuild \
+            -workspace ios/3secsCopilot.xcworkspace \
+            -scheme 3secsCopilot \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package IPA
+        id: package
+        run: |
+          set -euo pipefail
+          PRODUCTS_DIR="ios/build/Build/Products/Release-iphoneos"
+          APP_PATH="$(find "$PRODUCTS_DIR" -maxdepth 1 -name '*.app' | head -n1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found in $PRODUCTS_DIR" >&2
+            exit 1
+          fi
+          IPA_NAME="3secsCopilot-${{ steps.tag.outputs.tag }}.ipa"
+          WORK="$(mktemp -d)"
+          mkdir -p "$WORK/Payload"
+          cp -R "$APP_PATH" "$WORK/Payload/"
+          ( cd "$WORK" && zip -qry "$IPA_NAME" Payload )
+          mv "$WORK/$IPA_NAME" "$IPA_NAME"
+          echo "ipa=$IPA_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            "${{ steps.package.outputs.ipa }}" \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --notes "Dogfood build. Download the .ipa on your iPhone and open it in SideStore to install." \
+            || gh release upload "${{ steps.tag.outputs.tag }}" \
+                 "${{ steps.package.outputs.ipa }}" --clobber
