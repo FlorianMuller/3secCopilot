@@ -38,13 +38,6 @@ Follow the [Expo documentation on upgrading](https://docs.expo.dev/workflow/upgr
 
 ## Build
 
-### Tag
-
-```sh
-git tag -a vX.Y.Z 
-git push --tags
-```
-
 ### Expo developpment build
 
 This app is using expo devlopment build to run the app on real devices and be able to use native modules (that don't work in Expo go).
@@ -57,6 +50,29 @@ make ios-build-dev
 You can select a device with the `IOS_DEVICE` environment variable, or open the Xcode project with `make xcode-open-workspace` and select a device there.
 
 ### Dogfooding build
+
+A dogfooding build produces an **unsigned** `.ipa`. It is signed on-device at install
+time by SideStore/AltStore using your free Apple ID, so no paid Apple Developer account
+is required and the build needs no signing secrets.
+
+#### Automated (CI)
+
+Pushing a version tag (`X.Y.Z`) triggers the [Dogfood build workflow](.github/workflows/dogfood-build.yml),
+which builds the unsigned IPA on a GitHub macOS runner and publishes it as a GitHub Release.
+
+```sh
+git tag X.Y.Z
+git push --tags
+```
+
+Once the run finishes, open the new release, download `3secsCopilot-X.Y.Z.ipa` on your
+iOS device and open it in SideStore/AltStore to install.
+
+> The tag becomes the app version (`CFBundleShortVersionString`), so use a numeric
+> `X.Y.Z` tag. The workflow can also be run manually from the Actions tab
+> (`workflow_dispatch`) against an existing tag.
+
+#### Manual (local)
 
 Create xcode project
 ```sh
