@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, View, ViewToken } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { VideoMetadata } from "../../db/schema";
+import { useDayNotes } from "../../hooks/useDayNotes";
 import { useMediaLibraryPermissions } from "../../hooks/useMediaLibraryPermissions";
 import { useNavigationFocus } from "../../hooks/useNavigationFocus";
 import { useVideoLoader } from "../../hooks/useVideoLoader";
@@ -32,6 +33,8 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
       startDate,
       endDate,
     });
+
+  const { dayNotes, saveDayNote, deleteDayNote } = useDayNotes(startDate, endDate);
 
   const [visibleDays, setVisibleDays] = useState<Set<string>>(new Set());
 
@@ -97,11 +100,23 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
     [updateVideosMetadata]
   );
 
+  const handleDayNoteChange = useCallback(
+    (day: Date, note: string | null) => {
+      const trimmed = note?.trim();
+      if (trimmed) {
+        saveDayNote(day, trimmed);
+      } else {
+        deleteDayNote(day);
+      }
+    },
+    [saveDayNote, deleteDayNote]
+  );
+
   const renderItem = useCallback(
-    (props: { item: { day: Date; videosOfTheDay: PhoneMedia[]; isVisible: boolean } }) => (
-      <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} />
+    (props: { item: { day: Date; videosOfTheDay: PhoneMedia[]; isVisible: boolean; note?: string } }) => (
+      <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} onDayNoteChange={handleDayNoteChange} />
     ),
-    [handleSingleMetadataUpdate]
+    [handleSingleMetadataUpdate, handleDayNoteChange]
   );
 
   if (videoLoading) {
@@ -118,6 +133,7 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
         day,
         videosOfTheDay: videosByDay[day.toDateString()] || [],
         isVisible: visibleDays.has(day.toDateString()),
+        note: dayNotes[day.toDateString()],
       }))}
       renderItem={renderItem}
       keyExtractor={({ day }) => day.toDateString()}
@@ -128,6 +144,9 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
       maxToRenderPerBatch={20}
       onViewableItemsChanged={onViewableItemsChanged}
       viewabilityConfig={viewabilityConfig}
+      // Let iOS scroll the focused note input above the keyboard
+      automaticallyAdjustKeyboardInsets
+      keyboardShouldPersistTaps="handled"
       // To not render fist section under iPhone notch
       // todo: use safe zone component to detect if there's a notch
       ListHeaderComponent={<View style={{ height: 70 }} />}
