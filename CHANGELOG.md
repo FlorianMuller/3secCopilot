@@ -17,6 +17,14 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-06-28
+
+### Added
+
+- Year completion indicator on top of Camera Roll
+- Camera Roll filter to show only days with no video selected
+- Ability to add notes to a day
+
 ## [0.0.5] - 2026-03-02
 
 ### Added
