@@ -1,11 +1,11 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
 import { execSync } from "child_process";
 
-type BuildMode = "dev" | "dogfood";
+type BuildMode = "dev" | "sideload";
 
 const getBuildMode = (): BuildMode => {
   const mode = process.env.EXPO_BUILD_MODE;
-  return mode === "dev" || mode === "dogfood" ? mode : "dev";
+  return mode === "dev" || mode === "sideload" ? mode : "dev";
 };
 
 const getGitTag = (required: boolean): string => {
@@ -14,7 +14,7 @@ const getGitTag = (required: boolean): string => {
   } catch {
     if (required) {
       throw new Error(
-        "Build failed: no git tag found on the current commit. Tag the commit before building in dogfood mode."
+        "Build failed: no git tag found on the current commit. Tag the commit before building in sideload mode."
       );
     }
     return "dev";
@@ -108,7 +108,7 @@ const getConfigForBuildMode = (buildMode: BuildMode, version: string): ExpoConfi
         },
       };
 
-    case "dogfood":
+    case "sideload":
       return {
         ...baseConfig,
       };
@@ -120,7 +120,7 @@ const getConfigForBuildMode = (buildMode: BuildMode, version: string): ExpoConfi
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const buildMode = getBuildMode();
-  const version = getGitTag(buildMode === "dogfood");
+  const version = getGitTag(buildMode === "sideload");
   const buildConfig = getConfigForBuildMode(buildMode, version);
 
   console.log(`🔧 Building in ${buildMode} mode(${buildConfig?.ios?.bundleIdentifier})`);

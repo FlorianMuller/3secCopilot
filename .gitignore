@@ -21,3 +21,5 @@ ios
 ios-dev-build
 ios-prod
 android
+# Generated AltStore/SideStore source (built in CI)
+public/source.json

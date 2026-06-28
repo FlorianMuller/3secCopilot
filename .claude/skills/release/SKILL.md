@@ -1,13 +1,13 @@
 ---
 name: release
-description: Cut a new release for 3sec Copilot — update CHANGELOG.md from commits since the last tag, then push a version tag so CI builds and publishes the dogfood IPA. Use when the user asks to release, cut a release, ship a build, or bump the version.
+description: Cut a new release for 3sec Copilot — update CHANGELOG.md from commits since the last tag, then push a version tag so CI builds and publishes the sideload IPA. Use when the user asks to release, cut a release, ship a build, or bump the version.
 user-invocable: true
 ---
 
 # Release
 
 Cuts a new release: finalizes `CHANGELOG.md` and pushes a `X.Y.Z` tag, which triggers
-the [Dogfood build workflow](../../../.github/workflows/dogfood-build.yml) to build the
+the [Sideload build workflow](../../../.github/workflows/sideload-build.yml) to build the
 unsigned IPA and publish a GitHub Release. The tag becomes the app version
 (`CFBundleShortVersionString`), so it must be a numeric `X.Y.Z`.
 
@@ -87,4 +87,4 @@ Releases page: once the run finishes, the new release will have
 
 - Tags must be numeric `X.Y.Z` (no `v` prefix) — the tag is used verbatim as the app version.
 - Never push a tag before the changelog commit is in, so the release reflects the notes.
-- See [Contributing.md](../../../Contributing.md) → "Dogfooding build" for the full CI flow.
+- See [Contributing.md](../../../Contributing.md) → "Sideload build" for the full CI flow.

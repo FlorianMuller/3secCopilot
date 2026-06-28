@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3secs Copilot — sideload source</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font-family: -apple-system, system-ui, sans-serif;
+        max-width: 32rem;
+        margin: 4rem auto;
+        padding: 0 1.5rem;
+        line-height: 1.5;
+      }
+      code {
+        background: color-mix(in srgb, currentColor 12%, transparent);
+        padding: 0.1em 0.35em;
+        border-radius: 0.3em;
+        word-break: break-all;
+      }
+      .btn {
+        display: inline-block;
+        margin: 0.5rem 0.5rem 0.5rem 0;
+        padding: 0.6rem 1.1rem;
+        border-radius: 0.6rem;
+        background: #bc8ff2;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>3secs Copilot — sideload source</h1>
+    <p>Add this source in SideStore (or AltStore) to install and auto-update sideload builds.</p>
+
+    <p id="links"></p>
+
+    <p>Or add it manually:</p>
+    <p><code id="url"></code></p>
+
+    <script>
+      // Build links from the current origin so this works regardless of repo/owner.
+      var sourceUrl = new URL("source.json", window.location.href).href;
+      document.getElementById("url").textContent = sourceUrl;
+      document.getElementById("links").innerHTML =
+        '<a class="btn" href="sidestore://source?url=' + encodeURIComponent(sourceUrl) + '">Add to SideStore</a>' +
+        '<a class="btn" href="altstore://source?url=' + encodeURIComponent(sourceUrl) + '">Add to AltStore</a>';
+    </script>
+  </body>
+</html>

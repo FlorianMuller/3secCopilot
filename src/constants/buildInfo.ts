@@ -4,7 +4,7 @@ interface BuildInfo {
   version: string;
   gitCommitHash: string;
   buildTimestamp: string;
-  buildMode: "dev" | "dogfood";
+  buildMode: "dev" | "sideload";
 }
 
 export const buildInfo: BuildInfo = {

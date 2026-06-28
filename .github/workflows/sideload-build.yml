@@ -1,4 +1,4 @@
-name: Dogfood build
+name: Sideload build
 
 # Build an unsigned IPA on every version tag and publish it as a GitHub Release.
 # The IPA is intentionally left unsigned: SideStore re-signs it on-device at install
@@ -17,14 +17,14 @@ permissions:
   contents: write
 
 concurrency:
-  group: dogfood-build-${{ github.ref }}
+  group: sideload-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: macos-15
     env:
-      EXPO_BUILD_MODE: dogfood
+      EXPO_BUILD_MODE: sideload
     steps:
       - name: Resolve tag
         id: tag
@@ -47,7 +47,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prebuild iOS project (dogfood)
+      - name: Prebuild iOS project (sideload)
         run: npx expo prebuild --platform ios --clean
 
       - name: Build app (unsigned)
@@ -89,6 +89,51 @@ jobs:
           gh release create "${{ steps.tag.outputs.tag }}" \
             "${{ steps.package.outputs.ipa }}" \
             --title "${{ steps.tag.outputs.tag }}" \
-            --notes "Dogfood build. Download the .ipa on your iPhone and open it in SideStore to install." \
+            --notes "Sideload build. Download the .ipa on your iPhone and open it in SideStore to install." \
             || gh release upload "${{ steps.tag.outputs.tag }}" \
                  "${{ steps.package.outputs.ipa }}" --clobber
+
+  # Regenerate the AltStore/SideStore source from all releases and publish it to
+  # GitHub Pages so SideStore can auto-detect new versions. Runs after the
+  # release above so the new IPA asset is already attached.
+  publish-source:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    # Pages deploys must not be cancelled mid-flight; serialize them separately
+    # from the build concurrency group above.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate source.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/generateAltSource.mjs public/source.json
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

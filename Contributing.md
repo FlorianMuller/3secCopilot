@@ -49,15 +49,15 @@ make ios-build-dev
 
 You can select a device with the `IOS_DEVICE` environment variable, or open the Xcode project with `make xcode-open-workspace` and select a device there.
 
-### Dogfooding build
+### Sideload build
 
-A dogfooding build produces an **unsigned** `.ipa`. It is signed on-device at install
+A sideload build produces an **unsigned** `.ipa`. It is signed on-device at install
 time by SideStore/AltStore using your free Apple ID, so no paid Apple Developer account
 is required and the build needs no signing secrets.
 
 #### Automated (CI)
 
-Pushing a version tag (`X.Y.Z`) triggers the [Dogfood build workflow](.github/workflows/dogfood-build.yml),
+Pushing a version tag (`X.Y.Z`) triggers the [Sideload build workflow](.github/workflows/sideload-build.yml),
 which builds the unsigned IPA on a GitHub macOS runner and publishes it as a GitHub Release.
 
 ```sh
@@ -72,11 +72,30 @@ iOS device and open it in SideStore/AltStore to install.
 > `X.Y.Z` tag. The workflow can also be run manually from the Actions tab
 > (`workflow_dispatch`) against an existing tag.
 
+##### SideStore/AltStore source (auto-updates)
+
+To avoid downloading the IPA manually for every release, add the app **source** once
+in SideStore/AltStore. The CI regenerates it from all GitHub Releases and publishes it
+to GitHub Pages, so new versions show up as in-app updates:
+
+```
+https://florianmuller.github.io/3secCopilot/source.json
+```
+
+Open the [landing page](https://florianmuller.github.io/3secCopilot/) on your device for
+one-tap "Add to SideStore / AltStore" buttons, or paste the URL above into the app's
+*Sources → Add Source*. SideStore re-signs the unsigned IPA on-device with your free
+Apple ID at install time.
+
+> One-time repo setup: **Settings → Pages → Source → GitHub Actions** must be enabled
+> so the `publish-source` job can deploy. The source is produced by
+> [`scripts/generateAltSource.mjs`](scripts/generateAltSource.mjs).
+
 #### Manual (local)
 
 Create xcode project
 ```sh
-make ios-build-df-xcode
+make ios-build-sideload-xcode
 ```
 Open it
 ```sh

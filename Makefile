@@ -24,11 +24,11 @@ ios-build-dev: export OPTIONS ?= --device ${IOS_DEVICE}
 ios-build-dev: ## Build the iOS app and insall it on IOS_DEVICE
 	npx expo run:ios ${OPTIONS}
 
-##@ Dogfood Build
+##@ Sideload Build
 
-.PHONY: ios-build-df-xcode
-ios-build-df-xcode: export EXPO_BUILD_MODE ?= dogfood
-ios-build-df-xcode: ## Build xcode project for production
+.PHONY: ios-build-sideload-xcode
+ios-build-sideload-xcode: export EXPO_BUILD_MODE ?= sideload
+ios-build-sideload-xcode: ## Build xcode project for sideloading
 	npx expo prebuild --clean
 
 ##@ Build utils
