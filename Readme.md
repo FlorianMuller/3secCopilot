@@ -14,13 +14,3 @@ using your free Apple ID, and new versions auto-update.
 Once the source is added, future releases appear as in-app updates in SideStore —
 no need to come back here.
 
-## Quick start
-
-Prequiste: node (`nvm install node`)
-
-```shell
-npm install
-npm start
-```
-
-then scan the QR code with phone to see a preview of the app in the Expo Go app.
