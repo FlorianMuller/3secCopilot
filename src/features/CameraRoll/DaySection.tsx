@@ -95,9 +95,9 @@ export const DaySection = React.memo(function DaySection({
   const hasVideos = videosOfTheDay.length > 0;
   // The note is a reminder for days still missing a selected video, so it
   // disappears once one is picked (but stays in the DB).
-  const showNote = !!effectiveNote && !dayHasAVideoSelected;
-  const showAddNoteButton = !effectiveNote && !hasVideos && !isEditingNote;
-  const showAddNoteMenu = !effectiveNote && hasVideos && !isEditingNote && !dayHasAVideoSelected;
+  const showNote = !!effectiveNote && !dayHasAVideoSelected && !isLoading;
+  const showAddNoteButton = !effectiveNote && !hasVideos && !isEditingNote && !isLoading;
+  const showAddNoteMenu = !effectiveNote && hasVideos && !isEditingNote && !dayHasAVideoSelected && !isLoading;
 
   return (
     <View style={styles.dateSection} key={day.getTime()}>
@@ -129,7 +129,7 @@ export const DaySection = React.memo(function DaySection({
           {showAddNoteMenu && (
             <DropdownMenu.Root>
               <DropdownMenu.Trigger>
-                <MaterialCommunityIcons name="dots-vertical" size={20} color={theme.colors.primary} />
+                <MaterialCommunityIcons name="dots-vertical" size={20} color={theme.colors.text} />
               </DropdownMenu.Trigger>
               <DropdownMenu.Content>
                 <DropdownMenu.Item key="add-note" onSelect={startEditingNote}>
@@ -168,14 +168,14 @@ export const DaySection = React.memo(function DaySection({
 
         {/* Videos still loading (lazy fetch for the "unselected only" filter) */}
         {videosOfTheDay.length === 0 && isLoading && (
-          <View style={[styles.center, { height: 100 }]}>
+          <View style={[styles.center, { paddingTop: 50, paddingBottom: 10 }]}>
             <ActivityIndicator color={theme.colors.text} />
           </View>
         )}
 
         {/* No video */}
         {videosOfTheDay.length === 0 && !isLoading && (
-          <View style={[styles.center, { height: 100 }]}>
+          <View style={[styles.center, { paddingTop: 50, paddingBottom: 10 }]}>
             <MyAppText>❌ No videos</MyAppText>
           </View>
         )}
