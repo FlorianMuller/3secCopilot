@@ -3,6 +3,7 @@ import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useSt
 import { FlatList, View, ViewToken } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { VideoMetadata } from "../../db/schema";
+import { useDayNotes } from "../../hooks/useDayNotes";
 import { useMediaLibraryPermissions } from "../../hooks/useMediaLibraryPermissions";
 import { useNavigationFocus } from "../../hooks/useNavigationFocus";
 import { useVideoLoader } from "../../hooks/useVideoLoader";
@@ -39,6 +40,8 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
       startDate,
       endDate,
     });
+
+  const { dayNotes, saveDayNote, deleteDayNote } = useDayNotes(startDate, endDate);
 
   const [visibleDays, setVisibleDays] = useState<Set<string>>(new Set());
   const [showOnlyUnselected, setShowOnlyUnselected] = useState(false);
@@ -146,11 +149,25 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
     [updateVideosMetadata, refreshCompletion]
   );
 
+  const handleDayNoteChange = useCallback(
+    (day: Date, note: string | null) => {
+      const trimmed = note?.trim();
+      if (trimmed) {
+        saveDayNote(day, trimmed);
+      } else {
+        deleteDayNote(day);
+      }
+    },
+    [saveDayNote, deleteDayNote]
+  );
+
   const renderItem = useCallback(
-    (props: { item: { day: Date; videosOfTheDay: PhoneMedia[]; isVisible: boolean; isLoading: boolean } }) => (
-      <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} />
+    (props: {
+      item: { day: Date; videosOfTheDay: PhoneMedia[]; isVisible: boolean; note?: string; isLoading: boolean };
+    }) => (
+      <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} onDayNoteChange={handleDayNoteChange} />
     ),
-    [handleSingleMetadataUpdate]
+    [handleSingleMetadataUpdate, handleDayNoteChange]
   );
 
   const listData = useMemo(() => {
@@ -165,6 +182,7 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
             day,
             videosOfTheDay: cached || [],
             isVisible: visibleDays.has(day.toDateString()),
+            note: dayNotes[day.toDateString()],
             // Not in the cache yet means its lazy fetch is still pending — show a spinner, not "no videos".
             isLoading: cached === undefined,
           };
@@ -182,6 +200,7 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
       day,
       videosOfTheDay: videosByDay[day.toDateString()] || [],
       isVisible: visibleDays.has(day.toDateString()),
+      note: dayNotes[day.toDateString()],
       isLoading: false,
     }));
   }, [
@@ -194,6 +213,7 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
     days,
     videosByDay,
     visibleDays,
+    dayNotes,
   ]);
 
   // While the filter is on, fetch each day's videos (day-shift aware) so the user can pick one. By
@@ -241,6 +261,9 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
       maxToRenderPerBatch={20}
       onViewableItemsChanged={onViewableItemsChanged}
       viewabilityConfig={viewabilityConfig}
+      // Let iOS scroll the focused note input above the keyboard
+      automaticallyAdjustKeyboardInsets
+      keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
         <YearProgressHeader
           selectedDaysCount={selectedDaysCount}

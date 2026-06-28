@@ -51,3 +51,12 @@ export const preferencesTable = sqliteTable("preferences", {
   key: text("key").primaryKey(),
   value: text("value"),
 });
+
+export const dayNotesTable = sqliteTable("day_notes", {
+  // Normalized day Date (midnight), as produced by getDaysBetween
+  day: int({ mode: "timestamp" }).primaryKey(),
+  note: text().notNull(),
+  updatedAt: int({ mode: "timestamp" }).notNull(),
+});
+
+export type DayNote = typeof dayNotesTable.$inferSelect;
