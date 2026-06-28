@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { InsertVideoMetadata, SelectVideoMetadata, videosMetadataTable } from "../db/schema";
 import { db } from "../db/db";
 import { groupByUnique } from "../utils/groupBy";
@@ -84,6 +84,25 @@ export async function getVideosWithAssignedDateInRange(
     );
 
   return groupByUnique(metadataList, (m) => m.videoId);
+}
+
+// Returns all selected videos whose effective date (assignedToDate, falling back to videoOriginalDate)
+// falls within the given chronological range [rangeStart, rangeEnd].
+// Bounds are passed as epoch seconds because the COALESCE is a raw `sql` expression and Drizzle only
+// auto-encodes Date values for typed columns. Callers should pass a buffered range and do the exact
+// in-period (and day-shift) filtering themselves.
+export async function getSelectedVideosMetadataInRange(
+  rangeStart: Date,
+  rangeEnd: Date
+): Promise<SelectVideoMetadata[]> {
+  const startSec = Math.floor(rangeStart.getTime() / 1000);
+  const endSec = Math.floor(rangeEnd.getTime() / 1000);
+  const effectiveDate = sql`COALESCE(${videosMetadataTable.assignedToDate}, ${videosMetadataTable.videoOriginalDate})`;
+
+  return db
+    .select()
+    .from(videosMetadataTable)
+    .where(and(eq(videosMetadataTable.isSelected, true), gte(effectiveDate, startSec), lte(effectiveDate, endSec)));
 }
 
 export async function updateVideoTrimMetadata(

@@ -2,7 +2,7 @@ import Feather from "@expo/vector-icons/Feather";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useNavigation, useTheme } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import * as DropdownMenu from "zeego/dropdown-menu";
 import { MyAppText } from "../../components/text/MyAppText";
 import { SubTitle } from "../../components/text/SubTitle";
@@ -22,6 +22,9 @@ interface DaySectionProps {
     videosOfTheDay: PhoneMedia[];
     isVisible: boolean;
     note?: string;
+    // True while the day's videos are still being fetched lazily (the "unselected only" filter), so we
+    // show a spinner instead of prematurely flashing the "no videos" empty state.
+    isLoading: boolean;
   };
   onMetadataUpdate?: (videoId: string, metadata: VideoMetadata) => void;
   onDayNoteChange?: (day: Date, note: string | null) => void;
@@ -32,7 +35,7 @@ function showVideoByDefault(video: PhoneMedia) {
 }
 
 export const DaySection = React.memo(function DaySection({
-  item: { day, videosOfTheDay, isVisible, note },
+  item: { day, videosOfTheDay, isVisible, note, isLoading },
   onMetadataUpdate,
   onDayNoteChange,
 }: DaySectionProps) {
@@ -163,8 +166,15 @@ export const DaySection = React.memo(function DaySection({
             </View>
           ))}
 
+        {/* Videos still loading (lazy fetch for the "unselected only" filter) */}
+        {videosOfTheDay.length === 0 && isLoading && (
+          <View style={[styles.center, { height: 100 }]}>
+            <ActivityIndicator color={theme.colors.text} />
+          </View>
+        )}
+
         {/* No video */}
-        {videosOfTheDay.length === 0 && (
+        {videosOfTheDay.length === 0 && !isLoading && (
           <View style={[styles.center, { height: 100 }]}>
             <MyAppText>❌ No videos</MyAppText>
           </View>
