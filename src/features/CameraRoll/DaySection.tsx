@@ -2,7 +2,7 @@ import Feather from "@expo/vector-icons/Feather";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useNavigation, useTheme } from "@react-navigation/native";
 import React, { useState } from "react";
-import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { SubTitle } from "../../components/text/SubTitle";
 import { ThemedButton } from "../../components/ThemedButton";
@@ -20,6 +20,9 @@ interface DaySectionProps {
     day: Date;
     videosOfTheDay: PhoneMedia[];
     isVisible: boolean;
+    // True while the day's videos are still being fetched lazily (the "unselected only" filter), so we
+    // show a spinner instead of prematurely flashing the "no videos" empty state.
+    isLoading: boolean;
   };
   onMetadataUpdate?: (videoId: string, metadata: VideoMetadata) => void;
 }
@@ -29,7 +32,7 @@ function showVideoByDefault(video: PhoneMedia) {
 }
 
 export const DaySection = React.memo(function DaySection({
-  item: { day, videosOfTheDay, isVisible },
+  item: { day, videosOfTheDay, isVisible, isLoading },
   onMetadataUpdate,
 }: DaySectionProps) {
   const theme = useTheme();
@@ -100,8 +103,15 @@ export const DaySection = React.memo(function DaySection({
             </View>
           ))}
 
+        {/* Videos still loading (lazy fetch for the "unselected only" filter) */}
+        {videosOfTheDay.length === 0 && isLoading && (
+          <View style={[styles.center, { height: 100 }]}>
+            <ActivityIndicator color={theme.colors.text} />
+          </View>
+        )}
+
         {/* No video */}
-        {videosOfTheDay.length === 0 && (
+        {videosOfTheDay.length === 0 && !isLoading && (
           <View style={[styles.center, { height: 100 }]}>
             <MyAppText>❌ No videos</MyAppText>
           </View>
