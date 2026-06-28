@@ -22,6 +22,10 @@ export interface PhoneMedia extends MediaLibrary.Asset {
   metadata?: VideoMetadata;
 }
 
+// Max concurrent per-day video fetches while eagerly resolving days for the "with videos" filter,
+// keeping the camera-roll bridge responsive instead of firing one request per day at once.
+const FETCH_CONCURRENCY = 6;
+
 export interface CameraRollProps {
   startDate: Date;
   endDate: Date;
@@ -38,8 +42,19 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
 
   const [visibleDays, setVisibleDays] = useState<Set<string>>(new Set());
   const [showOnlyUnselected, setShowOnlyUnselected] = useState(false);
+  // Secondary filter, only meaningful while showOnlyUnselected is on: narrow further to days that
+  // actually have videos to pick from (i.e. droppable gaps), hiding days with nothing to select.
+  const [showOnlyWithVideos, setShowOnlyWithVideos] = useState(false);
   const deferredShowOnlyUnselected = useDeferredValue(showOnlyUnselected);
-  const isFilterStale = showOnlyUnselected !== deferredShowOnlyUnselected;
+  const deferredShowOnlyWithVideos = useDeferredValue(showOnlyWithVideos);
+  const isFilterStale =
+    showOnlyUnselected !== deferredShowOnlyUnselected || showOnlyWithVideos !== deferredShowOnlyWithVideos;
+
+  const handleTogglePrimaryFilter = useCallback(() => {
+    setShowOnlyUnselected((v) => !v);
+    // The secondary filter only exists alongside the primary one — reset it on every primary toggle.
+    setShowOnlyWithVideos(false);
+  }, []);
 
   const {
     selectedDaysCount,
@@ -142,7 +157,7 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
     if (deferredShowOnlyUnselected) {
       // Derive the full list of days without a selection from the DB (no camera-roll paging needed);
       // each day's videos are filled in lazily from dayVideosCache as it scrolls into view.
-      return getDaysBetween(startDate, endDate)
+      const unselectedDays = getDaysBetween(startDate, endDate)
         .filter((day) => !selectedDayKeys.has(day.toDateString()))
         .map((day) => {
           const cached = dayVideosCache[day.toDateString()];
@@ -154,6 +169,13 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
             isLoading: cached === undefined,
           };
         });
+
+      if (deferredShowOnlyWithVideos) {
+        // Keep days still resolving (so they show a spinner) and days that have videos; drop the ones
+        // confirmed empty. As the eager fetch below resolves them, empty days fall out of the list.
+        return unselectedDays.filter((d) => d.isLoading || d.videosOfTheDay.length > 0);
+      }
+      return unselectedDays;
     }
 
     return days.map((day) => ({
@@ -162,24 +184,41 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
       isVisible: visibleDays.has(day.toDateString()),
       isLoading: false,
     }));
-  }, [deferredShowOnlyUnselected, startDate, endDate, selectedDayKeys, dayVideosCache, days, videosByDay, visibleDays]);
+  }, [
+    deferredShowOnlyUnselected,
+    deferredShowOnlyWithVideos,
+    startDate,
+    endDate,
+    selectedDayKeys,
+    dayVideosCache,
+    days,
+    videosByDay,
+    visibleDays,
+  ]);
 
-  // While the filter is on, lazily fetch each visible day's videos (day-shift aware) so the user can
-  // pick one. Guarded against duplicate in-flight fetches and days already cached.
+  // While the filter is on, fetch each day's videos (day-shift aware) so the user can pick one. By
+  // default only visible days are fetched; with the "with videos" filter on we must resolve every
+  // unselected day (visible first) so empty days can be filtered out, throttled by FETCH_CONCURRENCY.
+  // Re-runs whenever a fetch lands (dayVideosCache changes), naturally pulling in the next days.
   useEffect(() => {
     if (!deferredShowOnlyUnselected) return;
     const dayByKey = new Map(listData.map((d) => [d.day.toDateString(), d.day]));
-    visibleDays.forEach((key) => {
-      if (dayVideosCache[key] !== undefined || fetchingDaysRef.current.has(key)) return;
+    const candidateKeys = deferredShowOnlyWithVideos
+      ? [...visibleDays, ...dayByKey.keys()] // visible first, then the rest; dedup handled by the guards below
+      : [...visibleDays];
+
+    for (const key of candidateKeys) {
+      if (fetchingDaysRef.current.size >= FETCH_CONCURRENCY) break;
+      if (dayVideosCache[key] !== undefined || fetchingDaysRef.current.has(key)) continue;
       const day = dayByKey.get(key);
-      if (!day) return;
+      if (!day) continue;
       fetchingDaysRef.current.add(key);
       getVideosForDay(day, dayShift || { hour: 0, minute: 0 })
         .then((vids) => setDayVideosCache((prev) => ({ ...prev, [key]: vids })))
         .catch((error) => console.error("Failed to load videos for day", key, error))
         .finally(() => fetchingDaysRef.current.delete(key));
-    });
-  }, [deferredShowOnlyUnselected, visibleDays, listData, dayVideosCache, dayShift]);
+    }
+  }, [deferredShowOnlyUnselected, deferredShowOnlyWithVideos, visibleDays, listData, dayVideosCache, dayShift]);
 
   if (videoLoading) {
     return (
@@ -207,7 +246,9 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
           selectedDaysCount={selectedDaysCount}
           totalDays={totalDays}
           showOnlyUnselected={showOnlyUnselected}
-          onToggleFilter={() => setShowOnlyUnselected((v) => !v)}
+          onToggleFilter={handleTogglePrimaryFilter}
+          showOnlyWithVideos={showOnlyWithVideos}
+          onToggleWithVideos={() => setShowOnlyWithVideos((v) => !v)}
         />
       }
     />
