@@ -5,9 +5,12 @@
 - [X] Year completion
 - [X] day with no video filter
 - [X] Add notes to day (show them for no video days + "add a note" button)
-- [ ] Create a "util" category:
-  - [ ] Add to util
-  - [ ] Days with no vidéo: "select from util"
+- [ ] Create a "video stash":
+  - [X] Add to stash
+  - [X] Days with no video: "select from stash" button
+  - [X] Able to remove video from stash
+  - [ ] Able to view stash video
+  - [ ] Scope stash by period (year)
 
 ## Export
 
