@@ -21,6 +21,8 @@ export interface UseVideoLoaderReturn {
   loadNextBatch: () => Promise<void>;
   refetchMetadata: () => Promise<void>;
   updateVideosMetadata: (updates: Record<string, VideoMetadata>) => void;
+  upsertVideos: (videos: PhoneMedia[]) => void;
+  removeVideos: (ids: string[]) => void;
   resetVideoLoader: () => void;
 }
 
@@ -116,6 +118,27 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
     });
   }, []);
 
+  // Insert or replace videos in the list (merge by id), then re-sort by effective date — used when a
+  // stashed video is assigned to a day and must appear under it in the right chronological spot.
+  const upsertVideos = useCallback((newVideos: PhoneMedia[]) => {
+    if (newVideos.length === 0) return;
+    setVideos((oldVideos) => {
+      const byId = new Map((oldVideos || []).map((v) => [v.id, v]));
+      for (const video of newVideos) {
+        byId.set(video.id, video);
+      }
+      return [...byId.values()].sort((a, b) => getVideoDatetime(b).getTime() - getVideoDatetime(a).getTime());
+    });
+  }, []);
+
+  // Drop videos from the list by id — symmetric to updateVideosMetadata, used when a video leaves the
+  // roll (e.g. it was just stashed).
+  const removeVideos = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    setVideos((oldVideos) => (oldVideos || []).filter((v) => !idSet.has(v.id)));
+  }, []);
+
   const resetVideoLoader = useCallback(() => {
     setVideos([]);
     setAllVideoLoaded(false);
@@ -164,6 +187,8 @@ export function useVideoLoader({ startDate, endDate, batchSize = 300 }: UseVideo
     loadNextBatch,
     refetchMetadata,
     updateVideosMetadata,
+    upsertVideos,
+    removeVideos,
     resetVideoLoader,
   };
 }

@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { InsertVideoMetadata, SelectVideoMetadata, videosMetadataTable } from "../db/schema";
 import { db } from "../db/db";
 import { groupByUnique } from "../utils/groupBy";
@@ -128,6 +128,60 @@ export async function changeVideoDate(
     videoId,
     videoOriginalDate,
     assignedToDate: newAssignedDate,
+  });
+}
+
+// Cheat stash --------------------------------------------------------------------------------------
+
+// Mark a video as a "filler" kept aside in the cheat stash. A stashed video has no day yet, so we
+// also clear any prior day assignment — otherwise the assigned-date pull-in in videoAssembly would
+// drag it back into the roll on its old day (and it would still show the "moved" badge). Clearing
+// selection keeps the cant_be_selected_and_in_stash constraint satisfied.
+export async function addVideoToStash(videoId: string, videoOriginalDate: Date): Promise<SelectVideoMetadata | null> {
+  return upsertVideoMetadata({
+    videoId,
+    videoOriginalDate,
+    isInStash: true,
+    isSelected: false,
+    assignedToDate: null,
+  });
+}
+
+// All videos currently in the cheat stash, newest-filmed first.
+export async function getStashVideosMetadata(): Promise<SelectVideoMetadata[]> {
+  return db
+    .select()
+    .from(videosMetadataTable)
+    .where(eq(videosMetadataTable.isInStash, true))
+    .orderBy(desc(videosMetadataTable.videoOriginalDate));
+}
+
+export async function removeVideoFromStash(videoId: string): Promise<SelectVideoMetadata | null> {
+  const res = await db
+    .update(videosMetadataTable)
+    .set({
+      isInStash: false,
+    })
+    .where(eq(videosMetadataTable.videoId, videoId))
+    .returning();
+
+  return returnOneMetadata(res);
+}
+
+// Use a stashed video to fill a forgotten day: assign it to that day, select it, and take it out of the
+// stash — all in one upsert. `assignedToDate` must already sit inside the target day's effective window
+// (computed at the day-shift cutoff time by the caller).
+export async function chooseStashVideoForDay(
+  videoId: string,
+  videoOriginalDate: Date,
+  assignedToDate: Date
+): Promise<SelectVideoMetadata | null> {
+  return upsertVideoMetadata({
+    videoId,
+    videoOriginalDate,
+    assignedToDate,
+    isSelected: true,
+    isInStash: false,
   });
 }
 

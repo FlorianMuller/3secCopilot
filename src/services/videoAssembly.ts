@@ -29,8 +29,11 @@ export async function assembleVideosFromAssets(
 
   const batchMetadata = await getVideosMetadtaByIds(wantedAssets.map((v) => v.id));
 
-  // Drop assets reassigned to another date — they belong to their assigned day, handled separately.
-  const creationDayVideos = wantedAssets.filter((asset) => !batchMetadata[asset.id]?.assignedToDate);
+  // Drop assets reassigned to another date — they belong to their assigned day, handled separately —
+  // and stashed videos, which are hidden from the roll until used to fill a day.
+  const creationDayVideos = wantedAssets.filter(
+    (asset) => !batchMetadata[asset.id]?.assignedToDate && !batchMetadata[asset.id]?.isInStash
+  );
 
   const range = typeof assignedRange === "function" ? assignedRange(creationDayVideos) : assignedRange;
   const assignedMetadata = await getVideosWithAssignedDateInRange(range.createdAfter, range.createdBefore);

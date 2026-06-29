@@ -6,6 +6,7 @@ import m0001 from './0001_productive_sabretooth.sql';
 import m0002 from './0002_premium_karnak.sql';
 import m0003 from './0003_many_ultimo.sql';
 import m0004 from './0004_slimy_sabra.sql';
+import m0005 from './0005_common_living_mummy.sql';
 
   export default {
     journal,
@@ -14,7 +15,8 @@ import m0004 from './0004_slimy_sabra.sql';
 m0001,
 m0002,
 m0003,
-m0004
+m0004,
+m0005
     }
   }
   

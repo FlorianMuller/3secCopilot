@@ -35,11 +35,19 @@ export interface CameraRollProps {
 export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
   const { dayShift } = preferences.useDayShiftPreference();
   const { ensurePermission } = useMediaLibraryPermissions();
-  const { videos, allVideoLoaded, lastDateToDisplay, loadNextBatch, refetchMetadata, updateVideosMetadata } =
-    useVideoLoader({
-      startDate,
-      endDate,
-    });
+  const {
+    videos,
+    allVideoLoaded,
+    lastDateToDisplay,
+    loadNextBatch,
+    refetchMetadata,
+    updateVideosMetadata,
+    upsertVideos,
+    removeVideos,
+  } = useVideoLoader({
+    startDate,
+    endDate,
+  });
 
   const { dayNotes, saveDayNote, deleteDayNote } = useDayNotes(startDate, endDate);
 
@@ -129,6 +137,24 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
 
   const handleSingleMetadataUpdate = useCallback(
     (videoId: string, metadata: VideoMetadata) => {
+      // A video just added to the cheat stash is hidden from the roll — drop it from the list and the
+      // filter cache instead of updating it in place.
+      if (metadata.isInStash) {
+        removeVideos([videoId]);
+        setDayVideosCache((prev) => {
+          let changed = false;
+          const next: Record<string, PhoneMedia[]> = {};
+          for (const [key, vids] of Object.entries(prev)) {
+            const filtered = vids.filter((v) => v.id !== videoId);
+            if (filtered.length !== vids.length) changed = true;
+            next[key] = filtered;
+          }
+          return changed ? next : prev;
+        });
+        refreshCompletion();
+        return;
+      }
+
       updateVideosMetadata({ [videoId]: metadata });
       // Keep the filter cache in sync so an action taken from within the filter (select, hide, trim…)
       // is reflected immediately; refreshCompletion then drops the day if it now has a selection.
@@ -146,7 +172,26 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
       });
       refreshCompletion();
     },
-    [updateVideosMetadata, refreshCompletion]
+    [updateVideosMetadata, removeVideos, refreshCompletion]
+  );
+
+  const handleStashVideoUsed = useCallback(
+    (_day: Date, newVideo: PhoneMedia) => {
+      // The stash video is now assigned + selected for the day: drop it into the loader's list (it
+      // sorts into the right day) and refresh completion so the day flips to "selected" and falls out
+      // of the "unselected only" filter.
+      upsertVideos([newVideo]);
+      refreshCompletion();
+    },
+    [upsertVideos, refreshCompletion]
+  );
+
+  const handleStashVideoRemoved = useCallback(
+    (newVideo: PhoneMedia) => {
+      // Taken back out of the stash — it's no longer hidden, so re-add it to the roll on its own day.
+      upsertVideos([newVideo]);
+    },
+    [upsertVideos]
   );
 
   const handleDayNoteChange = useCallback(
@@ -165,9 +210,15 @@ export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
     (props: {
       item: { day: Date; videosOfTheDay: PhoneMedia[]; isVisible: boolean; note?: string; isLoading: boolean };
     }) => (
-      <DaySection {...props} onMetadataUpdate={handleSingleMetadataUpdate} onDayNoteChange={handleDayNoteChange} />
+      <DaySection
+        {...props}
+        onMetadataUpdate={handleSingleMetadataUpdate}
+        onDayNoteChange={handleDayNoteChange}
+        onStashVideoUsed={handleStashVideoUsed}
+        onStashVideoRemoved={handleStashVideoRemoved}
+      />
     ),
-    [handleSingleMetadataUpdate, handleDayNoteChange]
+    [handleSingleMetadataUpdate, handleDayNoteChange, handleStashVideoUsed, handleStashVideoRemoved]
   );
 
   const listData = useMemo(() => {

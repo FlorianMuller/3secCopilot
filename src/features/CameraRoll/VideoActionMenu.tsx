@@ -3,6 +3,7 @@ import * as ContextMenu from "zeego/context-menu";
 import { VideoMetadata } from "../../db/schema";
 import { PhoneMedia } from "./CameraRoll";
 import { toggleVideoSelection } from "../../services/videoSelection";
+import { addVideoToStash } from "../../services/metadata";
 import { useVideoTrim } from "../../hooks/useVideoTrim";
 import { useVideoDatetimeEditor } from "../../hooks/useVideoDatetimeEditor";
 import * as MediaLibrary from "expo-media-library";
@@ -59,6 +60,17 @@ export const VideoActionMenu = ({ children, video, onMetadataUpdate }: VideoActi
     }
   };
 
+  const handleAddToStash = async () => {
+    try {
+      const newMetadata = await addVideoToStash(video.id, new Date(video.creationTime));
+      if (newMetadata && onMetadataUpdate) {
+        onMetadataUpdate(video.id, newMetadata);
+      }
+    } catch (e) {
+      console.error("Error adding to cheat stash:", e);
+    }
+  };
+
   const isSelected = video.metadata?.isSelected;
 
   return (
@@ -87,6 +99,17 @@ export const VideoActionMenu = ({ children, video, onMetadataUpdate }: VideoActi
           <ContextMenu.ItemIcon
             ios={{
               name: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+            }}
+          />
+        </ContextMenu.Item>
+
+        {/* Stashed videos are hidden from the roll, so this menu only ever adds. Removing from the
+            stash is done from the stash picker sheet. */}
+        <ContextMenu.Item key={"Cheat stash"} onSelect={handleAddToStash}>
+          <ContextMenu.ItemTitle>Add to cheat stash</ContextMenu.ItemTitle>
+          <ContextMenu.ItemIcon
+            ios={{
+              name: "archivebox",
             }}
           />
         </ContextMenu.Item>

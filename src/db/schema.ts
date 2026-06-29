@@ -28,6 +28,10 @@ export const videosMetadataTable = sqliteTable(
 
     // Other
     isHidden: int({ mode: "boolean" }).default(false).notNull(),
+
+    // Cheat stash: generic "filler" videos kept aside to fill forgotten days. A stashed video is hidden
+    // from the normal camera roll and only surfaces in the stash picker until it's used for a day.
+    isInStash: int({ mode: "boolean" }).default(false).notNull(),
   },
   (table) => ({
     // Ensure trim times are valid
@@ -39,6 +43,12 @@ export const videosMetadataTable = sqliteTable(
     cantBeSelectedAndHidden: check(
       "cant_be_selected_and_hidden",
       sql`${table.isSelected} != 1 OR ${table.isHidden} != 1`
+    ),
+
+    // A stashed video is by definition not-yet-used, so it can't also be selected
+    cantBeSelectedAndInStash: check(
+      "cant_be_selected_and_in_stash",
+      sql`${table.isSelected} != 1 OR ${table.isInStash} != 1`
     ),
   })
 );

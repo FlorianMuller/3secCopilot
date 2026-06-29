@@ -10,6 +10,7 @@ import { ThemedButton } from "../../components/ThemedButton";
 import { VideoMetadata } from "../../db/schema";
 import { VideoPlayerURI } from "../../navigation";
 import { CameraRollNavigationProp } from "../../navigation/CameraRollNavigation";
+import { useStashPicker } from "../../hooks/useStashPicker";
 import { isLivePhoto } from "../../services/mediaLibrary";
 import { displayDate } from "../../utils/dateTime";
 import { PhoneMedia } from "./CameraRoll";
@@ -28,6 +29,8 @@ interface DaySectionProps {
   };
   onMetadataUpdate?: (videoId: string, metadata: VideoMetadata) => void;
   onDayNoteChange?: (day: Date, note: string | null) => void;
+  onStashVideoUsed?: (day: Date, newVideo: PhoneMedia) => void;
+  onStashVideoRemoved?: (newVideo: PhoneMedia) => void;
 }
 
 function showVideoByDefault(video: PhoneMedia) {
@@ -38,9 +41,15 @@ export const DaySection = React.memo(function DaySection({
   item: { day, videosOfTheDay, isVisible, note, isLoading },
   onMetadataUpdate,
   onDayNoteChange,
+  onStashVideoUsed,
+  onStashVideoRemoved,
 }: DaySectionProps) {
   const theme = useTheme();
   const navigation = useNavigation<CameraRollNavigationProp>();
+  const { openStashPicker } = useStashPicker({
+    onVideoUsed: (usedDay, newVideo) => onStashVideoUsed?.(usedDay, newVideo),
+    onVideoUnstashed: (newVideo) => onStashVideoRemoved?.(newVideo),
+  });
   const [showLivePhotos, setShowLivePhotos] = useState(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
@@ -97,7 +106,11 @@ export const DaySection = React.memo(function DaySection({
   // disappears once one is picked (but stays in the DB).
   const showNote = !!effectiveNote && !dayHasAVideoSelected && !isLoading;
   const showAddNoteButton = !effectiveNote && !hasVideos && !isEditingNote && !isLoading;
-  const showAddNoteMenu = !effectiveNote && hasVideos && !isEditingNote && !dayHasAVideoSelected && !isLoading;
+  // The "+ fill from stash" affordance for empty days shows regardless of whether a note exists.
+  const showFillFromStashButton = !hasVideos && !isEditingNote && !isLoading;
+  // The 3-dots menu appears whenever a day has videos but no selection yet (for the stash action),
+  // even if it already has a note. The "Add note" item inside is gated separately on having no note.
+  const showDayMenu = hasVideos && !isEditingNote && !dayHasAVideoSelected && !isLoading;
 
   return (
     <View style={styles.dateSection} key={day.getTime()}>
@@ -125,16 +138,22 @@ export const DaySection = React.memo(function DaySection({
             </Pressable>
           )}
 
-          {/* Add note menu (when the day has videos but no note yet) */}
-          {showAddNoteMenu && (
+          {/* Day actions menu (day has videos but no selection yet): add note + fill from cheat stash */}
+          {showDayMenu && (
             <DropdownMenu.Root>
               <DropdownMenu.Trigger>
                 <MaterialCommunityIcons name="dots-vertical" size={20} color={theme.colors.text} />
               </DropdownMenu.Trigger>
               <DropdownMenu.Content>
-                <DropdownMenu.Item key="add-note" onSelect={startEditingNote}>
-                  <DropdownMenu.ItemTitle>Add note</DropdownMenu.ItemTitle>
-                  <DropdownMenu.ItemIcon ios={{ name: "note.text" }} />
+                {!effectiveNote && (
+                  <DropdownMenu.Item key="add-note" onSelect={startEditingNote}>
+                    <DropdownMenu.ItemTitle>Add note</DropdownMenu.ItemTitle>
+                    <DropdownMenu.ItemIcon ios={{ name: "note.text" }} />
+                  </DropdownMenu.Item>
+                )}
+                <DropdownMenu.Item key="fill-from-stash" onSelect={() => openStashPicker(day)}>
+                  <DropdownMenu.ItemTitle>Fill from cheat stash</DropdownMenu.ItemTitle>
+                  <DropdownMenu.ItemIcon ios={{ name: "archivebox" }} />
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Root>
@@ -206,12 +225,23 @@ export const DaySection = React.memo(function DaySection({
         </Pressable>
       )}
 
-      {showAddNoteButton && (
-        <Pressable onPress={startEditingNote} style={styles.noteContainer} hitSlop={8}>
-          <MyAppText color={dimmedColor} size={14} italic>
-            + add note
-          </MyAppText>
-        </Pressable>
+      {(showAddNoteButton || showFillFromStashButton) && (
+        <View style={styles.emptyDayActions}>
+          {showAddNoteButton && (
+            <Pressable onPress={startEditingNote} style={styles.noteContainer} hitSlop={8}>
+              <MyAppText color={dimmedColor} size={14} italic>
+                + add note
+              </MyAppText>
+            </Pressable>
+          )}
+          {showFillFromStashButton && (
+            <Pressable onPress={() => openStashPicker(day)} style={styles.noteContainer} hitSlop={8}>
+              <MyAppText color={dimmedColor} size={14} italic>
+                + fill from stash
+              </MyAppText>
+            </Pressable>
+          )}
+        </View>
       )}
     </View>
   );
@@ -240,6 +270,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingVertical: 3,
     maxWidth: "85%",
+  },
+  emptyDayActions: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
   },
   noteInput: {
     alignSelf: "stretch",
