@@ -17,6 +17,12 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-07-05
+
+### Fixed
+
+- Day notes disappearing after closing and reopening the app
+
 ## [0.0.6] - 2026-06-28
 
 ### Added
