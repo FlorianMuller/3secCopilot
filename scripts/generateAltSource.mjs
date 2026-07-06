@@ -48,6 +48,9 @@ if (versions.length === 0) {
   throw new Error("No releases with an .ipa asset were found; refusing to write an empty source.");
 }
 
+// Newest version (the array is already newest-first from the GitHub API).
+const [latest] = versions;
+
 const source = {
   name: "3secs Copilot (Sideload)",
   identifier: "com.fmuller.3secs.source",
@@ -60,6 +63,14 @@ const source = {
         "Select and trim one video per day from your camera roll to build a 3-second daily montage.",
       iconURL: `${RAW_BASE}/assets/icon.png`,
       tintColor: "BC8FF2",
+      // Legacy top-level fields mirroring the newest version. AltStore reads the
+      // `versions` array below, but SideStore still requires these on the app
+      // object; without them it won't detect updates or show version history.
+      version: latest.version,
+      versionDate: latest.date,
+      versionDescription: latest.localizedDescription,
+      downloadURL: latest.downloadURL,
+      size: latest.size,
       versions,
     },
   ],
