@@ -14,6 +14,8 @@ import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
 import { myDarkTheme, myLightTheme } from "./src/theme/themes";
 import "./src/utils/polyfills";
+// SPIKE — remove before Phase 2. See doc/export-spec.md §10 phase 1 + useExportSpike below.
+import { useExportSpike } from "./src/useExportSpike";
 
 const Tab = createBottomTabNavigator();
 
@@ -78,6 +80,10 @@ export default function App() {
   // Migrate database if table schemas have changed
   const { success, error } = useMigrations(db, migrations);
   const scheme = useColorScheme();
+
+  // SPIKE — remove before Phase 2. Runs the export-spike native module (modules/expo-montage)
+  // once on launch, in __DEV__ only. See doc/export-spec.md §10 phase 1.
+  useExportSpike();
 
   if (error) {
     return (
