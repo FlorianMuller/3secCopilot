@@ -11,6 +11,7 @@ import { getStashVideos } from "../../services/stash";
 import { displayDate } from "../../utils/dateTime";
 import { utilStyles } from "../../utils/utilStyles";
 import { PhoneMedia } from "./CameraRoll";
+import { StashVideoPreview } from "./StashVideoPreview";
 import { VidThumbnail } from "./VideoThumbnail";
 
 interface StashPickerSheetProps {
@@ -33,6 +34,9 @@ export function StashPickerSheet({ day, periodStart, periodEnd, onPick, onRemove
   const { width } = useWindowDimensions();
   const thumbnailSize = width / 5;
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  // When set, the sheet shows the video preview (step 2) instead of the grid (step 1); it indexes into
+  // the loaded videos so the preview can offer a thumbnail bar to switch between them.
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const loadStash = useCallback(async () => {
     setState({ status: "loading" });
@@ -64,6 +68,18 @@ export function StashPickerSheet({ day, periodStart, periodEnd, onPick, onRemove
       console.error("Failed to remove video from cheat stash", error);
     }
   };
+
+  if (state.status === "loaded" && previewIndex !== null) {
+    return (
+      <StashVideoPreview
+        videos={state.videos}
+        initialIndex={previewIndex}
+        day={day}
+        onUse={(video) => onPick(video)}
+        onBack={() => setPreviewIndex(null)}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -97,11 +113,11 @@ export function StashPickerSheet({ day, periodStart, periodEnd, onPick, onRemove
 
       {state.status === "loaded" && state.videos.length > 0 && (
         <BottomSheetScrollView contentContainerStyle={styles.grid}>
-          {state.videos.map((video) => (
+          {state.videos.map((video, index) => (
             <ContextMenu.Root key={video.id}>
               <ContextMenu.Trigger>
                 <View style={{ padding: 1, width: thumbnailSize, height: thumbnailSize }}>
-                  <VidThumbnail video={video} onPress={() => onPick(video)} onLongPress={() => {}} />
+                  <VidThumbnail video={video} onPress={() => setPreviewIndex(index)} onLongPress={() => {}} />
                 </View>
               </ContextMenu.Trigger>
               <ContextMenu.Content>
@@ -140,6 +156,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "flex-start",
-    paddingHorizontal: 4,
   },
 });

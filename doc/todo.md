@@ -9,8 +9,8 @@
   - [X] Add to stash
   - [X] Days with no video: "select from stash" button
   - [X] Able to remove video from stash
-  - [ ] Able to view stash video
-  - [ ] Scope stash by period (year)
+  - [X] Scope stash by period (year)
+  - [X] Able to play stash video before selection
 
 ## Export
 

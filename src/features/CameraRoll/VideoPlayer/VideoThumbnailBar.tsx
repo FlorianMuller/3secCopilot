@@ -1,8 +1,6 @@
-import { useNavigation, useTheme } from "@react-navigation/native";
+import { useTheme } from "@react-navigation/native";
 import { useEffect, useRef } from "react";
 import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
-import { CameraRollNavigationProp } from "../../../navigation/CameraRollNavigation";
-import { VideoPlayerURI } from "../../../navigation";
 import { PhoneMedia } from "../CameraRoll";
 import { VidThumbnail } from "../VideoThumbnail";
 import { utilStyles } from "../../../utils/utilStyles";
@@ -10,11 +8,9 @@ import { utilStyles } from "../../../utils/utilStyles";
 interface VideoThumbnailBarProps {
   videos: PhoneMedia[];
   currentIndex: number;
-  routeParams: {
-    ids: string[];
-    index: number;
-    day: string;
-  };
+  // Called with the tapped thumbnail's index. The caller decides what switching means — navigating to
+  // the full player, or moving the stash preview's local selection.
+  onSelect: (index: number) => void;
 }
 
 // const THUMBNAIL_SIZE = 60;
@@ -22,8 +18,7 @@ const THUMBNAIL_SIZE = 70;
 const THUMBNAIL_MARGIN = 1;
 const TOTAL_THUMBNAIL_WIDTH = THUMBNAIL_SIZE + THUMBNAIL_MARGIN * 2;
 
-export function VideoThumbnailBar({ videos, currentIndex, routeParams }: VideoThumbnailBarProps) {
-  const navigation = useNavigation<CameraRollNavigationProp>();
+export function VideoThumbnailBar({ videos, currentIndex, onSelect }: VideoThumbnailBarProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const theme = useTheme();
   const { width: screenWidth } = useWindowDimensions();
@@ -64,10 +59,7 @@ export function VideoThumbnailBar({ videos, currentIndex, routeParams }: VideoTh
                     borderRadius: theme.borderRadius,
                   },
                 ]}
-                onPress={() => {
-                  console.log("Navigating to video", video.id, "at index", index);
-                  navigation.navigate(VideoPlayerURI, { ...routeParams, index });
-                }}
+                onPress={() => onSelect(index)}
               />
             );
           })}

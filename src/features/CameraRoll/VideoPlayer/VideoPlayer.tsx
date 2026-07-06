@@ -3,9 +3,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as MediaLibrary from "expo-media-library";
-import { useVideoPlayer, VideoView } from "expo-video";
-import { useEventListener } from "expo";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { VideoView } from "expo-video";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { NavigationTitle } from "../../../components/NavigationTitle";
 import { SafeTabBarZone } from "../../../components/SafeTabBarZone";
@@ -13,7 +12,8 @@ import { MyAppText } from "../../../components/text/MyAppText";
 import { ThemedButton } from "../../../components/ThemedButton";
 import { VideoMetadata } from "../../../db/schema";
 import { useVideoTrim } from "../../../hooks/useVideoTrim";
-import { CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
+import { VideoPlayerURI } from "../../../navigation";
+import { CameraRollNavigationProp, CameraRollStackParamList } from "../../../navigation/CameraRollNavigation";
 import { isVideoDayShifted } from "../../../services/dayShift";
 import { cleanupTempVideo, copyVideoToTemp } from "../../../services/localVideo";
 import { getLocalUri } from "../../../services/mediaLocalUri";
@@ -23,6 +23,7 @@ import { doesTrimmedVideoExist, getTrimmedVideoPath, isVideoTrimmed, reTrimVideo
 import { toggleVideoSelection } from "../../../services/videoSelection";
 import { displayDate, displayShortDate, displayTime } from "../../../utils/dateTime";
 import { PhoneMedia } from "../CameraRoll";
+import { useFittedVideoPlayer } from "./useFittedVideoPlayer";
 import { VideoThumbnailBar } from "./VideoThumbnailBar";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { VideoMetadataEditor } from "./VideoMetadataEditor";
@@ -31,14 +32,10 @@ import { VideoPlayerMenu } from "./VideoPlayerMenu";
 export type VideoPlayerRouteProps = RouteProp<CameraRollStackParamList, "VideoPlayer">;
 
 export function VideoPlayer() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<CameraRollNavigationProp>();
   const { params } = useRoute<VideoPlayerRouteProps>();
   const id = params.ids[params.index];
   const { dayShift } = preferences.useDayShiftPreference();
-
-  const player = useVideoPlayer({}, (player) => {
-    player.audioMixingMode = "duckOthers";
-  });
 
   // All videos data (info + metadata)
   const [allVideos, setAllVideos] = useState<PhoneMedia[]>([]);
@@ -48,39 +45,14 @@ export function VideoPlayer() {
   const videoInfo = allVideos[params.index]?.info;
   const videoMetadata = allVideos[params.index]?.metadata || null;
 
+  // Player creation, autoplay-on-load and container aspect-fit, shared with the stash preview.
+  const { player, videoSize, onContainerLayout } = useFittedVideoPlayer(videoInfo);
+
   // Todo: use to show loading state when trimming video
   const [isLoadingTrimmedVideo, setIsLoadingTrimmedVideo] = useState(false);
 
   // Bottom sheet ref for metadata editor
   const metadataEditorRef = useRef<BottomSheet>(null);
-
-  // Container size for video dimension calculation
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-
-  // Track the video dimensions actually loaded in the player via the sourceLoad event.
-  // This ensures the VideoView keeps the previous video's size until the new source
-  // has fully loaded — preventing a flash when switching between different aspect ratios.
-  const [loadedVideoDimensions, setLoadedVideoDimensions] = useState<{ width: number; height: number } | null>(null);
-
-  useEventListener(player, "sourceLoad", () => {
-    if (videoInfo?.width && videoInfo?.height) {
-      setLoadedVideoDimensions({ width: videoInfo.width, height: videoInfo.height });
-    }
-  });
-
-  const videoSize = useMemo(() => {
-    if (!containerSize.width || !containerSize.height) return null;
-    if (!loadedVideoDimensions) {
-      return { width: containerSize.width, height: containerSize.height };
-    }
-    const videoAspect = loadedVideoDimensions.width / loadedVideoDimensions.height;
-    const containerAspect = containerSize.width / containerSize.height;
-    if (videoAspect > containerAspect) {
-      return { width: containerSize.width, height: containerSize.width / videoAspect };
-    } else {
-      return { width: containerSize.height * videoAspect, height: containerSize.height };
-    }
-  }, [loadedVideoDimensions, containerSize]);
 
   // Helper function to update metadata for a specific video
   const updateVideoMetadataInState = (videoId: string, newMetadata: VideoMetadata) => {
@@ -98,17 +70,6 @@ export function VideoPlayer() {
 
     return unsubscribe;
   }, [navigation, player]);
-
-  // Play video automatically after it loads
-  useEffect(() => {
-    const unsubscribe = player.addListener("sourceLoad", () => {
-      player.play();
-    });
-
-    return () => {
-      unsubscribe.remove();
-    };
-  }, [player]);
 
   // Video trim functionality
   const { openTrimEditor } = useVideoTrim({
@@ -281,7 +242,7 @@ export function VideoPlayer() {
       {/* Video player, taking all the remaining space */}
       <View
         style={{ flex: 1, justifyContent: "center", alignItems: "center", overflow: "hidden" }}
-        onLayout={(e) => setContainerSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+        onLayout={onContainerLayout}
       >
         {videoSize && (
           // <></>
@@ -314,7 +275,11 @@ export function VideoPlayer() {
       {/* <VideoBar player={player} /> */}
 
       {/* Video thumbnails bar */}
-      <VideoThumbnailBar videos={allVideos} currentIndex={params.index} routeParams={params} />
+      <VideoThumbnailBar
+        videos={allVideos}
+        currentIndex={params.index}
+        onSelect={(index) => navigation.navigate(VideoPlayerURI, { ...params, index })}
+      />
 
       {/* Toolbar */}
       <View style={styles.toolBar}>
