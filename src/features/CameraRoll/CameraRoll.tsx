@@ -14,6 +14,7 @@ import { getVideoDatetime } from "../../services/videoDatetime";
 import { getDaysBetween } from "../../utils/getDaysBetween";
 import { groupBy } from "../../utils/groupBy";
 import { utilStyles } from "../../utils/utilStyles";
+import { useSelectedPeriod } from "./contexts/PeriodContext";
 import { DaySection } from "./DaySection";
 import { useYearCompletion } from "./hooks/useYearCompletion";
 import { YearProgressHeader } from "./YearProgressHeader";
@@ -27,12 +28,9 @@ export interface PhoneMedia extends MediaLibrary.Asset {
 // keeping the camera-roll bridge responsive instead of firing one request per day at once.
 const FETCH_CONCURRENCY = 6;
 
-export interface CameraRollProps {
-  startDate: Date;
-  endDate: Date;
-}
-
-export default function CameraRoll({ startDate, endDate }: CameraRollProps) {
+export default function CameraRoll() {
+  // The period is provided by CameraRollPage; this component is only mounted once one is selected.
+  const { startDate, endDate } = useSelectedPeriod();
   const { dayShift } = preferences.useDayShiftPreference();
   const { ensurePermission } = useMediaLibraryPermissions();
   const {

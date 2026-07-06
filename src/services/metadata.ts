@@ -147,12 +147,21 @@ export async function addVideoToStash(videoId: string, videoOriginalDate: Date):
   });
 }
 
-// All videos currently in the cheat stash, newest-filmed first.
-export async function getStashVideosMetadata(): Promise<SelectVideoMetadata[]> {
+// Stashed videos whose original date falls within [rangeStart, rangeEnd] (rangeStart earlier,
+// rangeEnd later), newest-filmed first. The stash is scoped to the selected period so a filler from
+// one year doesn't surface while filling another. Stashed videos have no assignedToDate (cleared on
+// stash), so videoOriginalDate is the right key.
+export async function getStashVideosMetadata(rangeStart: Date, rangeEnd: Date): Promise<SelectVideoMetadata[]> {
   return db
     .select()
     .from(videosMetadataTable)
-    .where(eq(videosMetadataTable.isInStash, true))
+    .where(
+      and(
+        eq(videosMetadataTable.isInStash, true),
+        gte(videosMetadataTable.videoOriginalDate, rangeStart),
+        lte(videosMetadataTable.videoOriginalDate, rangeEnd)
+      )
+    )
     .orderBy(desc(videosMetadataTable.videoOriginalDate));
 }
 

@@ -1,6 +1,7 @@
 import React, { useCallback } from "react";
 import { useDynamicBottomSheet } from "../contexts/DynamicBottomSheetContext";
 import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
+import { useSelectedPeriod } from "../features/CameraRoll/contexts/PeriodContext";
 import { StashPickerSheet } from "../features/CameraRoll/StashPickerSheet";
 import { chooseStashVideoForDay } from "../services/metadata";
 import preferences from "../services/preferences";
@@ -18,6 +19,9 @@ interface UseStashPickerProps {
 export function useStashPicker({ onVideoUsed, onVideoUnstashed, onError }: UseStashPickerProps) {
   const { openBottomSheet, closeBottomSheet } = useDynamicBottomSheet();
   const { dayShift } = preferences.useDayShiftPreference();
+  // The stash is scoped to the selected period. Read it here (inside the provider) and pass the bounds
+  // to the sheet as props — the sheet renders in the root-level bottom-sheet portal, outside the provider.
+  const period = useSelectedPeriod();
 
   const openStashPicker = useCallback(
     (day: Date) => {
@@ -46,12 +50,21 @@ export function useStashPicker({ onVideoUsed, onVideoUnstashed, onError }: UseSt
         onVideoUnstashed?.(newVideo);
       };
 
-      openBottomSheet(<StashPickerSheet day={day} onPick={handlePick} onRemove={handleRemove} />, {
-        snapPoints: ["70%"],
-        enableDynamicSizing: false,
-      });
+      openBottomSheet(
+        <StashPickerSheet
+          day={day}
+          periodStart={period.startDate}
+          periodEnd={period.endDate}
+          onPick={handlePick}
+          onRemove={handleRemove}
+        />,
+        {
+          snapPoints: ["70%"],
+          enableDynamicSizing: false,
+        }
+      );
     },
-    [openBottomSheet, closeBottomSheet, dayShift, onVideoUsed, onVideoUnstashed, onError]
+    [openBottomSheet, closeBottomSheet, dayShift, period, onVideoUsed, onVideoUnstashed, onError]
   );
 
   return {

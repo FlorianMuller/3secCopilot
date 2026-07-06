@@ -2,12 +2,13 @@ import * as MediaLibrary from "expo-media-library";
 import { PhoneMedia } from "../features/CameraRoll/CameraRoll";
 import { getStashVideosMetadata } from "./metadata";
 
-// Load every stashed video as a renderable PhoneMedia, newest-filmed first. Assets that can no longer
-// be resolved from the media library (deleted from the phone) are skipped, same null-tolerant pattern
-// as the assigned-video pull-in in videoAssembly.
-export async function getStashVideos(): Promise<PhoneMedia[]> {
+// Load the stashed videos whose original date falls within [rangeStart, rangeEnd] (the selected
+// period) as renderable PhoneMedia, newest-filmed first. Assets that can no longer be resolved from
+// the media library (deleted from the phone) are skipped, same null-tolerant pattern as the
+// assigned-video pull-in in videoAssembly.
+export async function getStashVideos(rangeStart: Date, rangeEnd: Date): Promise<PhoneMedia[]> {
   // Already ordered newest-filmed first; Promise.all preserves that order.
-  const stashMetadata = await getStashVideosMetadata();
+  const stashMetadata = await getStashVideosMetadata(rangeStart, rangeEnd);
 
   const videos = await Promise.all(
     stashMetadata.map(async (metadata) => {

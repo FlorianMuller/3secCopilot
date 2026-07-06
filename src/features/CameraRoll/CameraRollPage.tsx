@@ -1,11 +1,19 @@
 import { LinearGradient } from "expo-linear-gradient";
-import CameraRoll from "./CameraRoll";
-import { PeriodSelector } from "./PeriodSelector";
 import { View } from "react-native";
-import { usePeriod } from "./hooks/usePeriod";
+import CameraRoll from "./CameraRoll";
+import { PeriodProvider, usePeriodContext } from "./contexts/PeriodContext";
+import { PeriodSelector } from "./PeriodSelector";
 
 export function CameraRollPage() {
-  const { periods, selectedPeriod, setSelectedPeriodId } = usePeriod();
+  return (
+    <PeriodProvider>
+      <CameraRollScreen />
+    </PeriodProvider>
+  );
+}
+
+function CameraRollScreen() {
+  const { periods, selectedPeriod } = usePeriodContext();
 
   return (
     <>
@@ -18,11 +26,12 @@ export function CameraRollPage() {
 
       {periods && selectedPeriod && (
         <>
-          <PeriodSelector periods={periods} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriodId} />
+          <PeriodSelector />
           {/* Offset CameraRoll start to not appear under PeriodSelector: */}
           <View style={{ height: 25 }} />
 
-          <CameraRoll startDate={selectedPeriod.startDate} endDate={selectedPeriod.endDate} key={selectedPeriod.id} />
+          {/* key resets all camera-roll state (videos, filters, caches) when switching periods */}
+          <CameraRoll key={selectedPeriod.id} />
         </>
       )}
     </>

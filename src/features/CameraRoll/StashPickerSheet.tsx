@@ -15,20 +15,20 @@ import { VidThumbnail } from "./VideoThumbnail";
 
 interface StashPickerSheetProps {
   day: Date;
+  // Selected-period bounds (periodStart later, periodEnd earlier) — the stash is scoped to them.
+  periodStart: Date;
+  periodEnd: Date;
   onPick: (video: PhoneMedia) => void;
   // Called after a video has been taken out of the stash from here, with its refreshed metadata, so the
   // camera roll can show it again.
   onRemove?: (video: PhoneMedia) => void;
 }
 
-type LoadState =
-  | { status: "loading" }
-  | { status: "error" }
-  | { status: "loaded"; videos: PhoneMedia[] };
+type LoadState = { status: "loading" } | { status: "error" } | { status: "loaded"; videos: PhoneMedia[] };
 
 // Bottom-sheet content listing the cheat stash as a flat newest-first grid. Tapping a thumbnail picks
 // that video to fill `day`. Rendered inside the shared DynamicBottomSheet.
-export function StashPickerSheet({ day, onPick, onRemove }: StashPickerSheetProps) {
+export function StashPickerSheet({ day, periodStart, periodEnd, onPick, onRemove }: StashPickerSheetProps) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const thumbnailSize = width / 5;
@@ -37,13 +37,14 @@ export function StashPickerSheet({ day, onPick, onRemove }: StashPickerSheetProp
   const loadStash = useCallback(async () => {
     setState({ status: "loading" });
     try {
-      const videos = await getStashVideos();
+      // getStashVideos expects (earlier, later); periodEnd is the earlier bound, periodStart the later.
+      const videos = await getStashVideos(periodEnd, periodStart);
       setState({ status: "loaded", videos });
     } catch (error) {
       console.error("Failed to load cheat stash videos", error);
       setState({ status: "error" });
     }
-  }, []);
+  }, [periodStart, periodEnd]);
 
   useEffect(() => {
     loadStash();
@@ -54,9 +55,7 @@ export function StashPickerSheet({ day, onPick, onRemove }: StashPickerSheetProp
       const metadata = await removeVideoFromStash(video.id);
       // Drop it from the grid right away.
       setState((prev) =>
-        prev.status === "loaded"
-          ? { status: "loaded", videos: prev.videos.filter((v) => v.id !== video.id) }
-          : prev
+        prev.status === "loaded" ? { status: "loaded", videos: prev.videos.filter((v) => v.id !== video.id) } : prev
       );
       if (metadata) {
         onRemove?.({ ...video, metadata });
@@ -71,7 +70,7 @@ export function StashPickerSheet({ day, onPick, onRemove }: StashPickerSheetProp
       <View style={styles.header}>
         <SubTitle>Cheat stash</SubTitle>
         <MyAppText size={14} color={theme.colors.text}>
-          Fill {displayDate(day)}
+          For {displayDate(day)}
         </MyAppText>
       </View>
 

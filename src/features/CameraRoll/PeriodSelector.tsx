@@ -3,16 +3,15 @@ import { StyleSheet, View } from "react-native";
 import * as DropdownMenu from "zeego/dropdown-menu";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { MyAppText } from "../../components/text/MyAppText";
-import { Period } from "./hooks/usePeriod";
+import { usePeriodContext } from "./contexts/PeriodContext";
 
-interface PeriodSelectorProps {
-  periods: Period[];
-  selectedPeriod: Period;
-  onSelectPeriod: (periodId: string) => void;
-}
-
-export function PeriodSelector({ periods, selectedPeriod, onSelectPeriod }: PeriodSelectorProps) {
+export function PeriodSelector() {
+  const { periods, selectedPeriod, setSelectedPeriodId } = usePeriodContext();
   const [isOpen, setIsOpen] = useState(false);
+
+  if (!periods || !selectedPeriod) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>
@@ -34,7 +33,7 @@ export function PeriodSelector({ periods, selectedPeriod, onSelectPeriod }: Peri
         </DropdownMenu.Trigger>
         <DropdownMenu.Content>
           {periods.map((period) => (
-            <DropdownMenu.Item key={period.id} onSelect={() => onSelectPeriod(period.id)}>
+            <DropdownMenu.Item key={period.id} onSelect={() => setSelectedPeriodId(period.id)}>
               <DropdownMenu.ItemTitle>{period.label}</DropdownMenu.ItemTitle>
             </DropdownMenu.Item>
           ))}

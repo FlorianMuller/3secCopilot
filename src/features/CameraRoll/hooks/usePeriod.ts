@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import preferences from "../../../services/preferences";
 import { YearGroupingMode } from "../../Options/sections/YearGrouping";
-import { get } from "react-native/Libraries/TurboModule/TurboModuleRegistry";
 
 export type Period = {
   id: string;
@@ -14,7 +13,16 @@ export function usePeriod() {
   const { yearGroupingMode } = preferences.useYearGroupingModePreference({ refetchOnFocus: true });
   const { birthdayDate } = preferences.useBirthdayDatePreference({ refetchOnFocus: true });
 
-  const periods: Period[] | undefined = computePeriods(yearGroupingMode, birthdayDate);
+  // Recompute only when an input actually changes by value — not on every render. The preference
+  // hooks hand back a fresh birthdayDate Date object on each focus refetch, so we key on its time
+  // value; the day key keeps the calendar "today" boundary live across midnight without churning
+  // identities within a day. Stable period (and thus startDate/endDate) identities let downstream
+  // memos in CameraRoll hold.
+  const todayKey = new Date().toDateString();
+  const periods: Period[] | undefined = useMemo(
+    () => computePeriods(yearGroupingMode, birthdayDate),
+    [yearGroupingMode, birthdayDate?.getTime(), todayKey]
+  );
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>();
   const selectedPeriod = periods?.find((p) => p.id === selectedPeriodId);
