@@ -9,8 +9,8 @@ import migrations from "./drizzle/migrations";
 import { FloatingTabBar } from "./src/components/MyTabBar";
 import { DynamicBottomSheetProvider } from "./src/contexts/DynamicBottomSheetContext";
 import { db, expoSqliteDb } from "./src/db/db";
-import { Preview } from "./src/features/Preview/Preview";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
+import { ExportNavigation } from "./src/navigation/ExportNavigation";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
 import { myDarkTheme, myLightTheme } from "./src/theme/themes";
 import "./src/utils/polyfills";
@@ -43,12 +43,12 @@ function AppTabs({ theme }: AppTabsProps) {
             }}
           />
           <Tab.Screen
-            name="Preview"
-            component={gestureHandlerRootHOC(Preview)}
+            name="ExportTab"
+            component={gestureHandlerRootHOC(ExportNavigation)}
             options={{
-              title: "Preview",
+              title: "Export",
               tabBarIcon: ({ focused, color, size }) => (
-                <Ionicons name={focused ? "play-circle" : "play-circle-outline"} size={size} color={color} />
+                <Ionicons name={focused ? "film" : "film-outline"} size={size} color={color} />
               ),
             }}
           />

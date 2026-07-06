@@ -167,6 +167,17 @@ const booleanConverter: Converter<boolean> = {
   },
 };
 
+const numberConverter: Converter<number> = {
+  toString: (v) => v.toString(),
+  fromString: (v) => {
+    if (v === null) {
+      return null;
+    }
+    const parsed = Number(v);
+    return Number.isFinite(parsed) ? parsed : null;
+  },
+};
+
 const dateConverter: Converter<Date> = {
   toString: (v) => v.toISOString(),
   fromString: (v) => {
@@ -205,6 +216,15 @@ function enumConverter<T extends string>(validValues: readonly T[]): Converter<T
 }
 
 // ----------------------------------------------------------------------------------------------------
+// Export option enums (doc/export-spec.md §9.3)
+
+export const exportMissingDaysModes = ["show", "skip"] as const;
+export type ExportMissingDaysMode = (typeof exportMissingDaysModes)[number];
+
+export const exportOrientations = ["landscape", "portrait"] as const;
+export type ExportOrientation = (typeof exportOrientations)[number];
+
+// ----------------------------------------------------------------------------------------------------
 // Preferences definition
 
 const preferences = {
@@ -212,5 +232,13 @@ const preferences = {
   ...createPreferencesFunctions("birthdayDate", dateConverter),
   ...createPreferencesFunctions("dayShift", objectConverter<DayShiftTime>(), { hour: 0, minute: 0 }),
   ...createPreferencesFunctions("yearGroupingMode", enumConverter<YearGroupingMode>(yearGroupingModes), "calendar"),
+  // Export options (doc/export-spec.md §9.3) — global defaults shared across all periods,
+  // only surfaced inline in the Export flow (not in the Settings tab)
+  ...createPreferencesFunctions("exportShowDate", booleanConverter, true),
+  ...createPreferencesFunctions("exportShowHour", booleanConverter, false),
+  ...createPreferencesFunctions("exportShowTitle", booleanConverter, true),
+  ...createPreferencesFunctions("exportMissingDays", enumConverter<ExportMissingDaysMode>(exportMissingDaysModes), "show"),
+  ...createPreferencesFunctions("exportMissingDayDurationMs", numberConverter, 500),
+  ...createPreferencesFunctions("exportOrientation", enumConverter<ExportOrientation>(exportOrientations), "landscape"),
 };
 export default preferences;
