@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation, useTheme } from "@react-navigation/native";
+import { useEffect, useRef } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import { ExportScreenURI } from "../../navigation";
 import { ExportNavigationProp } from "../../navigation/ExportNavigation";
@@ -13,6 +14,7 @@ import { PeriodThumbnail } from "./PeriodThumbnail";
 // Export tab root (§9.1): one row per period that has at least one selected video.
 export function PeriodList() {
   const { summaries } = useExportPeriods();
+  useDevAutoOpenPeriod(summaries);
 
   if (summaries === undefined) {
     return (
@@ -44,6 +46,21 @@ export function PeriodList() {
       ListFooterComponent={SafeTabBarZone}
     />
   );
+}
+
+// Dev automation hook (simulator testing): EXPO_PUBLIC_AUTO_OPEN_PERIOD=1 opens the
+// first period's export screen as soon as the list loads. No-op in release builds.
+function useDevAutoOpenPeriod(summaries: ExportPeriodSummary[] | undefined) {
+  const navigation = useNavigation<ExportNavigationProp>();
+  const hasOpened = useRef(false);
+
+  useEffect(() => {
+    if (__DEV__ && process.env.EXPO_PUBLIC_AUTO_OPEN_PERIOD && !hasOpened.current && summaries && summaries.length > 0) {
+      hasOpened.current = true;
+      const { period } = summaries[0];
+      navigation.navigate(ExportScreenURI, { periodId: period.id, periodLabel: period.label });
+    }
+  }, [summaries]);
 }
 
 function PeriodRow({ summary }: { summary: ExportPeriodSummary }) {

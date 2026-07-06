@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer } from "@react-navigation/native";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
+import { useEffect } from "react";
 import { Text, useColorScheme, View } from "react-native";
 import { gestureHandlerRootHOC, GestureHandlerRootView } from "react-native-gesture-handler";
 import migrations from "./drizzle/migrations";
@@ -11,6 +12,7 @@ import { DynamicBottomSheetProvider } from "./src/contexts/DynamicBottomSheetCon
 import { db, expoSqliteDb } from "./src/db/db";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { ExportNavigation } from "./src/navigation/ExportNavigation";
+import { seedDemoData } from "./src/services/devSeed";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
 import { myDarkTheme, myLightTheme } from "./src/theme/themes";
 import "./src/utils/polyfills";
@@ -21,12 +23,29 @@ interface AppTabsProps {
   theme: "light" | "dark";
 }
 
+// Dev automation hooks (simulator testing, no-ops in release builds):
+//   EXPO_PUBLIC_AUTOSEED=1     seed demo data on startup (services/devSeed.ts)
+//   EXPO_PUBLIC_INITIAL_TAB=…  open a given tab on startup (e.g. ExportTab)
+const devInitialTab = (__DEV__ && process.env.EXPO_PUBLIC_INITIAL_TAB) || "CameraRollTab";
+
+function useDevAutoSeed() {
+  useEffect(() => {
+    if (__DEV__ && process.env.EXPO_PUBLIC_AUTOSEED) {
+      seedDemoData()
+        .then((status) => console.log(`[autoseed] ${status}`))
+        .catch((e) => console.error("[autoseed] failed:", e));
+    }
+  }, []);
+}
+
 function AppTabs({ theme }: AppTabsProps) {
+  useDevAutoSeed();
+
   return (
     <NavigationContainer theme={theme === "dark" ? myDarkTheme : myLightTheme}>
       <DynamicBottomSheetProvider>
         <Tab.Navigator
-          initialRouteName="CameraRollTab"
+          initialRouteName={devInitialTab}
           screenOptions={{
             headerShown: false,
           }}
