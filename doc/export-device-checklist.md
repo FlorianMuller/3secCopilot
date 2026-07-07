@@ -45,6 +45,19 @@ Device items:
       real 1080p/4K footage at the §4.2 bitrates — confirm still "Premiere-class"
       visually and that file size stays near the estimate.
 
-## Phase 4 — Beats & overlays (pending)
+## Phase 4 — Beats & overlays (✅ sim-verified 2026-07-07)
+
+Sim-proven: card text centered, beat date over black, clip date/hour/title/description
+bottom-left with scrim (hour smaller when enabled), click audible at every beat on both
+audio paths, duration/pts/peakMB regressions clean. Device items:
+
+- [ ] Click sound character/loudness on real speakers (authored −12 dBFS, 100 ms,
+      1150 Hz blip) — tweak level or timbre if it reads harsh.
+- [ ] Overlay legibility over real bright/busy footage (scrim black α0.35; sizes are
+      the §7 "first draft" — nudge in Phase 5 preview if off).
+- [ ] A really long title: truncates with ellipsis at ~90% width — check it looks OK.
+- [ ] Sideload build: `ExpoMontage.bundle` resolves and the click plays (resource
+      bundle loading only proven on the sim dev build; a main-bundle fallback exists).
+- [ ] French device: dates render in French (device locale), hour as "12:39".
 
 ## Phase 5 — Preview & polish (pending)
