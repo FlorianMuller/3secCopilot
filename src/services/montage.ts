@@ -1,5 +1,7 @@
 import * as FileSystem from "expo-file-system";
+import { DateTime } from "luxon";
 import {
+  ClipOverlay,
   ExportCompleteEvent,
   ExportErrorEvent,
   ExportProgressEvent,
@@ -10,13 +12,15 @@ import ExpoMontage from "../../modules/expo-montage/src/ExpoMontageModule";
 import { SelectVideoMetadata } from "../db/schema";
 import { Period } from "../features/CameraRoll/hooks/usePeriod";
 import { DayShiftTime } from "../features/Options/sections/DayShiftSection";
+import { capitalize } from "../utils/capitalize";
 import { getDaysBetween } from "../utils/getDaysBetween";
 import { getEffectiveDate } from "./dayShift";
 import { ExportOrientation } from "./preferences";
 
 // JS side of the export pipeline (doc/export-spec.md §8).
 // Phase 2: timeline/day grouping and the size/duration math backing the export screen.
-// Phase 3: MontageClip[] build + the exportMontage orchestration (no overlay strings yet).
+// Phase 3: MontageClip[] build + the exportMontage orchestration.
+// Phase 4: overlay strings (luxon, device locale) + overlay/click settings.
 
 export const OPENING_CARD_DURATION_MS = 2000; // §6.1 — always on, no toggle
 
@@ -135,18 +139,54 @@ export function groupClipsForPeriod(
 }
 
 // ----------------------------------------------------------------------------------------------------
-// MontageClip[] build (§8 step 5, phase-3 subset: no overlay strings yet)
+// MontageClip[] build (§8 step 5) + overlay strings (§7 "Overlay format")
 
 export interface BuildMontageClipsOptions {
   // Period label for the opening title card, e.g. "2025"
   periodLabel: string;
   showMissingDays: boolean;
   missingDayDurationMs: number;
+  // Overlay toggles (§9.3): date/hour on the first line, title on the first line,
+  // description (tied to the title toggle) on the second
+  showDate: boolean;
+  showHour: boolean;
+  showTitle: boolean;
+}
+
+// "Lundi 4 juin" — luxon in the device locale (§7, confirmed: French dates on a
+// French device, correct elsewhere), capitalized for locales with lowercase weekdays
+function formatOverlayDate(day: Date): string {
+  return capitalize(DateTime.fromJSDate(day).toLocaleString({ weekday: "long", day: "numeric", month: "long" }));
+}
+
+// Bottom-left overlay parts for one filled day. The date is the *effective* (possibly
+// day-shifted) timeline day; the hour is the clip's original creation time — always
+// present in videos_metadata. Returns undefined when every toggle is off.
+function buildClipOverlay(
+  metadata: SelectVideoMetadata,
+  day: Date,
+  options: BuildMontageClipsOptions
+): ClipOverlay | undefined {
+  const overlay: ClipOverlay = {};
+  if (options.showDate) {
+    overlay.dateText = formatOverlayDate(day);
+  }
+  if (options.showHour) {
+    overlay.hourText = DateTime.fromJSDate(metadata.videoOriginalDate).toLocaleString(DateTime.TIME_SIMPLE);
+  }
+  if (options.showTitle && metadata.title) {
+    overlay.titleText = metadata.title;
+  }
+  if (options.showTitle && metadata.description) {
+    overlay.descriptionText = metadata.description;
+  }
+  return Object.keys(overlay).length > 0 ? overlay : undefined;
 }
 
 // Opening card, then one entry per period day ascending: the day's selected clip
 // (raw trim values — the native side clamps defensively against the real asset
-// duration, §8.4) or a missing-day beat (one per day, never grouped, §6.2).
+// duration, §8.4) or a missing-day beat (one per day, never grouped, §6.2; date
+// overlay only, §6.2 "Overlays").
 export function buildMontageClips(periodClips: PeriodClips, options: BuildMontageClipsOptions): MontageClip[] {
   const clips: MontageClip[] = [
     { type: "card", durationMs: OPENING_CARD_DURATION_MS, overlayLines: [options.periodLabel] },
@@ -156,14 +196,23 @@ export function buildMontageClips(periodClips: PeriodClips, options: BuildMontag
     const metadata = periodClips.clipByDay.get(day.toDateString());
     if (metadata === undefined) {
       if (options.showMissingDays) {
-        clips.push({ type: "missingDay", durationMs: options.missingDayDurationMs });
+        clips.push({
+          type: "missingDay",
+          durationMs: options.missingDayDurationMs,
+          overlay: options.showDate ? { dateText: formatOverlayDate(day) } : undefined,
+        });
       }
       continue;
     }
     const trim = hasTrim(metadata)
       ? { startMs: Math.max(0, metadata.trimStartTime!), endMs: metadata.trimEndTime }
       : { startMs: null, endMs: null }; // no/invalid trim = full clip (§8.4)
-    clips.push({ type: "video", assetId: metadata.videoId, ...trim });
+    clips.push({
+      type: "video",
+      assetId: metadata.videoId,
+      ...trim,
+      overlay: buildClipOverlay(metadata, day, options),
+    });
   }
 
   return clips;
@@ -174,6 +223,21 @@ export function buildMontageClips(periodClips: PeriodClips, options: BuildMontag
 
 export function getRenderSize(orientation: ExportOrientation): { width: number; height: number } {
   return orientation === "portrait" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+}
+
+// Overlay font sizes in pixels at renderSize (§7), proportional to the render height
+// so the text keeps the same visual weight across resolutions/orientations. First
+// draft (§7) — easy to nudge once the in-app preview lands.
+function getOverlaySettings(renderSize: { width: number; height: number }): MontageSettings["overlay"] {
+  const height = renderSize.height;
+  return {
+    position: "bottomLeft",
+    cardFontSize: Math.round(height * 0.1),
+    dateFontSize: Math.round(height * 0.032),
+    hourFontSize: Math.round(height * 0.024),
+    titleFontSize: Math.round(height * 0.032),
+    descriptionFontSize: Math.round(height * 0.026),
+  };
 }
 
 export interface MontageExportListeners {
@@ -214,8 +278,11 @@ export async function startMontageExport(
     fps: EXPORT_FPS,
     videoAverageBitrate: getVideoBitrate(renderSize, EXPORT_FPS),
     audioBitrate: AUDIO_BITRATE,
-    missingDayClick: false, // click sound lands in phase 4
+    // §6.2/§7: no dedicated preference (§9.3) — the click is on whenever missing-day
+    // beats are part of the timeline (no beats in the clip list = no clicks anyway)
+    missingDayClick: true,
     mode: "full",
+    overlay: getOverlaySettings(renderSize),
     outputPath,
   };
 

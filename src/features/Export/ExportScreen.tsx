@@ -145,6 +145,9 @@ export function ExportScreen() {
     if (
       period === undefined ||
       clips === undefined ||
+      exportShowDate === undefined ||
+      exportShowHour === undefined ||
+      exportShowTitle === undefined ||
       exportMissingDays === undefined ||
       exportMissingDayDurationMs === undefined ||
       exportOrientation === undefined ||
@@ -158,6 +161,9 @@ export function ExportScreen() {
         periodLabel: period.label,
         showMissingDays: exportMissingDays === "show",
         missingDayDurationMs: exportMissingDayDurationMs,
+        showDate: exportShowDate,
+        showHour: exportShowHour,
+        showTitle: exportShowTitle,
       });
       exportHandleRef.current = await startMontageExport(period.id, montageClips, exportOrientation, {
         onProgress: (event) => {
@@ -195,7 +201,16 @@ export function ExportScreen() {
       autoExportLog(`ERROR ${String(error)}`);
       setExportState({ status: "error", message: String(error) });
     }
-  }, [period, clips, exportMissingDays, exportMissingDayDurationMs, exportOrientation]);
+  }, [
+    period,
+    clips,
+    exportShowDate,
+    exportShowHour,
+    exportShowTitle,
+    exportMissingDays,
+    exportMissingDayDurationMs,
+    exportOrientation,
+  ]);
 
   const cancelExport = useCallback(() => {
     exportHandleRef.current?.cancel().catch((error) => console.warn("cancelExport failed:", error));
