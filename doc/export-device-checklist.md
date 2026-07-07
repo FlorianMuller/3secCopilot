@@ -13,10 +13,16 @@
       the floating tab bar.
 - [ ] Options persist across app restarts and are shared between periods.
 
-## Phase 3 — Export MVP (✅ sim-verified end-to-end 2026-07-07; forensics partially pending)
+## Phase 3 — Export MVP (✅ sim-verified end-to-end 2026-07-07; forensics ✅ passed 2026-07-07)
 
 Sim-proven: full chunked export of a 188-day period (7 chunks incl. beats-only ones),
 duration exactly as predicted, monotonic progress, error surfacing, temp cleanup.
+Forensics pass (ffprobe/frame/audio): H.264 High 1080p30 + AAC confirmed, card/beat
+frames exact black (Y=16), no boundary clicks (digital-zero silence, 0 click events),
+strictly monotonic pts/dts, single-entry edit list, cancel + no-overwrite verified.
+Found & fixed: chunk-boundary stutter (1–2 empty-edit frames + 1 dropped frame per
+boundary, from B-frame reorder delay vs duration-based retiming) — writer now encodes
+with frame reordering disabled (no B-frames) + per-segment first-sample anchoring.
 Device items:
 
 - [ ] Export a real period: encode speed & battery on real hardware (VideoToolbox; the
@@ -33,7 +39,11 @@ Device items:
 - [ ] Keep-awake: screen stays on during a long export; backgrounding kills the export
       with a sane error (accepted v1 behavior, §9.5).
 - [ ] Audio: clip sound plays, silent clips stay silent, listen at ~monthly chunk
-      boundaries for pops/clicks (§5.2 continuous-AAC design).
+      boundaries for pops/clicks (§5.2 continuous-AAC design; sim seed had silence at
+      most boundaries — listen with real clip audio spanning a boundary).
+- [ ] Quality of the no-B-frames encode (forensics fix disabled frame reordering) on
+      real 1080p/4K footage at the §4.2 bitrates — confirm still "Premiere-class"
+      visually and that file size stays near the estimate.
 
 ## Phase 4 — Beats & overlays (pending)
 
