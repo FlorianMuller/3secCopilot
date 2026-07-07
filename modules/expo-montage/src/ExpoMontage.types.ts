@@ -34,6 +34,25 @@ export type SpikeResult = {
 // ----------------------------------------------------------------------------------------------------
 // exportMontage API (doc/export-spec.md §7)
 
+/**
+ * Structured overlay text for a clip or missing-day beat (§7 "Overlay format"),
+ * pre-formatted in JS with luxon in the device locale. Parts are split (instead of
+ * one pre-joined line) so the native renderer can de-emphasize the hour in a
+ * smaller font within the first line:
+ *   <dateText> <hourText> - <titleText>
+ *   <descriptionText>
+ */
+export type ClipOverlay = {
+  /** e.g. "Lundi 4 juin" — dateFontSize, semibold */
+  dateText?: string;
+  /** e.g. "12:39" — hourFontSize, smaller & de-emphasized */
+  hourText?: string;
+  /** titleFontSize; joined to the first line with " - " */
+  titleText?: string;
+  /** Second line, descriptionFontSize — only rendered if present */
+  descriptionText?: string;
+};
+
 export type MontageClip =
   | {
       type: "video";
@@ -43,18 +62,20 @@ export type MontageClip =
       startMs?: number | null;
       /** Trim end in milliseconds; null/undefined = to end */
       endMs?: number | null;
-      /** Pre-formatted overlay lines — accepted but ignored in phase 3 (rendered in phase 4) */
-      overlayLines?: string[];
+      /** Bottom-left overlay over a subtle scrim; omit for no overlay */
+      overlay?: ClipOverlay;
     }
   | {
       type: "missingDay"; // ONE beat per missing day — never grouped (§6.2)
       /** Beat length, from the exportMissingDayDurationMs preference */
       durationMs: number;
-      overlayLines?: string[];
+      /** Date-only overlay (dateText), only when the date overlay is enabled */
+      overlay?: ClipOverlay;
     }
   | {
       type: "card"; // opening title card (§6.1) — black + centered text, no click
       durationMs: number;
+      /** Centered card lines, cardFontSize (e.g. ["2026"]) */
       overlayLines: string[];
     };
 
@@ -66,11 +87,12 @@ export type MontageSettings = {
   videoAverageBitrate: number;
   /** bps */
   audioBitrate: number;
-  /** Play the bundled click on missingDay beats — accepted but unused in phase 3 */
+  /** Play the bundled click on missingDay beats (§6.2); the card never clicks */
   missingDayClick: boolean;
   /** "preview" = fast/low-res internal draft — accepted; currently behaves like "full" */
   mode: "preview" | "full";
-  /** Accepted but unused in phase 3 */
+  /** Overlay font sizes in *pixels at renderSize* (§7); missing/zero values fall
+   * back to proportional native defaults */
   overlay?: {
     position: "bottomLeft";
     cardFontSize: number;

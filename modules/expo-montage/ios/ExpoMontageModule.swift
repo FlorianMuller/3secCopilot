@@ -34,6 +34,16 @@ struct OverlaySettingsRecord: Record {
   @Field var descriptionFontSize: Double = 0
 }
 
+/// Structured overlay text (§7 "Overlay format"), pre-formatted in JS in the device
+/// locale. Split into parts so the native renderer can de-emphasize the hour within
+/// the first line and put the description on a second line.
+struct ClipOverlayRecord: Record {
+  @Field var dateText: String? = nil
+  @Field var hourText: String? = nil
+  @Field var titleText: String? = nil
+  @Field var descriptionText: String? = nil
+}
+
 struct MontageClipRecord: Record {
   /// "video" | "missingDay" | "card"
   @Field var type: String = "video"
@@ -41,8 +51,10 @@ struct MontageClipRecord: Record {
   @Field var startMs: Double? = nil
   @Field var endMs: Double? = nil
   @Field var durationMs: Double? = nil
-  /// Accepted but ignored in phase 3 — text overlays land in phase 4
+  /// Card text lines (centered over black, cardFontSize)
   @Field var overlayLines: [String]? = nil
+  /// Bottom-left overlay for video clips and missing-day beats
+  @Field var overlay: ClipOverlayRecord? = nil
 }
 
 struct MontageSettingsRecord: Record {
@@ -50,11 +62,12 @@ struct MontageSettingsRecord: Record {
   @Field var fps: Double = 30
   @Field var videoAverageBitrate: Double = 16_000_000
   @Field var audioBitrate: Double = 256_000
-  /// Accepted but unused in phase 3 — the click sound lands in phase 4
+  /// Play the bundled click on missingDay beats (§6.2); the card never clicks
   @Field var missingDayClick: Bool = false
   /// "preview" | "full" — accepted; preview currently behaves like full
   @Field var mode: String = "full"
-  /// Accepted but unused in phase 3
+  /// Overlay font sizes in pixels at renderSize; missing/zero values fall back to
+  /// proportional defaults
   @Field var overlay: OverlaySettingsRecord? = nil
   /// file:// URL under the app's documents directory (parent dir is created)
   @Field var outputPath: String = ""
@@ -88,12 +101,22 @@ public class ExpoMontageModule: Module {
         videoBitrate: Int(settings.videoAverageBitrate),
         audioBitrate: Int(settings.audioBitrate)
       )
+      let overlayStyle = OverlayStyle(
+        cardFontSize: settings.overlay?.cardFontSize ?? 0,
+        dateFontSize: settings.overlay?.dateFontSize ?? 0,
+        hourFontSize: settings.overlay?.hourFontSize ?? 0,
+        titleFontSize: settings.overlay?.titleFontSize ?? 0,
+        descriptionFontSize: settings.overlay?.descriptionFontSize ?? 0,
+        renderHeight: CGFloat(settings.renderSize.height)
+      )
 
       let taskId = UUID().uuidString
       let exporter = MontageExporter(
         taskId: taskId,
         specs: specs,
         config: config,
+        overlayStyle: overlayStyle,
+        missingDayClick: settings.missingDayClick,
         outputURL: outputURL,
         sendProgress: { [weak self] phase, progress in
           self?.sendEvent("onExportProgress", ["taskId": taskId, "progress": progress, "phase": phase])

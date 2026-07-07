@@ -19,4 +19,10 @@ Pod::Spec.new do |s|
   }
 
   s.source_files = "**/*.{h,m,mm,swift,hpp,cpp}"
+
+  # Bundled audio (missing-day click, doc/export-spec.md §6.2) — loaded at runtime
+  # from the ExpoMontage.bundle resource bundle
+  s.resource_bundles = {
+    'ExpoMontage' => ['resources/*.caf']
+  }
 end

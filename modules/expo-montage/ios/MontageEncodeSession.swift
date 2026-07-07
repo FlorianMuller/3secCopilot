@@ -19,7 +19,7 @@ struct VideoTimelineItem {
   let compositionRange: CMTimeRange
   /// Where they belong on the output timeline
   let outputStart: CMTime
-  /// Pre-rendered overlay, composited per frame (nil in phase 3 exports)
+  /// Pre-rendered overlay (§5.3), composited per frame
   let overlay: CIImage?
 }
 
@@ -27,16 +27,27 @@ struct BlackTimelineItem {
   let outputRange: CMTimeRange
   /// Frame-quantized beat length (durations are rounded to whole frames upstream)
   let frameCount: Int
+  /// Pre-rendered overlay (missing-day date line or the opening card's text, §6)
+  let overlay: CIImage?
+}
+
+/// Missing-day clicks spliced into a synthesized-silence audio span (§6.2) — used
+/// when the chunk has no composition audio track to insert the click file into.
+struct SilenceClicks {
+  let pcm: ClickPCM
+  /// Click start positions on the chunk's output timeline, in 44.1 kHz frames
+  let positions: [Int]
 }
 
 /// How the session produces its audio stream.
 enum EncodeAudioMode {
   /// Composition audio track(s) laid out on the output timeline (real audio +
-  /// insertEmptyTimeRange spans) — read and appended as-is.
+  /// insertEmptyTimeRange spans + inserted click file segments) — read and appended as-is.
   case reader
   /// No usable source audio in this span: synthesize silent PCM for the whole
-  /// output duration so every chunk file has an audio track for the assemble pass.
-  case silence(CMTime)
+  /// output duration (with missing-day clicks spliced in when enabled) so every
+  /// chunk file has an audio track for the assemble pass.
+  case silence(duration: CMTime, clicks: SilenceClicks?)
   /// No audio at all (spike with an audio-less composition).
   case none
 }
@@ -75,6 +86,7 @@ final class EncodeSession: @unchecked Sendable {
   private let silenceTotalFrames: Int
   private var silenceFramesEmitted = 0
   private let silenceFormat: CMAudioFormatDescription?
+  private let silenceClicks: SilenceClicks?
 
   /// Set from the pump queues when isCancelled() fires mid-encode
   private var wasCancelled = false
@@ -151,6 +163,7 @@ final class EncodeSession: @unchecked Sendable {
       self.audioInput = nil
       self.silenceTotalFrames = 0
       self.silenceFormat = nil
+      self.silenceClicks = nil
     case .reader:
       let input = AVAssetWriterInput(mediaType: .audio, outputSettings: config.audioOutputSettings)
       input.expectsMediaDataInRealTime = false
@@ -158,13 +171,15 @@ final class EncodeSession: @unchecked Sendable {
       self.audioInput = input
       self.silenceTotalFrames = 0
       self.silenceFormat = nil
-    case .silence(let duration):
+      self.silenceClicks = nil
+    case .silence(let duration, let clicks):
       let input = AVAssetWriterInput(mediaType: .audio, outputSettings: config.audioOutputSettings)
       input.expectsMediaDataInRealTime = false
       writer.add(input)
       self.audioInput = input
       self.silenceTotalFrames = Int((duration.seconds * 44_100).rounded())
       self.silenceFormat = Self.makeSilenceFormatDescription()
+      self.silenceClicks = clicks
     }
   }
 
@@ -265,7 +280,8 @@ final class EncodeSession: @unchecked Sendable {
       guard let buffer = makePoolBuffer() else {
         return (false, true)
       }
-      ciContext.render(blackImage, to: buffer, bounds: renderBounds, colorSpace: renderColorSpace)
+      let frameImage = item.overlay.map { $0.composited(over: blackImage) } ?? blackImage
+      ciContext.render(frameImage, to: buffer, bounds: renderBounds, colorSpace: renderColorSpace)
       let pts = item.outputRange.start
         + CMTimeMultiply(config.frameDuration, multiplier: Int32(blackFramesEmitted))
       pixelBufferAdaptor.append(buffer, withPresentationTime: pts)
@@ -395,7 +411,8 @@ final class EncodeSession: @unchecked Sendable {
         guard let buffer = Self.makeSilenceBuffer(
           startFrame: silenceFramesEmitted,
           frameCount: frames,
-          format: silenceFormat
+          format: silenceFormat,
+          clicks: silenceClicks
         ) else {
           audioInput.markAsFinished()
           group.leave()
@@ -407,7 +424,7 @@ final class EncodeSession: @unchecked Sendable {
     }
   }
 
-  // MARK: - Silence synthesis (LPCM 44.1 kHz stereo int16, zero-filled)
+  // MARK: - Silence synthesis (LPCM 44.1 kHz stereo int16, zero-filled + spliced clicks)
 
   private static func makeSilenceFormatDescription() -> CMAudioFormatDescription? {
     var asbd = AudioStreamBasicDescription(
@@ -438,7 +455,8 @@ final class EncodeSession: @unchecked Sendable {
   private static func makeSilenceBuffer(
     startFrame: Int,
     frameCount: Int,
-    format: CMAudioFormatDescription
+    format: CMAudioFormatDescription,
+    clicks: SilenceClicks? = nil
   ) -> CMSampleBuffer? {
     let dataLength = frameCount * 4
     var blockBuffer: CMBlockBuffer?
@@ -459,6 +477,27 @@ final class EncodeSession: @unchecked Sendable {
       offsetIntoDestination: 0,
       dataLength: dataLength
     ) == kCMBlockBufferNoErr else { return nil }
+
+    // Splice the click PCM over the zero-filled span wherever a click overlaps
+    // this buffer's frame window [startFrame, startFrame + frameCount)
+    if let clicks {
+      let bufferEnd = startFrame + frameCount
+      for position in clicks.positions {
+        let overlapStart = max(position, startFrame)
+        let overlapEnd = min(position + clicks.pcm.frameCount, bufferEnd)
+        guard overlapEnd > overlapStart else { continue }
+        let copied = clicks.pcm.data.withUnsafeBytes { source -> Bool in
+          guard let base = source.baseAddress else { return false }
+          return CMBlockBufferReplaceDataBytes(
+            with: base + (overlapStart - position) * 4,
+            blockBuffer: blockBuffer,
+            offsetIntoDestination: (overlapStart - startFrame) * 4,
+            dataLength: (overlapEnd - overlapStart) * 4
+          ) == kCMBlockBufferNoErr
+        }
+        guard copied else { return nil }
+      }
+    }
 
     var sample: CMSampleBuffer?
     guard CMAudioSampleBufferCreateReadyWithPacketDescriptions(

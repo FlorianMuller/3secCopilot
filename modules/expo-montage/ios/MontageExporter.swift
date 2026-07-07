@@ -2,25 +2,40 @@ import AVFoundation
 import CoreMedia
 import Foundation
 
-/// Internal, validated form of a MontageClipRecord. `missingDay` and `card` both
-/// render as plain black + silence in phase 3 (text and click land in phase 4),
-/// so they collapse into a single `black` case here.
+/// Internal, validated form of a MontageClipRecord (§7).
 enum ExportClipSpec {
-  case video(assetId: String, startMs: Double?, endMs: Double?)
-  case black(durationMs: Double)
+  case video(assetId: String, startMs: Double?, endMs: Double?, overlay: ClipOverlayContent?)
+  /// One black beat per missing day (§6.2): optional date overlay, click when enabled
+  case missingDay(durationMs: Double, overlay: ClipOverlayContent?)
+  /// Opening title card (§6.1): centered text over black, never clicks
+  case card(durationMs: Double, lines: [String])
 
   init(record: MontageClipRecord) throws {
+    let overlay = record.overlay.flatMap { overlayRecord -> ClipOverlayContent? in
+      let content = ClipOverlayContent(
+        dateText: overlayRecord.dateText,
+        hourText: overlayRecord.hourText,
+        titleText: overlayRecord.titleText,
+        descriptionText: overlayRecord.descriptionText
+      )
+      return content.isEmpty ? nil : content
+    }
     switch record.type {
     case "video":
       guard let assetId = record.assetId, !assetId.isEmpty else {
         throw MontageError.invalidClip("video clip without assetId")
       }
-      self = .video(assetId: assetId, startMs: record.startMs, endMs: record.endMs)
-    case "missingDay", "card":
+      self = .video(assetId: assetId, startMs: record.startMs, endMs: record.endMs, overlay: overlay)
+    case "missingDay":
       guard let durationMs = record.durationMs, durationMs > 0 else {
-        throw MontageError.invalidClip("\(record.type) clip without a positive durationMs")
+        throw MontageError.invalidClip("missingDay clip without a positive durationMs")
       }
-      self = .black(durationMs: durationMs)
+      self = .missingDay(durationMs: durationMs, overlay: overlay)
+    case "card":
+      guard let durationMs = record.durationMs, durationMs > 0 else {
+        throw MontageError.invalidClip("card clip without a positive durationMs")
+      }
+      self = .card(durationMs: durationMs, lines: record.overlayLines ?? [])
     default:
       throw MontageError.invalidClip("unknown clip type \"\(record.type)\"")
     }
@@ -50,6 +65,8 @@ final class MontageExporter: @unchecked Sendable {
   let taskId: String
   private let specs: [ExportClipSpec]
   private let config: WriterConfig
+  private let overlayStyle: OverlayStyle
+  private let missingDayClick: Bool
   private let outputURL: URL
   private let sendProgress: (String, Double) -> Void
   private let sendComplete: ([String: Any]) -> Void
@@ -58,6 +75,18 @@ final class MontageExporter: @unchecked Sendable {
   private let resolver = AssetResolver()
   private let memory = MemoryTracker()
   private var warnings: [String] = []
+
+  /// Bundled click sound (§6.2), loaded once per export when missingDayClick is on.
+  /// Two forms for the two audio paths: an AVAsset track for composition insertion
+  /// (chunks with real audio) and decoded PCM for synthesized-silence splicing.
+  private struct ClickSource {
+    let track: AVAssetTrack
+    let duration: CMTime
+    let pcm: ClickPCM
+    /// Strong ref — AVAssetTrack.asset is a weak back-pointer (phase-3 lesson)
+    let asset: AVAsset
+  }
+  private var clickSource: ClickSource?
 
   private let cancelLock = NSLock()
   private var cancelRequested = false
@@ -71,6 +100,8 @@ final class MontageExporter: @unchecked Sendable {
     taskId: String,
     specs: [ExportClipSpec],
     config: WriterConfig,
+    overlayStyle: OverlayStyle,
+    missingDayClick: Bool,
     outputURL: URL,
     sendProgress: @escaping (String, Double) -> Void,
     sendComplete: @escaping ([String: Any]) -> Void,
@@ -79,6 +110,8 @@ final class MontageExporter: @unchecked Sendable {
     self.taskId = taskId
     self.specs = specs
     self.config = config
+    self.overlayStyle = overlayStyle
+    self.missingDayClick = missingDayClick
     self.outputURL = outputURL
     self.sendProgress = sendProgress
     self.sendComplete = sendComplete
@@ -131,6 +164,7 @@ final class MontageExporter: @unchecked Sendable {
     guard !specs.isEmpty else {
       throw MontageError.invalidClip("empty clip list")
     }
+    await loadClickSourceIfNeeded()
     let fileManager = FileManager.default
 
     let chunkDir = fileManager.temporaryDirectory.appendingPathComponent("montage-\(taskId)", isDirectory: true)
@@ -227,6 +261,34 @@ final class MontageExporter: @unchecked Sendable {
     ]
   }
 
+  /// Loads the bundled click (§6.2) once per export. A missing/broken resource must
+  /// never fail the export — beats degrade to silence with a warning.
+  private func loadClickSourceIfNeeded() async {
+    let hasMissingDays = specs.contains {
+      if case .missingDay = $0 { return true }
+      return false
+    }
+    guard missingDayClick, hasMissingDays else { return }
+    guard let url = MontageClickSound.locate() else {
+      warnings.append("Bundled click sound not found — missing-day beats stay silent")
+      return
+    }
+    do {
+      let pcm = try MontageClickSound.decodePCM(url: url)
+      let asset = AVURLAsset(url: url)
+      guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+        warnings.append("Bundled click sound has no audio track — missing-day beats stay silent")
+        return
+      }
+      let duration = try await asset.load(.duration)
+      clickSource = ClickSource(track: track, duration: duration, pcm: pcm, asset: asset)
+    } catch {
+      warnings.append(
+        "Bundled click sound could not be loaded (\((error as NSError).localizedDescription)) — missing-day beats stay silent"
+      )
+    }
+  }
+
   // MARK: - Chunk build (resolve assets -> 2-track composition + output timeline)
 
   private struct ChunkBuild {
@@ -246,8 +308,10 @@ final class MontageExporter: @unchecked Sendable {
   }
 
   private enum PreparedItem {
-    case video(videoTrack: AVAssetTrack, audioTrack: AVAssetTrack?, range: CMTimeRange, assetId: String)
-    case black(durationMs: Double)
+    case video(videoTrack: AVAssetTrack, audioTrack: AVAssetTrack?, range: CMTimeRange, assetId: String, overlay: CIImage?)
+    /// Card, missing-day beat, or degraded clip — overlay pre-rendered, one CIImage
+    /// per segment (§5.3); click only on missing days when enabled (§6.2)
+    case beat(durationMs: Double, overlay: CIImage?, click: Bool)
   }
 
   private func buildChunk(
@@ -262,9 +326,21 @@ final class MontageExporter: @unchecked Sendable {
     for spec in chunkSpecs {
       try checkCancelled()
       switch spec {
-      case .black(let durationMs):
-        prepared.append(.black(durationMs: durationMs))
-      case .video(let assetId, let startMs, let endMs):
+      case .card(let durationMs, let lines):
+        prepared.append(.beat(
+          durationMs: durationMs,
+          overlay: MontageOverlayRenderer.cardOverlay(lines: lines, style: overlayStyle, renderSize: config.renderSize),
+          click: false
+        ))
+      case .missingDay(let durationMs, let overlay):
+        prepared.append(.beat(
+          durationMs: durationMs,
+          overlay: overlay.flatMap {
+            MontageOverlayRenderer.clipOverlay(content: $0, style: overlayStyle, renderSize: config.renderSize)
+          },
+          click: clickSource != nil
+        ))
+      case .video(let assetId, let startMs, let endMs, let overlayContent):
         do {
           let resolved = try await resolver.resolve(assetId: assetId) { progress in
             onDownloadProgress(progress, resolvedCount)
@@ -289,7 +365,12 @@ final class MontageExporter: @unchecked Sendable {
             endMs: endMs,
             assetDuration: assetDuration
           )
-          prepared.append(.video(videoTrack: videoTrack, audioTrack: audioTrack, range: range, assetId: assetId))
+          let overlay = overlayContent.flatMap {
+            MontageOverlayRenderer.clipOverlay(content: $0, style: overlayStyle, renderSize: config.renderSize)
+          }
+          prepared.append(
+            .video(videoTrack: videoTrack, audioTrack: audioTrack, range: range, assetId: assetId, overlay: overlay)
+          )
         } catch {
           // §8.4: one bad/missing asset must never abort the export — degrade to a
           // short black beat and keep going. Cancellation still aborts.
@@ -297,7 +378,7 @@ final class MontageExporter: @unchecked Sendable {
           warnings.append(
             "Clip \(assetId) could not be loaded (\((error as NSError).localizedDescription)) — replaced with a black beat"
           )
-          prepared.append(.black(durationMs: Self.degradedBeatMs))
+          prepared.append(.beat(durationMs: Self.degradedBeatMs, overlay: nil, click: false))
         }
         resolvedCount += 1
         onDownloadProgress(0, resolvedCount)
@@ -310,20 +391,24 @@ final class MontageExporter: @unchecked Sendable {
     }
 
     // A chunk that is only beats (sparse month, or every asset degraded): no reader
-    // at all — the encode session synthesizes black frames + silence.
+    // at all — the encode session synthesizes black frames + silence (clicks spliced in).
     if !hasVideoClips {
       var outputCursor = CMTime.zero
       var timeline: [TimelineItem] = []
-      for case .black(let durationMs) in prepared {
-        let (item, duration) = Self.blackItem(durationMs: durationMs, at: outputCursor, config: config)
+      var clickPositions: [Int] = []
+      for case .beat(let durationMs, let overlay, let click) in prepared {
+        let (item, duration) = Self.blackItem(durationMs: durationMs, overlay: overlay, at: outputCursor, config: config)
         timeline.append(.black(item))
+        if click {
+          clickPositions.append(Int((outputCursor.seconds * 44_100).rounded()))
+        }
         outputCursor = outputCursor + duration
       }
       return ChunkBuild(
         composition: nil,
         videoComposition: nil,
         timeline: timeline,
-        audioMode: .silence(outputCursor),
+        audioMode: .silence(duration: outputCursor, clicks: silenceClicks(positions: clickPositions)),
         outputDuration: outputCursor,
         tempFileURLs: tempFileURLs,
         retainedAssets: retainedAssets
@@ -340,7 +425,7 @@ final class MontageExporter: @unchecked Sendable {
       throw MontageError.writerFailed("Could not create composition video track")
     }
     let hasRealAudio = prepared.contains {
-      if case .video(_, let audioTrack, _, _) = $0 { return audioTrack != nil }
+      if case .video(_, let audioTrack, _, _, _) = $0 { return audioTrack != nil }
       return false
     }
     var compAudioTrack: AVMutableCompositionTrack?
@@ -355,26 +440,53 @@ final class MontageExporter: @unchecked Sendable {
 
     // Two timelines (§5.3): the video track is dense (clips back to back, beats do
     // not exist in the composition), the audio track lives on the *output* timeline
-    // (real audio + insertEmptyTimeRange for beats and silent clips, as in the spike).
-    // The encode loop remaps video PTS and generates black frames for the beats.
+    // (real audio + insertEmptyTimeRange for beats and silent clips + inserted click
+    // segments, §6.2). The encode loop remaps video PTS and generates black frames
+    // (with their cached overlays) for the beats.
     var videoCursor = CMTime.zero
     var outputCursor = CMTime.zero
     var timeline: [TimelineItem] = []
     var instructions: [AVMutableVideoCompositionInstruction] = []
+    // Click positions for the synthesized-silence audio path (no comp audio track)
+    var clickPositions: [Int] = []
 
-    func appendBlack(durationMs: Double) {
-      let (item, duration) = Self.blackItem(durationMs: durationMs, at: outputCursor, config: config)
+    func appendBeat(durationMs: Double, overlay: CIImage?, click: Bool) {
+      let (item, duration) = Self.blackItem(durationMs: durationMs, overlay: overlay, at: outputCursor, config: config)
       timeline.append(.black(item))
-      compAudioTrack?.insertEmptyTimeRange(item.outputRange)
+      if let compAudioTrack {
+        var clickedDuration = CMTime.zero
+        if click, let clickSource {
+          let clickDuration = CMTimeMinimum(clickSource.duration, duration)
+          do {
+            try compAudioTrack.insertTimeRange(
+              CMTimeRange(start: .zero, duration: clickDuration),
+              of: clickSource.track,
+              at: outputCursor
+            )
+            clickedDuration = clickDuration
+          } catch {
+            warnings.append(
+              "Click sound could not be inserted (\((error as NSError).localizedDescription)) — beat stays silent"
+            )
+          }
+        }
+        if CMTimeCompare(clickedDuration, duration) < 0 {
+          compAudioTrack.insertEmptyTimeRange(
+            CMTimeRange(start: outputCursor + clickedDuration, duration: duration - clickedDuration)
+          )
+        }
+      } else if click {
+        clickPositions.append(Int((outputCursor.seconds * 44_100).rounded()))
+      }
       outputCursor = outputCursor + duration
     }
 
     for item in prepared {
       switch item {
-      case .black(let durationMs):
-        appendBlack(durationMs: durationMs)
+      case .beat(let durationMs, let overlay, let click):
+        appendBeat(durationMs: durationMs, overlay: overlay, click: click)
 
-      case .video(let videoTrack, let audioTrack, let range, let assetId):
+      case .video(let videoTrack, let audioTrack, let range, let assetId, let overlay):
         do {
           let transform = try await MontageCompositionHelpers.aspectFitTransform(
             for: videoTrack,
@@ -404,7 +516,7 @@ final class MontageExporter: @unchecked Sendable {
           instructions.append(instruction)
 
           timeline.append(
-            .video(VideoTimelineItem(compositionRange: compRange, outputStart: outputCursor, overlay: nil))
+            .video(VideoTimelineItem(compositionRange: compRange, outputStart: outputCursor, overlay: overlay))
           )
           videoCursor = videoCursor + range.duration
           outputCursor = outputCursor + range.duration
@@ -415,7 +527,7 @@ final class MontageExporter: @unchecked Sendable {
           warnings.append(
             "Clip \(assetId) could not be composed (\((error as NSError).localizedDescription)) — replaced with a black beat"
           )
-          appendBlack(durationMs: Self.degradedBeatMs)
+          appendBeat(durationMs: Self.degradedBeatMs, overlay: nil, click: false)
         }
       }
     }
@@ -443,21 +555,34 @@ final class MontageExporter: @unchecked Sendable {
       composition: composition,
       videoComposition: videoComposition,
       timeline: timeline,
-      audioMode: hasRealAudio ? .reader : .silence(outputCursor),
+      audioMode: hasRealAudio
+        ? .reader
+        : .silence(duration: outputCursor, clicks: silenceClicks(positions: clickPositions)),
       outputDuration: outputCursor,
       tempFileURLs: tempFileURLs,
       retainedAssets: retainedAssets
     )
   }
 
+  private func silenceClicks(positions: [Int]) -> SilenceClicks? {
+    guard let clickSource, !positions.isEmpty else { return nil }
+    return SilenceClicks(pcm: clickSource.pcm, positions: positions)
+  }
+
   /// Beats are quantized to whole output frames so black-frame PTS land exactly on
   /// the fps grid.
-  private static func blackItem(durationMs: Double, at outputStart: CMTime, config: WriterConfig) -> (BlackTimelineItem, CMTime) {
+  private static func blackItem(
+    durationMs: Double,
+    overlay: CIImage?,
+    at outputStart: CMTime,
+    config: WriterConfig
+  ) -> (BlackTimelineItem, CMTime) {
     let frames = max(1, Int((durationMs / 1000 * Double(config.fps)).rounded()))
     let duration = CMTime(value: CMTimeValue(frames), timescale: CMTimeScale(config.fps))
     let item = BlackTimelineItem(
       outputRange: CMTimeRange(start: outputStart, duration: duration),
-      frameCount: frames
+      frameCount: frames,
+      overlay: overlay
     )
     return (item, duration)
   }
@@ -529,9 +654,9 @@ final class MontageExporter: @unchecked Sendable {
   private static func estimateMs(_ specs: [ExportClipSpec]) -> Double {
     specs.reduce(0) { sum, spec in
       switch spec {
-      case .black(let durationMs):
+      case .missingDay(let durationMs, _), .card(let durationMs, _):
         return sum + durationMs
-      case .video(_, let startMs, let endMs):
+      case .video(_, let startMs, let endMs, _):
         if let startMs, let endMs, endMs > startMs {
           return sum + (endMs - startMs)
         }
