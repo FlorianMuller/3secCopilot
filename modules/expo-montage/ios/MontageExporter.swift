@@ -703,6 +703,17 @@ final class AssembleSession: @unchecked Sendable {
   /// Feeds a whole sequence of chunk outputs into a writer input. Armed exactly once
   /// per input; advances to the next segment when the current one is exhausted and
   /// calls markAsFinished after the last (or on cancellation).
+  ///
+  /// Retiming anchors every segment's first sample at `offset` past the first
+  /// segment's own start instead of trusting the delivered timestamps: passthrough
+  /// track outputs deliver *media*-timeline timestamps, which include the chunk
+  /// file's edit-list shift for the H.264 reorder delay (first video pts is 1–2
+  /// frames > 0). Concatenating with plain container-duration offsets therefore left
+  /// a 1–2 frame hole before every chunk and an equal overlap at its end — the
+  /// writer papered over each boundary with an empty edit (visible stutter) and a
+  /// dropped frame. Anchoring per segment keeps the grid dense across boundaries.
+  /// (The first sample in decode order is the segment's first *displayed* frame too
+  /// — guaranteed for our own uniform chunk encodes, which open on an IDR frame.)
   private func pumpSequence(
     input: AVAssetWriterInput,
     segments: [SegmentSource],
@@ -713,6 +724,8 @@ final class AssembleSession: @unchecked Sendable {
   ) {
     let queue = DispatchQueue(label: queueLabel)
     var segmentIndex = 0
+    var trackAnchor: CMTime?
+    var segmentAdjust: CMTime?
     var done = false
     input.requestMediaDataWhenReady(on: queue) { [self] in
       if done { return }
@@ -730,9 +743,19 @@ final class AssembleSession: @unchecked Sendable {
             guard let sample = segment.output.copyNextSampleBuffer() else {
               // Current chunk exhausted — move on to the next one
               segmentIndex += 1
+              segmentAdjust = nil
               continue
             }
-            if let retimed = Self.retimed(sample, by: segment.offset) {
+            // Zero-length marker buffers emitted at the chunk's edit-list
+            // boundaries carry no media (some with invalid timestamps) — skip them
+            guard CMSampleBufferGetNumSamples(sample) > 0 else { continue }
+            if segmentAdjust == nil {
+              let firstPTS = CMSampleBufferGetPresentationTimeStamp(sample)
+              let anchor = trackAnchor ?? firstPTS
+              trackAnchor = anchor
+              segmentAdjust = segment.offset + anchor - firstPTS
+            }
+            if let retimed = Self.retimed(sample, by: segmentAdjust ?? segment.offset) {
               input.append(retimed)
               if let progressSeconds {
                 progressSeconds(CMSampleBufferGetPresentationTimeStamp(retimed).seconds)

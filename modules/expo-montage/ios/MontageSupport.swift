@@ -72,6 +72,13 @@ struct WriterConfig {
         AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
         AVVideoExpectedSourceFrameRateKey: fps,
         AVVideoMaxKeyFrameIntervalKey: fps * 2,
+        // No B-frames: chunk files are concatenated by the passthrough assemble
+        // pass (§5.2), and per-chunk reorder delays (1–2 frames, varying with
+        // content) make a dense concat impossible — the next chunk's first DTS
+        // lands on/before the previous chunk's last DTS. Delay-free streams keep
+        // pts == dts, so chunks butt together exactly. Compression cost at these
+        // bitrates is negligible.
+        AVVideoAllowFrameReorderingKey: false,
       ],
     ]
   }
