@@ -4,10 +4,12 @@ import * as FileSystem from "expo-file-system";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { DateTime } from "luxon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
-import { ExportPhase } from "../../../modules/expo-montage/src/ExpoMontage.types";
+import { ClipAnalysis, ExportPhase } from "../../../modules/expo-montage/src/ExpoMontage.types";
+import ExpoMontage from "../../../modules/expo-montage/src/ExpoMontageModule";
 import { SelectVideoMetadata } from "../../db/schema";
 import { ExportScreenURI } from "../../navigation";
 import { ExportStackParamList } from "../../navigation/ExportNavigation";
@@ -18,17 +20,21 @@ import { ThemedButton } from "../../components/ThemedButton";
 import { getSelectedVideosMetadataInRange } from "../../services/metadata";
 import {
   buildMontageClips,
+  buildPreviewClips,
   computeMontageDurationMs,
+  computeQualityCombos,
   estimateFileSizeBytes,
   EXPORT_CANCELLED_MESSAGE,
-  EXPORT_FPS,
   getRenderSize,
   groupClipsForPeriod,
   MontageExportHandle,
   PeriodClips,
+  QualityCombo,
   startMontageExport,
+  startMontagePreview,
+  summarizeExportWarnings,
 } from "../../services/montage";
-import preferences from "../../services/preferences";
+import preferences, { ExportOrientation } from "../../services/preferences";
 import { formatBytes, formatDurationMs } from "../../utils/formatDuration";
 import { usePeriod } from "../CameraRoll/hooks/usePeriod";
 import { OptionLine } from "../Options/OptionLine";
@@ -45,12 +51,40 @@ type ExportFlowState =
   | { status: "done"; outputPath: string; durationMs: number; fileSizeBytes: number; warnings: string[] }
   | { status: "error"; message: string };
 
+// Preview flow (§9.4): idle → rendering → ready | error; invalidated back to idle
+// whenever an output-affecting option changes
+type PreviewFlowState =
+  | { status: "idle" }
+  | { status: "rendering"; progress: number }
+  | { status: "ready"; outputPath: string }
+  | { status: "error"; message: string };
+
 // Dev automation hook (simulator testing): EXPO_PUBLIC_AUTO_EXPORT=1 auto-starts the
 // export once the stats are loaded and logs progress lines a headless test can follow.
 function autoExportLog(line: string) {
   if (__DEV__ && process.env.EXPO_PUBLIC_AUTO_EXPORT) {
     console.log(`[autoexport] ${line}`);
   }
+}
+
+// EXPO_PUBLIC_AUTO_PREVIEW=1: auto-triggers the preview render on screen open and
+// logs its progress the same way (incl. a final DONE path=… durationMs=… line).
+function autoPreviewLog(line: string) {
+  if (__DEV__ && process.env.EXPO_PUBLIC_AUTO_PREVIEW) {
+    console.log(`[autopreview] ${line}`);
+  }
+}
+
+function useDevAutoPreview(statsReady: boolean, startPreview: () => void) {
+  const hasStarted = useRef(false);
+
+  useEffect(() => {
+    if (__DEV__ && process.env.EXPO_PUBLIC_AUTO_PREVIEW && statsReady && !hasStarted.current) {
+      hasStarted.current = true;
+      autoPreviewLog("starting preview");
+      startPreview();
+    }
+  }, [statsReady, startPreview]);
 }
 
 // EXPO_PUBLIC_AUTO_CANCEL_MS=<n>: when auto-export is running, exercise the cancel
@@ -122,12 +156,63 @@ export function ExportScreen() {
 
   const untrimmed = useUntrimmedDurations(clips?.untrimmedClips);
 
+  // Render-target quality (§4.1): fresh analyzeClips each screen open, default =
+  // mode combo, session-local override only (deliberately not persisted)
+  const analyses = useClipAnalyses(clips);
+  const qualityInfo = useMemo(() => (analyses === undefined ? undefined : computeQualityCombos(analyses)), [analyses]);
+  const [qualityOverride, setQualityOverride] = useState<QualityCombo>();
+  const quality = qualityOverride ?? qualityInfo?.defaultCombo;
+
+  useEffect(() => {
+    if (analyses !== undefined && qualityInfo !== undefined) {
+      const line = `analyze clips=${analyses.length} combos=${qualityInfo.combos
+        .map((combo) => `${combo.label}x${combo.clipCount}`)
+        .join(" ")} default=${qualityInfo.defaultCombo.label}`;
+      autoExportLog(line);
+      autoPreviewLog(line);
+    }
+  }, [analyses, qualityInfo]);
+
+  // EXPO_PUBLIC_AUTO_QUALITY=<label>: session-local quality override for headless
+  // runs (there is no tap tooling to drive the picker on the simulator)
+  const autoQualityLabel = __DEV__ ? process.env.EXPO_PUBLIC_AUTO_QUALITY : undefined;
+  useEffect(() => {
+    if (autoQualityLabel && qualityInfo !== undefined) {
+      const combo = qualityInfo.combos.find((c) => c.label === autoQualityLabel);
+      autoExportLog(
+        combo !== undefined
+          ? `quality override ${autoQualityLabel}`
+          : `quality override ${autoQualityLabel} NOT PRESENT (combos=${qualityInfo.combos.map((c) => c.label).join(",")})`
+      );
+      if (combo !== undefined) {
+        setQualityOverride(combo);
+      }
+    }
+  }, [autoQualityLabel, qualityInfo]);
+  const autoQualityPending = autoQualityLabel !== undefined && autoQualityLabel !== "" && qualityOverride === undefined;
+
   const [exportState, setExportState] = useState<ExportFlowState>({ status: "idle" });
   const exportHandleRef = useRef<MontageExportHandle | undefined>(undefined);
 
+  const [previewState, setPreviewState] = useState<PreviewFlowState>({ status: "idle" });
+  const previewStateRef = useRef(previewState);
+  previewStateRef.current = previewState;
+  const previewHandleRef = useRef<MontageExportHandle | undefined>(undefined);
+
   // Detach the event listeners if the screen unmounts mid-export (the native task
-  // keeps running; without a UI it is simply not observed anymore)
-  useEffect(() => () => exportHandleRef.current?.removeListeners(), []);
+  // keeps running; without a UI it is simply not observed anymore). A preview render
+  // is different: it only exists for this screen, so it is cancelled outright (§9.4).
+  useEffect(
+    () => () => {
+      exportHandleRef.current?.removeListeners();
+      const previewHandle = previewHandleRef.current;
+      if (previewHandle !== undefined) {
+        previewHandle.removeListeners();
+        previewHandle.cancel().catch((error) => console.warn("preview cancel failed:", error));
+      }
+    },
+    []
+  );
 
   // The writer session dies on backgrounding (§9.5) — keep the screen awake while exporting
   const isExporting = exportState.status === "exporting";
@@ -145,13 +230,16 @@ export function ExportScreen() {
     if (
       period === undefined ||
       clips === undefined ||
+      quality === undefined ||
       exportShowDate === undefined ||
       exportShowHour === undefined ||
       exportShowTitle === undefined ||
       exportMissingDays === undefined ||
       exportMissingDayDurationMs === undefined ||
       exportOrientation === undefined ||
-      exportHandleRef.current !== undefined
+      exportHandleRef.current !== undefined ||
+      // Preview and export share the native one-at-a-time slot
+      previewHandleRef.current !== undefined
     ) {
       return;
     }
@@ -165,7 +253,8 @@ export function ExportScreen() {
         showHour: exportShowHour,
         showTitle: exportShowTitle,
       });
-      exportHandleRef.current = await startMontageExport(period.id, montageClips, exportOrientation, {
+      autoExportLog(`quality=${quality.label}`);
+      exportHandleRef.current = await startMontageExport(period.id, montageClips, exportOrientation, quality, {
         onProgress: (event) => {
           autoExportLog(`phase=${event.phase} progress=${event.progress.toFixed(3)}`);
           setExportState({ status: "exporting", progress: event.progress, phase: event.phase });
@@ -204,6 +293,7 @@ export function ExportScreen() {
   }, [
     period,
     clips,
+    quality,
     exportShowDate,
     exportShowHour,
     exportShowTitle,
@@ -216,6 +306,121 @@ export function ExportScreen() {
     exportHandleRef.current?.cancel().catch((error) => console.warn("cancelExport failed:", error));
   }, []);
 
+  // ---------------------------------------------------------------------------------
+  // Preview (§9.4)
+
+  // Discard whatever the preview flow holds: cancel a running render, drop the
+  // cached file of a ready one, back to idle.
+  const discardPreview = useCallback(() => {
+    const handle = previewHandleRef.current;
+    if (handle !== undefined) {
+      previewHandleRef.current = undefined;
+      handle.removeListeners();
+      handle.cancel().catch((error) => console.warn("preview cancel failed:", error));
+    }
+    const state = previewStateRef.current;
+    if (state.status === "ready") {
+      FileSystem.deleteAsync(state.outputPath, { idempotent: true }).catch(() => {});
+    }
+    if (state.status !== "idle") {
+      setPreviewState({ status: "idle" });
+    }
+  }, []);
+
+  const startPreview = useCallback(async () => {
+    if (
+      period === undefined ||
+      clips === undefined ||
+      quality === undefined ||
+      exportShowDate === undefined ||
+      exportShowHour === undefined ||
+      exportShowTitle === undefined ||
+      exportMissingDays === undefined ||
+      exportMissingDayDurationMs === undefined ||
+      exportOrientation === undefined ||
+      previewHandleRef.current !== undefined ||
+      exportHandleRef.current !== undefined
+    ) {
+      return;
+    }
+    discardPreview();
+    setPreviewState({ status: "rendering", progress: 0 });
+    try {
+      const previewClips = buildPreviewClips(clips, {
+        periodLabel: period.label,
+        showMissingDays: exportMissingDays === "show",
+        missingDayDurationMs: exportMissingDayDurationMs,
+        showDate: exportShowDate,
+        showHour: exportShowHour,
+        showTitle: exportShowTitle,
+      });
+      autoPreviewLog(
+        `clips=${previewClips.length} (videos=${previewClips.filter((c) => c.type === "video").length} beats=${
+          previewClips.filter((c) => c.type === "missingDay").length
+        }) quality=${quality.label}`
+      );
+      previewHandleRef.current = await startMontagePreview(previewClips, exportOrientation, quality, {
+        onProgress: (event) => {
+          autoPreviewLog(`phase=${event.phase} progress=${event.progress.toFixed(3)}`);
+          setPreviewState({ status: "rendering", progress: event.progress });
+        },
+        onComplete: (event) => {
+          previewHandleRef.current = undefined;
+          autoPreviewLog(
+            `DONE path=${event.outputPath} durationMs=${Math.round(event.durationMs)} sizeBytes=${
+              event.fileSizeBytes
+            } peakMB=${Math.round(event.peakMemoryMB)}`
+          );
+          setPreviewState({ status: "ready", outputPath: event.outputPath });
+        },
+        onError: (event) => {
+          previewHandleRef.current = undefined;
+          if (event.message === EXPORT_CANCELLED_MESSAGE) {
+            autoPreviewLog("CANCELLED");
+            setPreviewState({ status: "idle" });
+          } else {
+            autoPreviewLog(`ERROR ${event.message}`);
+            setPreviewState({ status: "error", message: event.message });
+          }
+        },
+      });
+    } catch (error) {
+      previewHandleRef.current = undefined;
+      autoPreviewLog(`ERROR ${String(error)}`);
+      setPreviewState({ status: "error", message: String(error) });
+    }
+  }, [
+    period,
+    clips,
+    quality,
+    exportShowDate,
+    exportShowHour,
+    exportShowTitle,
+    exportMissingDays,
+    exportMissingDayDurationMs,
+    exportOrientation,
+    discardPreview,
+  ]);
+
+  // §9.4: invalidate the cached preview whenever an output-affecting option changes
+  // (overlay toggles, missing days & beat duration, orientation, quality pick)
+  const previewOptionsKey = [
+    exportShowDate,
+    exportShowHour,
+    exportShowTitle,
+    exportMissingDays,
+    exportMissingDayDurationMs,
+    exportOrientation,
+    quality?.label,
+  ].join("|");
+  const previousPreviewOptionsKey = useRef(previewOptionsKey);
+  useEffect(() => {
+    if (previousPreviewOptionsKey.current !== previewOptionsKey) {
+      previousPreviewOptionsKey.current = previewOptionsKey;
+      discardPreview();
+    }
+  }, [previewOptionsKey, discardPreview]);
+
   const optionsLoaded =
     exportShowDate !== undefined &&
     exportShowHour !== undefined &&
@@ -224,11 +429,16 @@ export function ExportScreen() {
     exportMissingDayDurationMs !== undefined &&
     exportOrientation !== undefined;
 
-  useDevAutoExport(
-    period !== undefined && clips !== undefined && untrimmed !== undefined && optionsLoaded,
-    startExport,
-    cancelExport
-  );
+  const statsReady =
+    period !== undefined &&
+    clips !== undefined &&
+    untrimmed !== undefined &&
+    quality !== undefined &&
+    !autoQualityPending &&
+    optionsLoaded;
+
+  useDevAutoExport(statsReady, startExport, cancelExport);
+  useDevAutoPreview(statsReady, startPreview);
 
   if (period === undefined || clips === undefined || !optionsLoaded) {
     return (
@@ -238,7 +448,8 @@ export function ExportScreen() {
     );
   }
 
-  const renderSize = getRenderSize(exportOrientation);
+  // §9.2 loading state: quality-dependent stats show "..." until analyzeClips resolves
+  const renderSize = quality === undefined ? undefined : getRenderSize(exportOrientation, quality);
 
   const montageDurationMs =
     untrimmed === undefined
@@ -248,6 +459,8 @@ export function ExportScreen() {
           missingDayDurationMs: exportMissingDayDurationMs,
         });
 
+  const previewRendering = previewState.status === "rendering";
+
   return (
     <ScrollView style={{ paddingTop: 15 }}>
       <View style={{ gap: 20 }}>
@@ -255,9 +468,10 @@ export function ExportScreen() {
           clips={clips}
           montageDurationMs={montageDurationMs}
           estimatedSizeBytes={
-            montageDurationMs === undefined
+            // §4.2: recomputed live as options change (beats, duration pref, quality pick)
+            montageDurationMs === undefined || renderSize === undefined || quality === undefined
               ? undefined
-              : estimateFileSizeBytes(montageDurationMs, renderSize, EXPORT_FPS)
+              : estimateFileSizeBytes(montageDurationMs, renderSize, quality.fps)
           }
           unavailableCount={untrimmed?.unavailableIds.length ?? 0}
         />
@@ -304,19 +518,40 @@ export function ExportScreen() {
               onValueChange={saveExportOrientation}
             />
           </OptionLine>
+
+          <OptionLine label="Quality">
+            {qualityInfo === undefined || quality === undefined ? (
+              <MyAppText size={14} italic>
+                Analyzing...
+              </MyAppText>
+            ) : (
+              // §4.1: only the combos actually present in this period's clips;
+              // the pick is session-local, never persisted
+              <SegmentedControl
+                size={14}
+                options={qualityInfo.combos.map((combo) => ({ label: combo.label, value: combo.label }))}
+                selectedValue={quality.label}
+                onValueChange={(label) =>
+                  setQualityOverride(qualityInfo.combos.find((combo) => combo.label === label))
+                }
+              />
+            )}
+          </OptionLine>
         </OptionSection>
 
         {exportState.status === "idle" && (
           <View style={{ gap: 10, marginHorizontal: 10 }}>
-            <Pressable onPress={() => Alert.alert("Preview", "The preview render lands in a later phase.")}>
-              <ThemedButton
-                variant="outline"
-                themeColor="primary"
-                text="Preview"
-                Icon={({ theme }) => <Feather name="play" size={20} color={theme.colors.primary} />}
-              />
-            </Pressable>
-            <Pressable onPress={startExport}>
+            {!previewRendering && (
+              <Pressable onPress={startPreview} disabled={quality === undefined}>
+                <ThemedButton
+                  variant="outline"
+                  themeColor="primary"
+                  text={previewState.status === "ready" ? "Preview again" : "Preview"}
+                  Icon={({ theme }) => <Feather name="play" size={20} color={theme.colors.primary} />}
+                />
+              </Pressable>
+            )}
+            <Pressable onPress={startExport} disabled={quality === undefined || previewRendering}>
               <ThemedButton
                 themeColor="primary"
                 text="Create the video"
@@ -324,6 +559,29 @@ export function ExportScreen() {
               />
             </Pressable>
           </View>
+        )}
+
+        {previewState.status === "rendering" && (
+          <PreviewRenderingSection progress={previewState.progress} onCancel={discardPreview} />
+        )}
+
+        {previewState.status === "ready" && quality !== undefined && (
+          <PreviewReadySection
+            outputPath={previewState.outputPath}
+            orientation={exportOrientation}
+            finalQualityLabel={quality.label}
+          />
+        )}
+
+        {previewState.status === "error" && (
+          <OptionSection
+            title="Preview failed"
+            Icon={({ theme: { colors } }) => <Feather name="alert-triangle" size={25} color={colors.text} />}
+          >
+            <MyAppText size={13} italic>
+              {previewState.message}
+            </MyAppText>
+          </OptionSection>
         )}
 
         {exportState.status === "exporting" && (
@@ -503,6 +761,73 @@ function ExportingSection({
   );
 }
 
+// ----------------------------------------------------------------------------------------------------
+// Preview sections (§9.4)
+
+function PreviewRenderingSection({ progress, onCancel }: { progress: number; onCancel: () => void }) {
+  return (
+    <OptionSection
+      title="Rendering preview"
+      Icon={({ theme: { colors } }) => <Feather name="loader" size={25} color={colors.text} />}
+    >
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <MyAppText size={14}>Rendering…</MyAppText>
+          <MyAppText size={14}>{`${Math.round(progress * 100)}%`}</MyAppText>
+        </View>
+        <ProgressBar progress={progress} />
+      </View>
+      <Pressable onPress={onCancel}>
+        <ThemedButton
+          variant="outline"
+          themeColor="primary"
+          text="Cancel"
+          Icon={({ theme }) => <Feather name="x" size={20} color={theme.colors.primary} />}
+        />
+      </Pressable>
+    </OptionSection>
+  );
+}
+
+function PreviewReadySection({
+  outputPath,
+  orientation,
+  finalQualityLabel,
+}: {
+  outputPath: string;
+  orientation: ExportOrientation;
+  finalQualityLabel: string;
+}) {
+  const player = useVideoPlayer(outputPath, (p) => {
+    p.loop = true;
+    p.play();
+  });
+  const isPortrait = orientation === "portrait";
+
+  return (
+    <OptionSection
+      title="Preview"
+      Icon={({ theme: { colors } }) => <Feather name="play" size={25} color={colors.text} />}
+    >
+      <VideoView
+        player={player}
+        style={{
+          alignSelf: "center",
+          width: isPortrait ? "55%" : "100%",
+          aspectRatio: isPortrait ? 9 / 16 : 16 / 9,
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+        contentFit="contain"
+        nativeControls
+      />
+      <MyAppText size={12} italic>
+        {`Low-resolution draft of the first days — the final video renders at ${finalQualityLabel}.`}
+      </MyAppText>
+    </OptionSection>
+  );
+}
+
 function ExportDoneSection({
   outputPath,
   durationMs,
@@ -558,7 +883,7 @@ function ExportDoneSection({
     >
       <MyAppText size={16}>{`${formatDurationMs(durationMs)} — ${formatBytes(fileSizeBytes)}`}</MyAppText>
 
-      {warnings.map((warning) => (
+      {summarizeExportWarnings(warnings).map((warning) => (
         <MyAppText key={warning} italic size={12}>
           {`⚠ ${warning}`}
         </MyAppText>
@@ -609,6 +934,53 @@ function ExportErrorSection({ message, onRetry }: { message: string; onRetry: ()
       </Pressable>
     </OptionSection>
   );
+}
+
+// ----------------------------------------------------------------------------------------------------
+// analyzeClips over the period's selected clips (§4.1): metadata-only native scan
+// backing the quality picker. Runs fresh on every screen open (the hook state dies
+// with the screen); unresolvable assets are simply missing from the result.
+
+function useClipAnalyses(clips: PeriodClips | undefined) {
+  const [analyses, setAnalyses] = useState<ClipAnalysis[]>();
+
+  // Key on the joined ids: `clips` is a new object every render (usePeriod rebuilds
+  // its periods each render — same lesson as useUntrimmedDurations below)
+  const idsKey = useMemo(() => {
+    if (clips === undefined) {
+      return undefined;
+    }
+    return clips.days
+      .map((day) => clips.clipByDay.get(day.toDateString())?.videoId)
+      .filter((id): id is string => id !== undefined)
+      .join("\n");
+  }, [clips]);
+
+  useEffect(() => {
+    if (idsKey === undefined) {
+      return;
+    }
+    let cancelled = false;
+    const assetIds = idsKey.length > 0 ? idsKey.split("\n") : [];
+    ExpoMontage.analyzeClips(assetIds)
+      .then((result) => {
+        if (!cancelled) {
+          setAnalyses(result);
+        }
+      })
+      .catch((error) => {
+        // Fall back to the 1080p30 default instead of blocking the screen forever
+        console.warn("analyzeClips failed:", error);
+        if (!cancelled) {
+          setAnalyses([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [idsKey]);
+
+  return analyses;
 }
 
 // ----------------------------------------------------------------------------------------------------

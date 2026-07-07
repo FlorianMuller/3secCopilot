@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system";
 import { DateTime } from "luxon";
 import {
+  ClipAnalysis,
   ClipOverlay,
   ExportCompleteEvent,
   ExportErrorEvent,
@@ -21,13 +22,11 @@ import { ExportOrientation } from "./preferences";
 // Phase 2: timeline/day grouping and the size/duration math backing the export screen.
 // Phase 3: MontageClip[] build + the exportMontage orchestration.
 // Phase 4: overlay strings (luxon, device locale) + overlay/click settings.
+// Phase 5: quality combos (analyzeClips, §4.1) + the preview render (§9.4).
 
 export const OPENING_CARD_DURATION_MS = 2000; // §6.1 — always on, no toggle
 
 export const AUDIO_BITRATE = 256_000; // AAC stereo, §4.2
-
-// Assumed render frame rate until the analyzeClips-driven quality picker lands (§4.1, phase 5)
-export const EXPORT_FPS = 30;
 
 // The native side reports a cancelled export as onExportError with this message
 export const EXPORT_CANCELLED_MESSAGE = "cancelled";
@@ -45,6 +44,64 @@ export function getVideoBitrate(renderSize: { width: number; height: number }, f
   const row =
     VIDEO_BITRATE_TABLE.find((r) => longEdge <= r.longEdge) ?? VIDEO_BITRATE_TABLE[VIDEO_BITRATE_TABLE.length - 1];
   return fps > 30 ? row.at60Fps : row.upTo30Fps;
+}
+
+// ----------------------------------------------------------------------------------------------------
+// Render-target quality (§4.1) — derived fresh from analyzeClips each time the export
+// screen opens; the user's pick is a session-local override, never persisted.
+
+export interface QualityCombo {
+  /** Picker label and identity, e.g. "1080p30" */
+  label: string;
+  /** Landscape long edge of the resolution tier (1280 | 1920 | 3840) */
+  longEdge: number;
+  /** Render frame rate (30 | 60) */
+  fps: number;
+  /** How many analyzed clips fall in this combo */
+  clipCount: number;
+}
+
+const QUALITY_TIERS = [
+  { longEdge: 1280, shortEdge: 720, name: "720p" },
+  { longEdge: 1920, shortEdge: 1080, name: "1080p" },
+  { longEdge: 3840, shortEdge: 2160, name: "4K" },
+] as const;
+
+// Fallback when nothing resolves (empty period, every asset offloaded/deleted)
+export const DEFAULT_QUALITY: QualityCombo = { label: "1080p30", longEdge: 1920, fps: 30, clipCount: 0 };
+
+function qualityTierFor(longEdge: number) {
+  return QUALITY_TIERS.find((tier) => longEdge <= tier.longEdge) ?? QUALITY_TIERS[QUALITY_TIERS.length - 1];
+}
+
+// Distinct resolution/fps combos present in the analyzed clips (§4.1). Each clip is
+// bucketed by its display long edge into a resolution tier (portrait/landscape twins
+// are the same combo — the render orientation comes from the exportOrientation pref)
+// and into 30/60 fps (24/25 render as 30; 50+ and slow-mo 120/240 as 60). The default
+// is the MODE (most common) combo — deliberately not the max, so a single 4K outlier
+// doesn't drag the whole export's size/time up. Ties resolve to the lighter combo.
+export function computeQualityCombos(analyses: ClipAnalysis[]): {
+  combos: QualityCombo[];
+  defaultCombo: QualityCombo;
+} {
+  const byLabel = new Map<string, QualityCombo>();
+  for (const analysis of analyses) {
+    const tier = qualityTierFor(Math.max(analysis.width, analysis.height));
+    const fps = analysis.fps >= 45 ? 60 : 30;
+    const label = `${tier.name}${fps}`;
+    const combo = byLabel.get(label);
+    if (combo !== undefined) {
+      combo.clipCount += 1;
+    } else {
+      byLabel.set(label, { label, longEdge: tier.longEdge, fps, clipCount: 1 });
+    }
+  }
+  if (byLabel.size === 0) {
+    return { combos: [DEFAULT_QUALITY], defaultCombo: DEFAULT_QUALITY };
+  }
+  const combos = [...byLabel.values()].sort((a, b) => a.longEdge - b.longEdge || a.fps - b.fps);
+  const defaultCombo = combos.reduce((best, combo) => (combo.clipCount > best.clipCount ? combo : best));
+  return { combos, defaultCombo };
 }
 
 // §4.2: (videoBitrate + audioBitrate) × totalDuration
@@ -183,10 +240,31 @@ function buildClipOverlay(
   return Object.keys(overlay).length > 0 ? overlay : undefined;
 }
 
-// Opening card, then one entry per period day ascending: the day's selected clip
-// (raw trim values — the native side clamps defensively against the real asset
-// duration, §8.4) or a missing-day beat (one per day, never grouped, §6.2; date
-// overlay only, §6.2 "Overlays").
+// One filled day's video entry (raw trim values — the native side clamps defensively
+// against the real asset duration, §8.4)
+function buildVideoClip(metadata: SelectVideoMetadata, day: Date, options: BuildMontageClipsOptions): MontageClip {
+  const trim = hasTrim(metadata)
+    ? { startMs: Math.max(0, metadata.trimStartTime!), endMs: metadata.trimEndTime }
+    : { startMs: null, endMs: null }; // no/invalid trim = full clip (§8.4)
+  return {
+    type: "video",
+    assetId: metadata.videoId,
+    ...trim,
+    overlay: buildClipOverlay(metadata, day, options),
+  };
+}
+
+function buildMissingDayClip(day: Date, options: BuildMontageClipsOptions): MontageClip {
+  return {
+    type: "missingDay",
+    durationMs: options.missingDayDurationMs,
+    overlay: options.showDate ? { dateText: formatOverlayDate(day) } : undefined,
+  };
+}
+
+// Opening card, then one entry per period day ascending: the day's selected clip or
+// a missing-day beat (one per day, never grouped, §6.2; date overlay only, §6.2
+// "Overlays").
 export function buildMontageClips(periodClips: PeriodClips, options: BuildMontageClipsOptions): MontageClip[] {
   const clips: MontageClip[] = [
     { type: "card", durationMs: OPENING_CARD_DURATION_MS, overlayLines: [options.periodLabel] },
@@ -196,23 +274,43 @@ export function buildMontageClips(periodClips: PeriodClips, options: BuildMontag
     const metadata = periodClips.clipByDay.get(day.toDateString());
     if (metadata === undefined) {
       if (options.showMissingDays) {
-        clips.push({
-          type: "missingDay",
-          durationMs: options.missingDayDurationMs,
-          overlay: options.showDate ? { dateText: formatOverlayDate(day) } : undefined,
-        });
+        clips.push(buildMissingDayClip(day, options));
       }
       continue;
     }
-    const trim = hasTrim(metadata)
-      ? { startMs: Math.max(0, metadata.trimStartTime!), endMs: metadata.trimEndTime }
-      : { startMs: null, endMs: null }; // no/invalid trim = full clip (§8.4)
-    clips.push({
-      type: "video",
-      assetId: metadata.videoId,
-      ...trim,
-      overlay: buildClipOverlay(metadata, day, options),
-    });
+    clips.push(buildVideoClip(metadata, day, options));
+  }
+
+  return clips;
+}
+
+// Preview clip list (§9.4): the opening card + the first PREVIEW_FILLED_DAYS filled
+// days of the period + the missing-day beats falling *between* those days (a sparse
+// period's leading gap and anything after the last included day are not part of the
+// preview) — always real footage, the whole period when fewer days are filled.
+export const PREVIEW_FILLED_DAYS = 20;
+
+export function buildPreviewClips(periodClips: PeriodClips, options: BuildMontageClipsOptions): MontageClip[] {
+  const clips: MontageClip[] = [
+    { type: "card", durationMs: OPENING_CARD_DURATION_MS, overlayLines: [options.periodLabel] },
+  ];
+
+  let filledCount = 0;
+  let pendingMissing: MontageClip[] = [];
+  for (const day of periodClips.days) {
+    const metadata = periodClips.clipByDay.get(day.toDateString());
+    if (metadata === undefined) {
+      if (options.showMissingDays && filledCount > 0) {
+        pendingMissing.push(buildMissingDayClip(day, options));
+      }
+      continue;
+    }
+    clips.push(...pendingMissing, buildVideoClip(metadata, day, options));
+    pendingMissing = [];
+    filledCount += 1;
+    if (filledCount >= PREVIEW_FILLED_DAYS) {
+      break;
+    }
   }
 
   return clips;
@@ -221,8 +319,27 @@ export function buildMontageClips(periodClips: PeriodClips, options: BuildMontag
 // ----------------------------------------------------------------------------------------------------
 // Export orchestration (§8 step 7 / §9.5)
 
-export function getRenderSize(orientation: ExportOrientation): { width: number; height: number } {
-  return orientation === "portrait" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+// Orientation (§9.3 pref) + chosen resolution tier (§4.1) → renderSize
+export function getRenderSize(orientation: ExportOrientation, quality: QualityCombo): { width: number; height: number } {
+  const tier = qualityTierFor(quality.longEdge);
+  return orientation === "portrait"
+    ? { width: tier.shortEdge, height: tier.longEdge }
+    : { width: tier.longEdge, height: tier.shortEdge };
+}
+
+// Preview encoder shortcuts (§9.4/§11.4): the same pipeline and overlay path as the
+// full export, but rendered on a 640×360 (16:9 — the aspect of every final tier, so
+// aspect-fit framing is identical) canvas at a ~1.5 Mbps draft bitrate, fps capped at
+// 30. Overlay font px come from getOverlaySettings at the preview renderSize, so text
+// proportions match the final render exactly. Audio settings stay as-is.
+const PREVIEW_LONG_EDGE = 640;
+const PREVIEW_SHORT_EDGE = 360;
+const PREVIEW_VIDEO_BITRATE = 1_500_000;
+
+export function getPreviewRenderSize(orientation: ExportOrientation): { width: number; height: number } {
+  return orientation === "portrait"
+    ? { width: PREVIEW_SHORT_EDGE, height: PREVIEW_LONG_EDGE }
+    : { width: PREVIEW_LONG_EDGE, height: PREVIEW_SHORT_EDGE };
 }
 
 // Overlay font sizes in pixels at renderSize (§7), proportional to the render height
@@ -256,13 +373,13 @@ export interface MontageExportHandle {
 }
 
 // Ensures documentDirectory/exports/ exists, derives the output path and settings
-// (§4.2 bitrate table, orientation pref), starts the native export and wires the
-// event subscriptions. Listeners are registered before the native call so no event
-// can be missed; the native module runs a single export at a time.
+// (§4.2 bitrate table, orientation pref, chosen quality combo §4.1), starts the
+// native export and wires the event subscriptions.
 export async function startMontageExport(
   periodId: string,
   clips: MontageClip[],
   orientation: ExportOrientation,
+  quality: QualityCombo,
   listeners: MontageExportListeners
 ): Promise<MontageExportHandle> {
   const exportsDirectory = `${FileSystem.documentDirectory}exports/`;
@@ -272,20 +389,66 @@ export async function startMontageExport(
   }
 
   const outputPath = `${exportsDirectory}${periodId}-${Date.now()}.mp4`;
-  const renderSize = getRenderSize(orientation);
-  const settings: MontageSettings = {
-    renderSize,
-    fps: EXPORT_FPS,
-    videoAverageBitrate: getVideoBitrate(renderSize, EXPORT_FPS),
-    audioBitrate: AUDIO_BITRATE,
-    // §6.2/§7: no dedicated preference (§9.3) — the click is on whenever missing-day
-    // beats are part of the timeline (no beats in the clip list = no clicks anyway)
-    missingDayClick: true,
-    mode: "full",
-    overlay: getOverlaySettings(renderSize),
-    outputPath,
-  };
+  const renderSize = getRenderSize(orientation, quality);
+  return startExportTask(
+    clips,
+    {
+      renderSize,
+      fps: quality.fps,
+      videoAverageBitrate: getVideoBitrate(renderSize, quality.fps),
+      audioBitrate: AUDIO_BITRATE,
+      // §6.2/§7: no dedicated preference (§9.3) — the click is on whenever missing-day
+      // beats are part of the timeline (no beats in the clip list = no clicks anyway)
+      missingDayClick: true,
+      mode: "full",
+      overlay: getOverlaySettings(renderSize),
+      outputPath,
+    },
+    listeners
+  );
+}
 
+// Preview render (§9.4): same pipeline in mode "preview" with the §11.4 shortcuts,
+// output under cacheDirectory — a cache, wiped before each render (unlike real
+// exports, which are never overwritten).
+export async function startMontagePreview(
+  clips: MontageClip[],
+  orientation: ExportOrientation,
+  quality: QualityCombo,
+  listeners: MontageExportListeners
+): Promise<MontageExportHandle> {
+  const previewDirectory = `${FileSystem.cacheDirectory}exports-preview/`;
+  await FileSystem.deleteAsync(previewDirectory, { idempotent: true });
+  await FileSystem.makeDirectoryAsync(previewDirectory, { intermediates: true });
+
+  // Timestamped name so a re-render is never served from a stale player/file cache
+  const outputPath = `${previewDirectory}preview-${Date.now()}.mp4`;
+  const renderSize = getPreviewRenderSize(orientation);
+  return startExportTask(
+    clips,
+    {
+      renderSize,
+      fps: Math.min(quality.fps, 30),
+      videoAverageBitrate: PREVIEW_VIDEO_BITRATE,
+      audioBitrate: AUDIO_BITRATE,
+      missingDayClick: true,
+      mode: "preview",
+      overlay: getOverlaySettings(renderSize),
+      outputPath,
+    },
+    listeners
+  );
+}
+
+// Starts the native task and wires the event subscriptions. Listeners are registered
+// before the native call so no event can be missed; the native module runs a single
+// export at a time (preview and full export share that slot).
+async function startExportTask(
+  clips: MontageClip[],
+  settings: MontageSettings,
+  listeners: MontageExportListeners
+): Promise<MontageExportHandle> {
+  const { outputPath } = settings;
   // taskId is only known once exportMontage resolves; events carry it from the very
   // first emission, so match once known (single export at a time natively).
   let taskId: string | undefined;
@@ -325,6 +488,42 @@ export async function startMontageExport(
     cancel: () => ExpoMontage.cancelExport(taskId!),
     removeListeners,
   };
+}
+
+// Per-asset degradation warnings arrive from the native side as one line per clip —
+// at year scale that can be dozens of near-identical lines. Group the known families
+// into single human sentences for the done screen and keep unknown lines verbatim.
+export function summarizeExportWarnings(warnings: string[]): string[] {
+  const families = [
+    {
+      pattern: /replaced with a black beat/,
+      summarize: (count: number) =>
+        count === 1
+          ? "1 clip couldn't be read and was rendered as a missing day"
+          : `${count} clips couldn't be read and were rendered as missing days`,
+    },
+    {
+      pattern: /has no audio track — inserted silence/,
+      summarize: (count: number) =>
+        count === 1 ? "1 clip has no sound of its own" : `${count} clips have no sound of their own`,
+    },
+    {
+      pattern: /is a Live Photo — used its paired video/,
+      summarize: (count: number) =>
+        count === 1 ? "1 Live Photo — its video part was used" : `${count} Live Photos — their video parts were used`,
+    },
+  ].map((family) => ({ ...family, count: 0 }));
+
+  const others: string[] = [];
+  for (const warning of warnings) {
+    const family = families.find((f) => f.pattern.test(warning));
+    if (family !== undefined) {
+      family.count += 1;
+    } else {
+      others.push(warning);
+    }
+  }
+  return [...families.filter((f) => f.count > 0).map((f) => f.summarize(f.count)), ...others];
 }
 
 // Total montage duration (§9.2) — recomputed live as options change.
