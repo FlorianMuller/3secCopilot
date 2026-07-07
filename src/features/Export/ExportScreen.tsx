@@ -53,7 +53,9 @@ function autoExportLog(line: string) {
   }
 }
 
-function useDevAutoExport(statsReady: boolean, startExport: () => void) {
+// EXPO_PUBLIC_AUTO_CANCEL_MS=<n>: when auto-export is running, exercise the cancel
+// path n ms after the export starts (logs CANCELLED when the cancellation resolves).
+function useDevAutoExport(statsReady: boolean, startExport: () => void, cancelExport: () => void) {
   const hasStarted = useRef(false);
 
   useEffect(() => {
@@ -61,8 +63,16 @@ function useDevAutoExport(statsReady: boolean, startExport: () => void) {
       hasStarted.current = true;
       autoExportLog("starting export");
       startExport();
+      const autoCancelMs = Number(process.env.EXPO_PUBLIC_AUTO_CANCEL_MS);
+      if (autoCancelMs > 0) {
+        autoExportLog(`auto-cancel scheduled in ${autoCancelMs}ms`);
+        setTimeout(() => {
+          autoExportLog("auto-cancelling");
+          cancelExport();
+        }, autoCancelMs);
+      }
     }
-  }, [statsReady, startExport]);
+  }, [statsReady, startExport, cancelExport]);
 }
 
 // Stats + options + export actions for one period (§9.2–9.3).
@@ -172,7 +182,7 @@ export function ExportScreen() {
         onError: (event) => {
           exportHandleRef.current = undefined;
           if (event.message === EXPORT_CANCELLED_MESSAGE) {
-            autoExportLog("cancelled");
+            autoExportLog("CANCELLED");
             setExportState({ status: "idle" });
           } else {
             autoExportLog(`ERROR ${event.message}`);
@@ -199,7 +209,11 @@ export function ExportScreen() {
     exportMissingDayDurationMs !== undefined &&
     exportOrientation !== undefined;
 
-  useDevAutoExport(period !== undefined && clips !== undefined && untrimmed !== undefined && optionsLoaded, startExport);
+  useDevAutoExport(
+    period !== undefined && clips !== undefined && untrimmed !== undefined && optionsLoaded,
+    startExport,
+    cancelExport
+  );
 
   if (period === undefined || clips === undefined || !optionsLoaded) {
     return (
