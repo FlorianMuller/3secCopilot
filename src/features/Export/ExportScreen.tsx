@@ -589,6 +589,12 @@ function ExportErrorSection({ message, onRetry }: { message: string; onRetry: ()
 function useUntrimmedDurations(untrimmedClips: SelectVideoMetadata[] | undefined) {
   const [result, setResult] = useState<{ totalMs: number; unavailableIds: string[] }>();
 
+  // Key the effect on the clip ids, not the array identity: `untrimmedClips` is
+  // recomputed (new array) on every render because usePeriod rebuilds its periods
+  // each render — with the array itself as dependency this effect refetched from
+  // MediaLibrary and setResult in an endless loop ("Maximum update depth exceeded").
+  const untrimmedIdsKey = untrimmedClips?.map((clip) => clip.videoId).join(",");
+
   useEffect(() => {
     if (untrimmedClips === undefined) {
       return;
@@ -614,7 +620,8 @@ function useUntrimmedDurations(untrimmedClips: SelectVideoMetadata[] | undefined
     return () => {
       cancelled = true;
     };
-  }, [untrimmedClips]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [untrimmedIdsKey]);
 
   return result;
 }
