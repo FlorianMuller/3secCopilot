@@ -116,6 +116,80 @@ final class MemoryTracker: @unchecked Sendable {
   }
 }
 
+// MARK: - Clip analysis (§4.1)
+
+/// Metadata-only scan backing the quality picker: resolution & frame rate of each
+/// selected clip, no decode and no iCloud download. Unresolvable assets (offloaded
+/// to iCloud, Live Photos, deleted since selection) are skipped rather than failing
+/// the whole call — the mode/default is computed from what resolves.
+enum ClipAnalyzer {
+  private static let maxConcurrentRequests = 6
+
+  static func analyze(assetIds: [String]) async -> [[String: Any]] {
+    var assetById: [String: PHAsset] = [:]
+    let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: assetIds, options: nil)
+    fetchResult.enumerateObjects { asset, _, _ in
+      assetById[asset.localIdentifier] = asset
+    }
+
+    // Bounded concurrency: year-scale periods are hundreds of PHImageManager
+    // requests — a small window keeps it fast without flooding the photo daemon.
+    var results = [[String: Any]?](repeating: nil, count: assetIds.count)
+    await withTaskGroup(of: (Int, [String: Any]?).self) { group in
+      var iterator = assetIds.enumerated().makeIterator()
+      func addNextTask() {
+        while let (index, assetId) = iterator.next() {
+          // Live Photos would need a paired-video temp-file extraction (§5.6) —
+          // far more than a metadata scan; they are skipped here like deleted assets
+          guard let phAsset = assetById[assetId], phAsset.mediaType == .video else { continue }
+          group.addTask { (index, await analyzeOne(phAsset: phAsset, assetId: assetId)) }
+          return
+        }
+      }
+      for _ in 0..<maxConcurrentRequests {
+        addNextTask()
+      }
+      while let (index, result) = await group.next() {
+        results[index] = result
+        addNextTask()
+      }
+    }
+    return results.compactMap { $0 }
+  }
+
+  private static func analyzeOne(phAsset: PHAsset, assetId: String) async -> [String: Any]? {
+    let requestOptions = PHVideoRequestOptions()
+    // Metadata-only: never trigger an iCloud download just to build the picker.
+    // Offloaded assets come back nil and are skipped.
+    requestOptions.isNetworkAccessAllowed = false
+    requestOptions.version = .current
+
+    let avAsset: AVAsset? = await withCheckedContinuation { continuation in
+      PHImageManager.default().requestAVAsset(forVideo: phAsset, options: requestOptions) { asset, _, _ in
+        continuation.resume(returning: asset)
+      }
+    }
+    guard
+      let avAsset,
+      let track = try? await avAsset.loadTracks(withMediaType: .video).first,
+      let (naturalSize, preferredTransform, fps) = try? await track.load(
+        .naturalSize, .preferredTransform, .nominalFrameRate
+      )
+    else {
+      return nil
+    }
+    // Display size with the rotation metadata applied — a portrait iPhone clip
+    // reports e.g. 1920×1080 naturalSize but displays as 1080×1920
+    let displayRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+    return [
+      "assetId": assetId,
+      "width": abs(displayRect.width).rounded(),
+      "height": abs(displayRect.height).rounded(),
+      "fps": Double(fps),
+    ]
+  }
+}
+
 // MARK: - Asset resolution
 
 struct ResolvedAsset {

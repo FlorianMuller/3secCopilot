@@ -35,6 +35,21 @@ export type SpikeResult = {
 // exportMontage API (doc/export-spec.md §7)
 
 /**
+ * One clip's metadata from analyzeClips (§4.1) — resolution & frame rate, used to
+ * compute the quality picker's combos and the default (mode) render target.
+ */
+export type ClipAnalysis = {
+  /** PHAsset localIdentifier (= videoId in videos_metadata) */
+  assetId: string;
+  /** Display width in pixels (rotation metadata applied) */
+  width: number;
+  /** Display height in pixels (rotation metadata applied) */
+  height: number;
+  /** Nominal frame rate of the video track */
+  fps: number;
+};
+
+/**
  * Structured overlay text for a clip or missing-day beat (§7 "Overlay format"),
  * pre-formatted in JS with luxon in the device locale. Parts are split (instead of
  * one pre-joined line) so the native renderer can de-emphasize the hour in a
@@ -89,7 +104,11 @@ export type MontageSettings = {
   audioBitrate: number;
   /** Play the bundled click on missingDay beats (§6.2); the card never clicks */
   missingDayClick: boolean;
-  /** "preview" = fast/low-res internal draft — accepted; currently behaves like "full" */
+  /**
+   * "preview" = fast/low-res draft (§9.4). The shortcuts themselves (small
+   * renderSize, capped fps, draft bitrate, proportional overlay px) are chosen in
+   * JS and arrive through the other settings — the native pipeline is identical.
+   */
   mode: "preview" | "full";
   /** Overlay font sizes in *pixels at renderSize* (§7); missing/zero values fall
    * back to proportional native defaults */

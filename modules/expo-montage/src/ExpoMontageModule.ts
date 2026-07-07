@@ -1,6 +1,7 @@
 import { NativeModule, requireNativeModule } from "expo";
 
 import {
+  ClipAnalysis,
   ExpoMontageModuleEvents,
   MontageClip,
   MontageSettings,
@@ -11,6 +12,12 @@ import {
 
 declare class ExpoMontageModule extends NativeModule<ExpoMontageModuleEvents> {
   spikeConcat(clips: SpikeClip[], options: SpikeOptions): Promise<SpikeResult>;
+  /**
+   * Metadata-only scan (§4.1): resolution & frame rate per asset, no decode, no
+   * iCloud download. Unresolvable assets (offloaded, Live Photos, deleted) are
+   * missing from the result instead of rejecting the whole call.
+   */
+  analyzeClips(assetIds: string[]): Promise<ClipAnalysis[]>;
   /**
    * Starts an export and returns immediately; progress/completion/errors are
    * reported through the onExport* events (doc/export-spec.md §7).

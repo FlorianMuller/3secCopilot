@@ -87,6 +87,13 @@ public class ExpoMontageModule: Module {
       return try await composer.run(clips: clips, options: options)
     }
 
+    // Metadata-only scan backing the quality picker (§4.1): resolution & frame rate
+    // per asset, no decode, no iCloud download. Unresolvable assets (offloaded,
+    // Live Photos, deleted) are skipped instead of failing the whole call.
+    AsyncFunction("analyzeClips") { (assetIds: [String]) async -> [[String: Any]] in
+      await ClipAnalyzer.analyze(assetIds: assetIds)
+    }
+
     // Returns { taskId } immediately; the export proceeds asynchronously and reports
     // through the onExportProgress/onExportComplete/onExportError events.
     AsyncFunction("exportMontage") { (clips: [MontageClipRecord], settings: MontageSettingsRecord) throws -> [String: Any] in
