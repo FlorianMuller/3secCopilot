@@ -60,4 +60,27 @@ audio paths, duration/pts/peakMB regressions clean. Device items:
       bundle loading only proven on the sim dev build; a main-bundle fallback exists).
 - [ ] French device: dates render in French (device locale), hour as "12:39".
 
-## Phase 5 — Preview & polish (pending)
+## Phase 5 — Preview & quality picker (✅ sim-verified 2026-07-07)
+
+Sim-proven: analyzeClips ground-truth-correct, quality picker (3 combos) + live size
+estimate, preview exact duration/renderSize with matching overlay proportions, 720p60
+full-export regression clean, preview invalidation on option change. Device items:
+
+- [ ] Inline preview player: scroll to it after "Preview" finishes, plays with sound,
+      looks right (sim check was log-level only — player sits below the fold).
+- [ ] Tap an option while a preview is ready → preview invalidates (sim verified the
+      code path + a cross-session variant, not a literal in-session tap).
+- [ ] analyzeClips at year scale (365 assets): "Analyzing…" resolves in acceptable
+      seconds on a real library, incl. iCloud-optimized storage (it never downloads).
+- [ ] Quality picker on real footage: combos present match your library (e.g. 4K60),
+      default is the sensible mode, picking a lower tier visibly shrinks estimate.
+- [ ] Preview render speed on device + it never blocks a later full export (shared
+      one-at-a-time slot; a ready preview looping during an export = possible media
+      contention to watch for).
+
+## Deferred post-v1 (recorded, not device items)
+
+- Audio normalization (§11.3) — deferred: needs per-clip PCM measurement + AVAudioMix
+  fencing around click segments; the beats-only silence path bypasses the mix.
+- HDR (HLG/HEVC) output option (§4.2); tone-mapping contrast compare (§11.6).
+- Quality picker row may crowd with 4+ combos (cosmetic).
