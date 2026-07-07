@@ -1,9 +1,13 @@
 import Feather from "@expo/vector-icons/Feather";
 import { RouteProp, useRoute, useTheme } from "@react-navigation/native";
+import * as FileSystem from "expo-file-system";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import * as MediaLibrary from "expo-media-library";
+import * as Sharing from "expo-sharing";
 import { DateTime } from "luxon";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
+import { ExportPhase } from "../../../modules/expo-montage/src/ExpoMontage.types";
 import { SelectVideoMetadata } from "../../db/schema";
 import { ExportScreenURI } from "../../navigation";
 import { ExportStackParamList } from "../../navigation/ExportNavigation";
@@ -13,10 +17,16 @@ import { MyAppText } from "../../components/text/MyAppText";
 import { ThemedButton } from "../../components/ThemedButton";
 import { getSelectedVideosMetadataInRange } from "../../services/metadata";
 import {
+  buildMontageClips,
   computeMontageDurationMs,
   estimateFileSizeBytes,
+  EXPORT_CANCELLED_MESSAGE,
+  EXPORT_FPS,
+  getRenderSize,
   groupClipsForPeriod,
+  MontageExportHandle,
   PeriodClips,
+  startMontageExport,
 } from "../../services/montage";
 import preferences from "../../services/preferences";
 import { formatBytes, formatDurationMs } from "../../utils/formatDuration";
@@ -26,9 +36,34 @@ import { OptionSection } from "../Options/OptionSection";
 
 const DAY_MS = 86_400_000;
 
-// Phase 2 note: the render target is assumed 1080p30 for the size estimate until the
-// analyzeClips-driven quality picker lands (§4.1, phasing §10.5).
-const ASSUMED_FPS = 30;
+const KEEP_AWAKE_TAG = "montage-export";
+
+// Export flow state machine (§9.5): idle → exporting → done | error
+type ExportFlowState =
+  | { status: "idle" }
+  | { status: "exporting"; progress: number; phase: ExportPhase }
+  | { status: "done"; outputPath: string; durationMs: number; fileSizeBytes: number; warnings: string[] }
+  | { status: "error"; message: string };
+
+// Dev automation hook (simulator testing): EXPO_PUBLIC_AUTO_EXPORT=1 auto-starts the
+// export once the stats are loaded and logs progress lines a headless test can follow.
+function autoExportLog(line: string) {
+  if (__DEV__ && process.env.EXPO_PUBLIC_AUTO_EXPORT) {
+    console.log(`[autoexport] ${line}`);
+  }
+}
+
+function useDevAutoExport(statsReady: boolean, startExport: () => void) {
+  const hasStarted = useRef(false);
+
+  useEffect(() => {
+    if (__DEV__ && process.env.EXPO_PUBLIC_AUTO_EXPORT && statsReady && !hasStarted.current) {
+      hasStarted.current = true;
+      autoExportLog("starting export");
+      startExport();
+    }
+  }, [statsReady, startExport]);
+}
 
 // Stats + options + export actions for one period (§9.2–9.3).
 export function ExportScreen() {
@@ -77,6 +112,85 @@ export function ExportScreen() {
 
   const untrimmed = useUntrimmedDurations(clips?.untrimmedClips);
 
+  const [exportState, setExportState] = useState<ExportFlowState>({ status: "idle" });
+  const exportHandleRef = useRef<MontageExportHandle | undefined>(undefined);
+
+  // Detach the event listeners if the screen unmounts mid-export (the native task
+  // keeps running; without a UI it is simply not observed anymore)
+  useEffect(() => () => exportHandleRef.current?.removeListeners(), []);
+
+  // The writer session dies on backgrounding (§9.5) — keep the screen awake while exporting
+  const isExporting = exportState.status === "exporting";
+  useEffect(() => {
+    if (!isExporting) {
+      return;
+    }
+    activateKeepAwakeAsync(KEEP_AWAKE_TAG);
+    return () => {
+      deactivateKeepAwake(KEEP_AWAKE_TAG);
+    };
+  }, [isExporting]);
+
+  const startExport = useCallback(async () => {
+    if (
+      period === undefined ||
+      clips === undefined ||
+      exportMissingDays === undefined ||
+      exportMissingDayDurationMs === undefined ||
+      exportOrientation === undefined ||
+      exportHandleRef.current !== undefined
+    ) {
+      return;
+    }
+    setExportState({ status: "exporting", progress: 0, phase: "download" });
+    try {
+      const montageClips = buildMontageClips(clips, {
+        periodLabel: period.label,
+        showMissingDays: exportMissingDays === "show",
+        missingDayDurationMs: exportMissingDayDurationMs,
+      });
+      exportHandleRef.current = await startMontageExport(period.id, montageClips, exportOrientation, {
+        onProgress: (event) => {
+          autoExportLog(`phase=${event.phase} progress=${event.progress.toFixed(3)}`);
+          setExportState({ status: "exporting", progress: event.progress, phase: event.phase });
+        },
+        onComplete: (event) => {
+          exportHandleRef.current = undefined;
+          autoExportLog(
+            `DONE path=${event.outputPath} durationMs=${Math.round(event.durationMs)} sizeBytes=${
+              event.fileSizeBytes
+            } peakMB=${Math.round(event.peakMemoryMB)}`
+          );
+          setExportState({
+            status: "done",
+            outputPath: event.outputPath,
+            durationMs: event.durationMs,
+            fileSizeBytes: event.fileSizeBytes,
+            warnings: event.warnings,
+          });
+        },
+        onError: (event) => {
+          exportHandleRef.current = undefined;
+          if (event.message === EXPORT_CANCELLED_MESSAGE) {
+            autoExportLog("cancelled");
+            setExportState({ status: "idle" });
+          } else {
+            autoExportLog(`ERROR ${event.message}`);
+            setExportState({ status: "error", message: event.message });
+          }
+        },
+      });
+    } catch (error) {
+      exportHandleRef.current = undefined;
+      autoExportLog(`ERROR ${String(error)}`);
+      setExportState({ status: "error", message: String(error) });
+    }
+  }, [period, clips, exportMissingDays, exportMissingDayDurationMs, exportOrientation]);
+
+  const cancelExport = useCallback(() => {
+    exportHandleRef.current?.cancel().catch((error) => console.warn("cancelExport failed:", error));
+  }, []);
+
   const optionsLoaded =
     exportShowDate !== undefined &&
     exportShowHour !== undefined &&
@@ -84,6 +198,8 @@ export function ExportScreen() {
     exportMissingDays !== undefined &&
     exportMissingDayDurationMs !== undefined &&
     exportOrientation !== undefined;
+
+  useDevAutoExport(period !== undefined && clips !== undefined && untrimmed !== undefined && optionsLoaded, startExport);
 
   if (period === undefined || clips === undefined || !optionsLoaded) {
     return (
@@ -93,7 +209,7 @@ export function ExportScreen() {
     );
   }
 
-  const renderSize = exportOrientation === "portrait" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+  const renderSize = getRenderSize(exportOrientation);
 
   const montageDurationMs =
     untrimmed === undefined
@@ -112,7 +228,7 @@ export function ExportScreen() {
           estimatedSizeBytes={
             montageDurationMs === undefined
               ? undefined
-              : estimateFileSizeBytes(montageDurationMs, renderSize, ASSUMED_FPS)
+              : estimateFileSizeBytes(montageDurationMs, renderSize, EXPORT_FPS)
           }
           unavailableCount={untrimmed?.unavailableIds.length ?? 0}
         />
@@ -161,23 +277,41 @@ export function ExportScreen() {
           </OptionLine>
         </OptionSection>
 
-        <View style={{ gap: 10, marginHorizontal: 10 }}>
-          <Pressable onPress={() => Alert.alert("Preview", "The preview render lands with the export engine.")}>
-            <ThemedButton
-              variant="outline"
-              themeColor="primary"
-              text="Preview"
-              Icon={({ theme }) => <Feather name="play" size={20} color={theme.colors.primary} />}
-            />
-          </Pressable>
-          <Pressable onPress={() => Alert.alert("Create the video", "The export engine is coming in the next phase.")}>
-            <ThemedButton
-              themeColor="primary"
-              text="Create the video"
-              Icon={({ theme }) => <Feather name="film" size={20} color={theme.colors.textOnPrimary} />}
-            />
-          </Pressable>
-        </View>
+        {exportState.status === "idle" && (
+          <View style={{ gap: 10, marginHorizontal: 10 }}>
+            <Pressable onPress={() => Alert.alert("Preview", "The preview render lands in a later phase.")}>
+              <ThemedButton
+                variant="outline"
+                themeColor="primary"
+                text="Preview"
+                Icon={({ theme }) => <Feather name="play" size={20} color={theme.colors.primary} />}
+              />
+            </Pressable>
+            <Pressable onPress={startExport}>
+              <ThemedButton
+                themeColor="primary"
+                text="Create the video"
+                Icon={({ theme }) => <Feather name="film" size={20} color={theme.colors.textOnPrimary} />}
+              />
+            </Pressable>
+          </View>
+        )}
+
+        {exportState.status === "exporting" && (
+          <ExportingSection progress={exportState.progress} phase={exportState.phase} onCancel={cancelExport} />
+        )}
+
+        {exportState.status === "done" && (
+          <ExportDoneSection
+            outputPath={exportState.outputPath}
+            durationMs={exportState.durationMs}
+            fileSizeBytes={exportState.fileSizeBytes}
+            warnings={exportState.warnings}
+            onDeleted={() => setExportState({ status: "idle" })}
+          />
+        )}
+
+        {exportState.status === "error" && <ExportErrorSection message={exportState.message} onRetry={startExport} />}
 
         <SafeTabBarZone />
       </View>
@@ -277,6 +411,175 @@ function missingDayDurationOptions(currentValue: number) {
   const presets = [250, 500, 1000];
   const values = presets.includes(currentValue) ? presets : [...presets, currentValue].sort((a, b) => a - b);
   return values.map((v) => ({ label: `${(v / 1000).toLocaleString()} s`, value: v.toString() }));
+}
+
+// ----------------------------------------------------------------------------------------------------
+// Export flow sections (§9.5)
+
+const PHASE_LABELS: Record<ExportPhase, string> = {
+  download: "Downloading…",
+  chunk: "Rendering…",
+  assemble: "Finalizing…",
+};
+
+function ProgressBar({ progress }: { progress: number }) {
+  const theme = useTheme();
+  return (
+    <View style={{ height: 8, borderRadius: 4, backgroundColor: theme.colors.border, overflow: "hidden" }}>
+      <View
+        style={{
+          width: `${Math.min(Math.max(progress, 0), 1) * 100}%`,
+          height: "100%",
+          borderRadius: 4,
+          backgroundColor: theme.colors.primary,
+        }}
+      />
+    </View>
+  );
+}
+
+function ExportingSection({
+  progress,
+  phase,
+  onCancel,
+}: {
+  progress: number;
+  phase: ExportPhase;
+  onCancel: () => void;
+}) {
+  return (
+    <OptionSection
+      title="Creating the video"
+      Icon={({ theme: { colors } }) => <Feather name="loader" size={25} color={colors.text} />}
+    >
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <MyAppText size={14}>{PHASE_LABELS[phase]}</MyAppText>
+          <MyAppText size={14}>{`${Math.round(progress * 100)}%`}</MyAppText>
+        </View>
+        <ProgressBar progress={progress} />
+        <MyAppText size={12} italic>
+          Keep the app open — the export stops if you leave.
+        </MyAppText>
+      </View>
+      <Pressable onPress={onCancel}>
+        <ThemedButton
+          variant="outline"
+          themeColor="primary"
+          text="Cancel"
+          Icon={({ theme }) => <Feather name="x" size={20} color={theme.colors.primary} />}
+        />
+      </Pressable>
+    </OptionSection>
+  );
+}
+
+function ExportDoneSection({
+  outputPath,
+  durationMs,
+  fileSizeBytes,
+  warnings,
+  onDeleted,
+}: {
+  outputPath: string;
+  durationMs: number;
+  fileSizeBytes: number;
+  warnings: string[];
+  onDeleted: () => void;
+}) {
+  async function saveToPhotos() {
+    try {
+      await MediaLibrary.saveToLibraryAsync(outputPath);
+      Alert.alert("Saved to Photos", "The montage was added to your Photos library.");
+    } catch (error) {
+      Alert.alert("Save failed", String(error));
+    }
+  }
+
+  async function share() {
+    try {
+      await Sharing.shareAsync(outputPath, { mimeType: "video/mp4" });
+    } catch (error) {
+      Alert.alert("Share failed", String(error));
+    }
+  }
+
+  function confirmDelete() {
+    Alert.alert("Delete this export?", "The video file will be removed.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await FileSystem.deleteAsync(outputPath, { idempotent: true });
+            onDeleted();
+          } catch (error) {
+            Alert.alert("Delete failed", String(error));
+          }
+        },
+      },
+    ]);
+  }
+
+  return (
+    <OptionSection
+      title="Montage ready"
+      Icon={({ theme: { colors } }) => <Feather name="check-circle" size={25} color={colors.text} />}
+    >
+      <MyAppText size={16}>{`${formatDurationMs(durationMs)} — ${formatBytes(fileSizeBytes)}`}</MyAppText>
+
+      {warnings.map((warning) => (
+        <MyAppText key={warning} italic size={12}>
+          {`⚠ ${warning}`}
+        </MyAppText>
+      ))}
+
+      <Pressable onPress={saveToPhotos}>
+        <ThemedButton
+          themeColor="primary"
+          text="Save to Photos"
+          Icon={({ theme }) => <Feather name="download" size={20} color={theme.colors.textOnPrimary} />}
+        />
+      </Pressable>
+      <Pressable onPress={share}>
+        <ThemedButton
+          variant="outline"
+          themeColor="primary"
+          text="Share"
+          Icon={({ theme }) => <Feather name="share" size={20} color={theme.colors.primary} />}
+        />
+      </Pressable>
+      <Pressable onPress={confirmDelete}>
+        <ThemedButton
+          variant="outline"
+          themeColor="primary"
+          text="Delete"
+          Icon={({ theme }) => <Feather name="trash-2" size={20} color={theme.colors.primary} />}
+        />
+      </Pressable>
+    </OptionSection>
+  );
+}
+
+function ExportErrorSection({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <OptionSection
+      title="Export failed"
+      Icon={({ theme: { colors } }) => <Feather name="alert-triangle" size={25} color={colors.text} />}
+    >
+      <MyAppText size={13} italic>
+        {message}
+      </MyAppText>
+      <Pressable onPress={onRetry}>
+        <ThemedButton
+          themeColor="primary"
+          text="Retry"
+          Icon={({ theme }) => <Feather name="refresh-cw" size={20} color={theme.colors.textOnPrimary} />}
+        />
+      </Pressable>
+    </OptionSection>
+  );
 }
 
 // ----------------------------------------------------------------------------------------------------

@@ -1,16 +1,32 @@
+import * as FileSystem from "expo-file-system";
+import {
+  ExportCompleteEvent,
+  ExportErrorEvent,
+  ExportProgressEvent,
+  MontageClip,
+  MontageSettings,
+} from "../../modules/expo-montage/src/ExpoMontage.types";
+import ExpoMontage from "../../modules/expo-montage/src/ExpoMontageModule";
 import { SelectVideoMetadata } from "../db/schema";
 import { Period } from "../features/CameraRoll/hooks/usePeriod";
 import { DayShiftTime } from "../features/Options/sections/DayShiftSection";
 import { getDaysBetween } from "../utils/getDaysBetween";
 import { getEffectiveDate } from "./dayShift";
+import { ExportOrientation } from "./preferences";
 
 // JS side of the export pipeline (doc/export-spec.md §8).
-// Phase 2 scope: timeline/day grouping and the size/duration math backing the export screen.
-// Phase 3 adds the MontageClip[] build + exportMontage call on top of these.
+// Phase 2: timeline/day grouping and the size/duration math backing the export screen.
+// Phase 3: MontageClip[] build + the exportMontage orchestration (no overlay strings yet).
 
 export const OPENING_CARD_DURATION_MS = 2000; // §6.1 — always on, no toggle
 
 export const AUDIO_BITRATE = 256_000; // AAC stereo, §4.2
+
+// Assumed render frame rate until the analyzeClips-driven quality picker lands (§4.1, phase 5)
+export const EXPORT_FPS = 30;
+
+// The native side reports a cancelled export as onExportError with this message
+export const EXPORT_CANCELLED_MESSAGE = "cancelled";
 
 // Premiere-class bitrate table (§4.2). Owned by JS so the size estimate and the
 // native encoder settings always agree. Portrait uses its landscape twin's value.
@@ -115,6 +131,132 @@ export function groupClipsForPeriod(
     trimmedDurationMs,
     untrimmedClips,
     firstClipId,
+  };
+}
+
+// ----------------------------------------------------------------------------------------------------
+// MontageClip[] build (§8 step 5, phase-3 subset: no overlay strings yet)
+
+export interface BuildMontageClipsOptions {
+  // Period label for the opening title card, e.g. "2025"
+  periodLabel: string;
+  showMissingDays: boolean;
+  missingDayDurationMs: number;
+}
+
+// Opening card, then one entry per period day ascending: the day's selected clip
+// (raw trim values — the native side clamps defensively against the real asset
+// duration, §8.4) or a missing-day beat (one per day, never grouped, §6.2).
+export function buildMontageClips(periodClips: PeriodClips, options: BuildMontageClipsOptions): MontageClip[] {
+  const clips: MontageClip[] = [
+    { type: "card", durationMs: OPENING_CARD_DURATION_MS, overlayLines: [options.periodLabel] },
+  ];
+
+  for (const day of periodClips.days) {
+    const metadata = periodClips.clipByDay.get(day.toDateString());
+    if (metadata === undefined) {
+      if (options.showMissingDays) {
+        clips.push({ type: "missingDay", durationMs: options.missingDayDurationMs });
+      }
+      continue;
+    }
+    const trim = hasTrim(metadata)
+      ? { startMs: Math.max(0, metadata.trimStartTime!), endMs: metadata.trimEndTime }
+      : { startMs: null, endMs: null }; // no/invalid trim = full clip (§8.4)
+    clips.push({ type: "video", assetId: metadata.videoId, ...trim });
+  }
+
+  return clips;
+}
+
+// ----------------------------------------------------------------------------------------------------
+// Export orchestration (§8 step 7 / §9.5)
+
+export function getRenderSize(orientation: ExportOrientation): { width: number; height: number } {
+  return orientation === "portrait" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+}
+
+export interface MontageExportListeners {
+  onProgress: (event: ExportProgressEvent) => void;
+  // Terminal events — the handle's subscriptions are removed before these fire
+  onComplete: (event: ExportCompleteEvent) => void;
+  onError: (event: ExportErrorEvent) => void;
+}
+
+export interface MontageExportHandle {
+  taskId: string;
+  outputPath: string;
+  cancel: () => Promise<void>;
+  // Detach the listeners without stopping the export (e.g. screen unmount)
+  removeListeners: () => void;
+}
+
+// Ensures documentDirectory/exports/ exists, derives the output path and settings
+// (§4.2 bitrate table, orientation pref), starts the native export and wires the
+// event subscriptions. Listeners are registered before the native call so no event
+// can be missed; the native module runs a single export at a time.
+export async function startMontageExport(
+  periodId: string,
+  clips: MontageClip[],
+  orientation: ExportOrientation,
+  listeners: MontageExportListeners
+): Promise<MontageExportHandle> {
+  const exportsDirectory = `${FileSystem.documentDirectory}exports/`;
+  const directoryInfo = await FileSystem.getInfoAsync(exportsDirectory);
+  if (!directoryInfo.exists) {
+    await FileSystem.makeDirectoryAsync(exportsDirectory, { intermediates: true });
+  }
+
+  const outputPath = `${exportsDirectory}${periodId}-${Date.now()}.mp4`;
+  const renderSize = getRenderSize(orientation);
+  const settings: MontageSettings = {
+    renderSize,
+    fps: EXPORT_FPS,
+    videoAverageBitrate: getVideoBitrate(renderSize, EXPORT_FPS),
+    audioBitrate: AUDIO_BITRATE,
+    missingDayClick: false, // click sound lands in phase 4
+    mode: "full",
+    outputPath,
+  };
+
+  // taskId is only known once exportMontage resolves; events carry it from the very
+  // first emission, so match once known (single export at a time natively).
+  let taskId: string | undefined;
+  const isCurrentTask = (event: { taskId: string }) => taskId === undefined || event.taskId === taskId;
+
+  const subscriptions = [
+    ExpoMontage.addListener("onExportProgress", (event) => {
+      if (isCurrentTask(event)) {
+        listeners.onProgress(event);
+      }
+    }),
+    ExpoMontage.addListener("onExportComplete", (event) => {
+      if (isCurrentTask(event)) {
+        removeListeners();
+        listeners.onComplete(event);
+      }
+    }),
+    ExpoMontage.addListener("onExportError", (event) => {
+      if (isCurrentTask(event)) {
+        removeListeners();
+        listeners.onError(event);
+      }
+    }),
+  ];
+  const removeListeners = () => subscriptions.forEach((subscription) => subscription.remove());
+
+  try {
+    ({ taskId } = await ExpoMontage.exportMontage(clips, settings));
+  } catch (error) {
+    removeListeners();
+    throw error;
+  }
+
+  return {
+    taskId,
+    outputPath,
+    cancel: () => ExpoMontage.cancelExport(taskId!),
+    removeListeners,
   };
 }
 
