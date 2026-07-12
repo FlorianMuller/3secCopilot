@@ -240,5 +240,9 @@ const preferences = {
   ...createPreferencesFunctions("exportMissingDays", enumConverter<ExportMissingDaysMode>(exportMissingDaysModes), "show"),
   ...createPreferencesFunctions("exportMissingDayDurationMs", numberConverter, 500),
   ...createPreferencesFunctions("exportOrientation", enumConverter<ExportOrientation>(exportOrientations), "landscape"),
+  // Dev A/V-sync debugging (doc/export-device-checklist.md L91): when on, the Export
+  // screen shows a debug section (date-window limiter) and writes a `.debug.jsonl`
+  // sidecar next to each export. Off by default; only shown in dev builds.
+  ...createPreferencesFunctions("exportDebug", booleanConverter, false),
 };
 export default preferences;

@@ -68,6 +68,10 @@ final class MontageExporter: @unchecked Sendable {
   private let overlayStyle: OverlayStyle
   private let missingDayClick: Bool
   private let outputURL: URL
+  /// When true, per-source / per-chunk / assembled A/V measurements are collected and
+  /// returned in the complete event so JS can write the `.debug.jsonl` sidecar
+  /// (doc/export-device-checklist.md L91 A/V-drift investigation). Off in release use.
+  private let collectDiagnostics: Bool
   private let sendProgress: (String, Double) -> Void
   private let sendComplete: ([String: Any]) -> Void
   private let sendError: (String, String?) -> Void
@@ -75,6 +79,11 @@ final class MontageExporter: @unchecked Sendable {
   private let resolver = AssetResolver()
   private let memory = MemoryTracker()
   private var warnings: [String] = []
+
+  // Diagnostics accumulators (only populated when collectDiagnostics is true). Touched
+  // solely by the single sequential export task, so plain vars are safe.
+  private var diagSources: [[String: Any]] = []
+  private var diagChunks: [[String: Any]] = []
 
   /// Bundled click sound (§6.2), loaded once per export when missingDayClick is on.
   /// Two forms for the two audio paths: an AVAsset track for composition insertion
@@ -103,6 +112,7 @@ final class MontageExporter: @unchecked Sendable {
     overlayStyle: OverlayStyle,
     missingDayClick: Bool,
     outputURL: URL,
+    collectDiagnostics: Bool = false,
     sendProgress: @escaping (String, Double) -> Void,
     sendComplete: @escaping ([String: Any]) -> Void,
     sendError: @escaping (String, String?) -> Void
@@ -113,6 +123,7 @@ final class MontageExporter: @unchecked Sendable {
     self.overlayStyle = overlayStyle
     self.missingDayClick = missingDayClick
     self.outputURL = outputURL
+    self.collectDiagnostics = collectDiagnostics
     self.sendProgress = sendProgress
     self.sendComplete = sendComplete
     self.sendError = sendError
@@ -188,6 +199,8 @@ final class MontageExporter: @unchecked Sendable {
     var chunkURLs: [URL] = []
     var completedMs = 0.0
     var totalOutputSeconds = 0.0
+    // Running assemble offset (Σ container durations of prior chunks) for diagnostics
+    var assembleOffsetSeconds = 0.0
 
     for (index, chunkSpecs) in chunks.enumerated() {
       try checkCancelled()
@@ -198,7 +211,8 @@ final class MontageExporter: @unchecked Sendable {
       let downloadableCount = max(Self.videoCount(in: chunkSpecs), 1)
 
       emitProgress(phase: "download", base)
-      let build = try await buildChunk(specs: chunkSpecs) { [weak self] assetFraction, resolvedCount in
+      let build = try await buildChunk(specs: chunkSpecs, itemIndexBase: index * Self.chunkItemLimit) {
+        [weak self] assetFraction, resolvedCount in
         let downloadFraction = (Double(resolvedCount) + assetFraction) / Double(downloadableCount)
         self?.emitProgress(phase: "download", base + width * Self.downloadShare * min(downloadFraction, 1))
       }
@@ -226,6 +240,22 @@ final class MontageExporter: @unchecked Sendable {
       }
       Self.deleteFiles(build.tempFileURLs)
 
+      if collectDiagnostics {
+        let m = await Self.measureTrackDurations(url: chunkURL)
+        diagChunks.append([
+          "index": index,
+          "firstItemIndex": index * Self.chunkItemLimit,
+          "itemCount": chunkSpecs.count,
+          "mode": Self.audioModeLabel(build.audioMode),
+          "intendedMs": build.outputDuration.seconds * 1000,
+          "videoMs": m.video * 1000,
+          "audioMs": m.audio * 1000,
+          "containerMs": m.container * 1000,
+          "offsetMs": assembleOffsetSeconds * 1000,
+        ])
+        assembleOffsetSeconds += m.container
+      }
+
       chunkURLs.append(chunkURL)
       completedMs += chunkEstimatesMs[index]
     }
@@ -252,13 +282,24 @@ final class MontageExporter: @unchecked Sendable {
     let attributes = try? fileManager.attributesOfItem(atPath: outputURL.path)
     let fileSize = (attributes?[.size] as? Int64) ?? 0
 
-    return [
+    var result: [String: Any] = [
       "outputPath": outputURL.absoluteString,
       "durationMs": totalOutputSeconds * 1000,
       "fileSizeBytes": fileSize,
       "peakMemoryMB": memory.peakMemoryMB,
       "warnings": warnings,
     ]
+    if collectDiagnostics {
+      // The final assembled A/V delta is the drift the user hears; per-source and
+      // per-chunk rows localize where it accrues (doc/export-device-checklist.md L91).
+      let assembled = await Self.measureTrackDurations(url: outputURL)
+      result["diagnostics"] = [
+        "sources": diagSources,
+        "chunks": diagChunks,
+        "assembled": ["videoMs": assembled.video * 1000, "audioMs": assembled.audio * 1000],
+      ]
+    }
+    return result
   }
 
   /// Loads the bundled click (§6.2) once per export. A missing/broken resource must
@@ -316,6 +357,7 @@ final class MontageExporter: @unchecked Sendable {
 
   private func buildChunk(
     specs chunkSpecs: [ExportClipSpec],
+    itemIndexBase: Int,
     onDownloadProgress: @escaping (Double, Int) -> Void
   ) async throws -> ChunkBuild {
     var prepared: [PreparedItem] = []
@@ -323,7 +365,7 @@ final class MontageExporter: @unchecked Sendable {
     var retainedAssets: [AVAsset] = []
     var resolvedCount = 0
 
-    for spec in chunkSpecs {
+    for (localIndex, spec) in chunkSpecs.enumerated() {
       try checkCancelled()
       switch spec {
       case .card(let durationMs, let lines):
@@ -365,6 +407,18 @@ final class MontageExporter: @unchecked Sendable {
             endMs: endMs,
             assetDuration: assetDuration
           )
+          if collectDiagnostics {
+            await recordSourceDiagnostic(
+              itemIndex: itemIndexBase + localIndex,
+              assetId: assetId,
+              assetDuration: assetDuration,
+              videoTrack: videoTrack,
+              audioTrack: audioTrack,
+              range: range,
+              startMs: startMs,
+              endMs: endMs
+            )
+          }
           let overlay = overlayContent.flatMap {
             MontageOverlayRenderer.clipOverlay(content: $0, style: overlayStyle, renderSize: config.renderSize)
           }
@@ -556,7 +610,7 @@ final class MontageExporter: @unchecked Sendable {
       videoComposition: videoComposition,
       timeline: timeline,
       audioMode: hasRealAudio
-        ? .reader
+        ? .reader(duration: outputCursor)
         : .silence(duration: outputCursor, clicks: silenceClicks(positions: clickPositions)),
       outputDuration: outputCursor,
       tempFileURLs: tempFileURLs,
@@ -670,6 +724,67 @@ final class MontageExporter: @unchecked Sendable {
       if case .video = $0 { return true }
       return false
     }.count
+  }
+
+  /// Diagnostics (doc/export-device-checklist.md L91): a written file's real track
+  /// durations in seconds. -1 for a missing track. A/V drift shows up as a video-track
+  /// vs audio-track mismatch here (per chunk) or in the final assembled file.
+  private static func measureTrackDurations(url: URL) async -> (video: Double, audio: Double, container: Double) {
+    let asset = AVURLAsset(url: url)
+    let container = finite((try? await asset.load(.duration))?.seconds ?? -1)
+    let video = finite((try? await asset.loadTracks(withMediaType: .video).first?.load(.timeRange).duration)??.seconds ?? -1)
+    let audio = finite((try? await asset.loadTracks(withMediaType: .audio).first?.load(.timeRange).duration)??.seconds ?? -1)
+    return (video, audio, container)
+  }
+
+  private static func audioModeLabel(_ mode: EncodeAudioMode) -> String {
+    switch mode {
+    case .reader: return "reader"
+    case .silence: return "silence"
+    case .none: return "none"
+    }
+  }
+
+  /// NaN/inf guard so the diagnostics dict survives JSON serialization over the bridge.
+  private static func finite(_ v: Double) -> Double { v.isFinite ? v : -1 }
+
+  /// Per-source A/V measurement: the source video-track vs audio-track length is the
+  /// prime suspect for cumulative drift when real-footage audio tracks run slightly
+  /// longer than their video tracks (doc/export-device-checklist.md L91).
+  private func recordSourceDiagnostic(
+    itemIndex: Int,
+    assetId: String,
+    assetDuration: CMTime,
+    videoTrack: AVAssetTrack,
+    audioTrack: AVAssetTrack?,
+    range: CMTimeRange,
+    startMs: Double?,
+    endMs: Double?
+  ) async {
+    let sourceVideoMs = Self.finite(((try? await videoTrack.load(.timeRange).duration.seconds) ?? -1) * 1000)
+    var sourceAudioMs = -1.0
+    if let audioTrack {
+      sourceAudioMs = Self.finite(((try? await audioTrack.load(.timeRange).duration.seconds) ?? -1) * 1000)
+    }
+    let frameInfo = try? await videoTrack.load(.nominalFrameRate, .minFrameDuration)
+    let fps = Self.finite(frameInfo.map { Double($0.0) } ?? -1)
+    let minFrameMs = Self.finite((frameInfo?.1).map { $0.isValid ? $0.seconds * 1000 : -1 } ?? -1)
+    let trimStart: Any = startMs.map { Self.finite($0) as Any } ?? NSNull()
+    let trimEnd: Any = endMs.map { Self.finite($0) as Any } ?? NSNull()
+    diagSources.append([
+      "itemIndex": itemIndex,
+      "assetId": assetId,
+      "assetDurationMs": Self.finite(assetDuration.seconds * 1000),
+      "sourceVideoMs": sourceVideoMs,
+      "sourceAudioMs": sourceAudioMs,
+      "hasAudio": audioTrack != nil,
+      "fps": fps,
+      "minFrameMs": minFrameMs,
+      "trimStartMs": trimStart,
+      "trimEndMs": trimEnd,
+      "clampedStartMs": Self.finite(range.start.seconds * 1000),
+      "clampedDurationMs": Self.finite(range.duration.seconds * 1000),
+    ])
   }
 
   private static func deleteFiles(_ urls: [URL]) {

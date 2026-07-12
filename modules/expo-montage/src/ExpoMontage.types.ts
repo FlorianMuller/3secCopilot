@@ -122,6 +122,57 @@ export type MontageSettings = {
   };
   /** file:// URL under documentDirectory/exports/ — the parent directory is created natively */
   outputPath: string;
+  /** Dev only (doc/export-device-checklist.md L91): collect A/V-sync measurements and
+   * return them in onExportComplete.diagnostics. Off in normal use. */
+  diagnostics?: boolean;
+};
+
+// ----------------------------------------------------------------------------------------------------
+// Export diagnostics (doc/export-device-checklist.md L91 A/V-drift investigation)
+
+/** One selected clip's source A/V measurement, taken as the export reads it. The
+ * sourceVideoMs vs sourceAudioMs gap is the prime suspect for cumulative drift. */
+export type SourceDiagnostic = {
+  /** Position in the full timeline (0 = card), matching the MontageClip[] index */
+  itemIndex: number;
+  assetId: string;
+  assetDurationMs: number;
+  sourceVideoMs: number;
+  sourceAudioMs: number;
+  hasAudio: boolean;
+  /** Nominal frame rate; -1 if unknown */
+  fps: number;
+  /** Track min frame duration in ms (VFR hint: ≪ 1000/fps means variable); -1 if unknown */
+  minFrameMs: number;
+  /** Raw trim as requested (null = clip edge) */
+  trimStartMs: number | null;
+  trimEndMs: number | null;
+  /** Range actually used after defensive clamping (§8.4) */
+  clampedStartMs: number;
+  clampedDurationMs: number;
+};
+
+/** One ~monthly chunk's actual encoded track durations vs the intended timeline. */
+export type ChunkDiagnostic = {
+  index: number;
+  /** Timeline index of this chunk's first item */
+  firstItemIndex: number;
+  itemCount: number;
+  /** "reader" (real audio) | "silence" (beats-only) | "none" */
+  mode: string;
+  intendedMs: number;
+  videoMs: number;
+  audioMs: number;
+  containerMs: number;
+  /** Where this chunk is placed in the assembled timeline (Σ prior container ms) */
+  offsetMs: number;
+};
+
+export type ExportDiagnostics = {
+  sources: SourceDiagnostic[];
+  chunks: ChunkDiagnostic[];
+  /** Final assembled file's track durations — a nonzero video/audio gap is the drift */
+  assembled: { videoMs: number; audioMs: number };
 };
 
 export type ExportPhase = "download" | "chunk" | "assemble";
@@ -143,6 +194,8 @@ export type ExportCompleteEvent = {
   peakMemoryMB: number;
   /** Non-fatal issues (Live Photos, silent clips, assets degraded to black beats...) */
   warnings: string[];
+  /** Present only when settings.diagnostics was set (dev A/V-drift investigation) */
+  diagnostics?: ExportDiagnostics;
 };
 
 export type ExportErrorEvent = {

@@ -1,4 +1,5 @@
 import Feather from "@expo/vector-icons/Feather";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { RouteProp, useRoute, useTheme } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
@@ -30,10 +31,12 @@ import {
   MontageExportHandle,
   PeriodClips,
   QualityCombo,
+  slicePeriodClips,
   startMontageExport,
   startMontagePreview,
   summarizeExportWarnings,
 } from "../../services/montage";
+import { writeExportDiagnostics } from "../../services/exportDebug";
 import preferences, { ExportOrientation } from "../../services/preferences";
 import { formatBytes, formatDurationMs } from "../../utils/formatDuration";
 import { usePeriod } from "../CameraRoll/hooks/usePeriod";
@@ -125,6 +128,16 @@ export function ExportScreen() {
   const { exportMissingDayDurationMs, saveExportMissingDayDurationMs } =
     preferences.useExportMissingDayDurationMsPreference();
   const { exportOrientation, saveExportOrientation } = preferences.useExportOrientationPreference();
+
+  // Dev A/V-sync debugging (doc/export-device-checklist.md L91): when the pref is on in
+  // a dev build, the Export screen writes a `.debug.jsonl` sidecar and can limit the
+  // export to a date window for fast iteration.
+  const { exportDebug } = preferences.useExportDebugPreference();
+  // EXPO_PUBLIC_EXPORT_DEBUG=1 forces it on for headless sim runs (no UI toggle needed)
+  const debugEnabled = __DEV__ && (exportDebug === true || !!process.env.EXPO_PUBLIC_EXPORT_DEBUG);
+  const [debugRangeOn, setDebugRangeOn] = useState(false);
+  const [debugFrom, setDebugFrom] = useState<Date | undefined>();
+  const [debugTo, setDebugTo] = useState<Date | undefined>();
 
   const [metadataList, setMetadataList] = useState<SelectVideoMetadata[]>();
 
@@ -245,7 +258,12 @@ export function ExportScreen() {
     }
     setExportState({ status: "exporting", progress: 0, phase: "download" });
     try {
-      const montageClips = buildMontageClips(clips, {
+      // Debug: optionally restrict the timeline to a date window for fast iteration
+      const effectiveClips =
+        debugEnabled && debugRangeOn && debugFrom !== undefined && debugTo !== undefined
+          ? slicePeriodClips(clips, debugFrom, debugTo)
+          : clips;
+      const montageClips = buildMontageClips(effectiveClips, {
         periodLabel: period.label,
         showMissingDays: exportMissingDays === "show",
         missingDayDurationMs: exportMissingDayDurationMs,
@@ -254,26 +272,45 @@ export function ExportScreen() {
         showTitle: exportShowTitle,
       });
       autoExportLog(`quality=${quality.label}`);
-      exportHandleRef.current = await startMontageExport(period.id, montageClips, exportOrientation, quality, {
-        onProgress: (event) => {
-          autoExportLog(`phase=${event.phase} progress=${event.progress.toFixed(3)}`);
-          setExportState({ status: "exporting", progress: event.progress, phase: event.phase });
-        },
-        onComplete: (event) => {
-          exportHandleRef.current = undefined;
-          autoExportLog(
-            `DONE path=${event.outputPath} durationMs=${Math.round(event.durationMs)} sizeBytes=${
-              event.fileSizeBytes
-            } peakMB=${Math.round(event.peakMemoryMB)}`
-          );
-          setExportState({
-            status: "done",
-            outputPath: event.outputPath,
-            durationMs: event.durationMs,
-            fileSizeBytes: event.fileSizeBytes,
-            warnings: event.warnings,
-          });
-        },
+      exportHandleRef.current = await startMontageExport(
+        period.id,
+        montageClips,
+        exportOrientation,
+        quality,
+        {
+          onProgress: (event) => {
+            autoExportLog(`phase=${event.phase} progress=${event.progress.toFixed(3)}`);
+            setExportState({ status: "exporting", progress: event.progress, phase: event.phase });
+          },
+          onComplete: (event) => {
+            exportHandleRef.current = undefined;
+            autoExportLog(
+              `DONE path=${event.outputPath} durationMs=${Math.round(event.durationMs)} sizeBytes=${
+                event.fileSizeBytes
+              } peakMB=${Math.round(event.peakMemoryMB)}`
+            );
+            if (debugEnabled) {
+              writeExportDiagnostics(montageClips, event, {
+                periodLabel: period.label,
+                renderSize: getRenderSize(exportOrientation, quality),
+                fps: quality.fps,
+                mode: "full",
+                quality: quality.label,
+              }).then((path) => {
+                if (path !== undefined) {
+                  autoExportLog(`debug sidecar=${path}`);
+                  console.log(`[exportDebug] wrote ${path}`);
+                }
+              });
+            }
+            setExportState({
+              status: "done",
+              outputPath: event.outputPath,
+              durationMs: event.durationMs,
+              fileSizeBytes: event.fileSizeBytes,
+              warnings: event.warnings,
+            });
+          },
         onError: (event) => {
           exportHandleRef.current = undefined;
           if (event.message === EXPORT_CANCELLED_MESSAGE) {
@@ -284,7 +321,9 @@ export function ExportScreen() {
             setExportState({ status: "error", message: event.message });
           }
         },
-      });
+        },
+        debugEnabled
+      );
     } catch (error) {
       exportHandleRef.current = undefined;
       autoExportLog(`ERROR ${String(error)}`);
@@ -300,6 +339,10 @@ export function ExportScreen() {
     exportMissingDays,
     exportMissingDayDurationMs,
     exportOrientation,
+    debugEnabled,
+    debugRangeOn,
+    debugFrom,
+    debugTo,
   ]);
 
   const cancelExport = useCallback(() => {
@@ -538,6 +581,43 @@ export function ExportScreen() {
             )}
           </OptionLine>
         </OptionSection>
+
+        {debugEnabled && (
+          <OptionSection
+            title="Debug (A/V sync)"
+            Icon={({ theme: { colors } }) => <Feather name="terminal" size={25} color={colors.text} />}
+          >
+            <MyAppText size={12} italic style={{ paddingHorizontal: 10, paddingBottom: 6 }}>
+              Writes a .debug.jsonl next to the video (per-clip / per-chunk / assembled A/V
+              measurements). Optionally limit the export to a date window for fast iteration.
+            </MyAppText>
+            <BooleanOptionLine label="Limit to date range" value={debugRangeOn} onChange={setDebugRangeOn} />
+            {debugRangeOn && clips.days.length > 0 && (
+              <>
+                <OptionLine label="From">
+                  <DateTimePicker
+                    value={debugFrom ?? clips.days[0]}
+                    mode="date"
+                    display="default"
+                    minimumDate={clips.days[0]}
+                    maximumDate={clips.days[clips.days.length - 1]}
+                    onChange={(_, selected) => selected && setDebugFrom(selected)}
+                  />
+                </OptionLine>
+                <OptionLine label="To">
+                  <DateTimePicker
+                    value={debugTo ?? clips.days[clips.days.length - 1]}
+                    mode="date"
+                    display="default"
+                    minimumDate={clips.days[0]}
+                    maximumDate={clips.days[clips.days.length - 1]}
+                    onChange={(_, selected) => selected && setDebugTo(selected)}
+                  />
+                </OptionLine>
+              </>
+            )}
+          </OptionSection>
+        )}
 
         {exportState.status === "idle" && (
           <View style={{ gap: 10, marginHorizontal: 10 }}>

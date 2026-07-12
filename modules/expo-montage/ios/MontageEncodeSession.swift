@@ -42,8 +42,13 @@ struct SilenceClicks {
 /// How the session produces its audio stream.
 enum EncodeAudioMode {
   /// Composition audio track(s) laid out on the output timeline (real audio +
-  /// insertEmptyTimeRange spans + inserted click file segments) — read and appended as-is.
-  case reader
+  /// insertEmptyTimeRange spans + inserted click file segments) — read and appended.
+  /// `duration` is the intended output length: AVAssetReaderAudioMixOutput does not
+  /// emit the *trailing* silence of a track that ends on an empty edit (a chunk ending
+  /// on a missing-day beat), so the pump pads with silence up to this length. Without
+  /// it the audio track finishes early and drifts progressively ahead of the video
+  /// across chunks (doc/export-device-checklist.md L91).
+  case reader(duration: CMTime)
   /// No usable source audio in this span: synthesize silent PCM for the whole
   /// output duration (with missing-day clicks spliced in when enabled) so every
   /// chunk file has an audio track for the assemble pass.
@@ -88,6 +93,24 @@ final class EncodeSession: @unchecked Sendable {
   private let silenceFormat: CMAudioFormatDescription?
   private let silenceClicks: SilenceClicks?
 
+  // Reader-mode trailing-silence padding state — only touched on the audio pump queue
+  private let readerIntendedFrames: Int
+  private var readerAudioEndFrame = 0
+  private var readerExhausted = false
+  private var readerPadFrame = 0
+
+  /// Fixed reader output format; matches makeSilenceFormatDescription so reader samples
+  /// and padding silence are the same format for the AAC writer input.
+  private static let lpcmReaderSettings: [String: Any] = [
+    AVFormatIDKey: kAudioFormatLinearPCM,
+    AVSampleRateKey: 44_100,
+    AVNumberOfChannelsKey: 2,
+    AVLinearPCMBitDepthKey: 16,
+    AVLinearPCMIsFloatKey: false,
+    AVLinearPCMIsBigEndianKey: false,
+    AVLinearPCMIsNonInterleaved: false,
+  ]
+
   /// Set from the pump queues when isCancelled() fires mid-encode
   private var wasCancelled = false
 
@@ -125,7 +148,10 @@ final class EncodeSession: @unchecked Sendable {
       if case .reader = audioMode {
         let audioTracks = composition.tracks(withMediaType: .audio)
         if !audioTracks.isEmpty {
-          let output = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
+          // Fixed 44.1 kHz int16 stereo LPCM so the reader samples and the trailing
+          // silence padding (makeSilenceBuffer) share one format — the AAC writer
+          // input rejects a format change mid-stream.
+          let output = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: Self.lpcmReaderSettings)
           output.alwaysCopiesSampleData = false
           reader.add(output)
           self.audioOutput = output
@@ -164,14 +190,17 @@ final class EncodeSession: @unchecked Sendable {
       self.silenceTotalFrames = 0
       self.silenceFormat = nil
       self.silenceClicks = nil
-    case .reader:
+      self.readerIntendedFrames = 0
+    case .reader(let duration):
       let input = AVAssetWriterInput(mediaType: .audio, outputSettings: config.audioOutputSettings)
       input.expectsMediaDataInRealTime = false
       writer.add(input)
       self.audioInput = input
       self.silenceTotalFrames = 0
-      self.silenceFormat = nil
+      // Same silence format used to pad the trailing gap the mix output omits
+      self.silenceFormat = Self.makeSilenceFormatDescription()
       self.silenceClicks = nil
+      self.readerIntendedFrames = Int((duration.seconds * 44_100).rounded())
     case .silence(let duration, let clicks):
       let input = AVAssetWriterInput(mediaType: .audio, outputSettings: config.audioOutputSettings)
       input.expectsMediaDataInRealTime = false
@@ -180,6 +209,7 @@ final class EncodeSession: @unchecked Sendable {
       self.silenceTotalFrames = Int((duration.seconds * 44_100).rounded())
       self.silenceFormat = Self.makeSilenceFormatDescription()
       self.silenceClicks = clicks
+      self.readerIntendedFrames = 0
     }
   }
 
@@ -372,12 +402,33 @@ final class EncodeSession: @unchecked Sendable {
           return
         }
         let finished = autoreleasepool { () -> Bool in
+          // Once the reader is drained, spend the remaining iterations padding the
+          // trailing silence the mix output omits when the composition ends on an empty
+          // edit (a chunk ending on a missing-day beat), so the audio track reaches the
+          // intended length instead of finishing early and drifting ahead of the video
+          // (doc/export-device-checklist.md L91). One buffer per ready-check keeps the
+          // pad within writer backpressure (a long silent tail could otherwise be minutes).
+          if readerExhausted {
+            return stepReaderPad(group: group)
+          }
           guard reader?.status == .reading, let sample = audioOutput.copyNextSampleBuffer() else {
-            audioInput.markAsFinished()
-            group.leave()
-            return true
+            readerExhausted = true
+            readerPadFrame = readerAudioEndFrame
+            return stepReaderPad(group: group)
           }
           audioInput.append(sample)
+          let end = CMTimeAdd(
+            CMSampleBufferGetPresentationTimeStamp(sample),
+            CMSampleBufferGetDuration(sample)
+          )
+          // isNumeric guards against invalid/indefinite timestamps (Int(NaN) would trap):
+          // edit-boundary marker buffers can carry them.
+          if end.isNumeric {
+            let endFrame = Int((end.seconds * 44_100).rounded())
+            if endFrame > readerAudioEndFrame {
+              readerAudioEndFrame = endFrame
+            }
+          }
           return false
         }
         if finished {
@@ -385,6 +436,30 @@ final class EncodeSession: @unchecked Sendable {
         }
       }
     }
+  }
+
+  /// One unit of reader-mode trailing-silence padding: appends a single silence buffer
+  /// and returns false, or finishes the audio input and returns true once the intended
+  /// length is reached (immediately, when the chunk ends on real clip audio and needs no
+  /// pad). Called once per `isReadyForMoreMediaData` iteration so the pad respects writer
+  /// backpressure and stays cancellable between buffers.
+  private func stepReaderPad(group: DispatchGroup) -> Bool {
+    guard let audioInput else { return true }
+    guard let silenceFormat, readerPadFrame < readerIntendedFrames else {
+      audioInput.markAsFinished()
+      group.leave()
+      return true
+    }
+    let count = min(24_000, readerIntendedFrames - readerPadFrame)
+    guard let buffer = Self.makeSilenceBuffer(startFrame: readerPadFrame, frameCount: count, format: silenceFormat)
+    else {
+      audioInput.markAsFinished()
+      group.leave()
+      return true
+    }
+    audioInput.append(buffer)
+    readerPadFrame += count
+    return false
   }
 
   private func pumpSilence(group: DispatchGroup) {

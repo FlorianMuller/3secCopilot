@@ -195,6 +195,50 @@ export function groupClipsForPeriod(
   };
 }
 
+// Dev debug (doc/export-device-checklist.md L91): restrict a period's day timeline to
+// an inclusive [fromDate, toDate] calendar-day window, recomputing the derived totals,
+// so a small slice (e.g. late-January around a missing-day batch) can be exported fast
+// to reproduce an A/V-sync issue instead of rendering a whole 6-month period.
+export function slicePeriodClips(periodClips: PeriodClips, fromDate: Date, toDate: Date): PeriodClips {
+  const fromMs = new Date(fromDate).setHours(0, 0, 0, 0);
+  const toMs = new Date(toDate).setHours(23, 59, 59, 999);
+  const days = periodClips.days.filter((day) => {
+    const t = day.getTime();
+    return t >= fromMs && t <= toMs;
+  });
+
+  const clipByDay = new Map<string, SelectVideoMetadata>();
+  const missingDays: Date[] = [];
+  let trimmedDurationMs = 0;
+  const untrimmedClips: SelectVideoMetadata[] = [];
+  let firstClipId: string | null = null;
+  for (const day of days) {
+    const clip = periodClips.clipByDay.get(day.toDateString());
+    if (clip === undefined) {
+      missingDays.push(day);
+      continue;
+    }
+    clipByDay.set(day.toDateString(), clip);
+    firstClipId = firstClipId ?? clip.videoId;
+    if (hasTrim(clip)) {
+      trimmedDurationMs += trimDurationMs(clip);
+    } else {
+      untrimmedClips.push(clip);
+    }
+  }
+
+  return {
+    days,
+    clipByDay,
+    missingDays,
+    totalDays: days.length,
+    filledDaysCount: clipByDay.size,
+    trimmedDurationMs,
+    untrimmedClips,
+    firstClipId,
+  };
+}
+
 // ----------------------------------------------------------------------------------------------------
 // MontageClip[] build (§8 step 5) + overlay strings (§7 "Overlay format")
 
@@ -380,7 +424,10 @@ export async function startMontageExport(
   clips: MontageClip[],
   orientation: ExportOrientation,
   quality: QualityCombo,
-  listeners: MontageExportListeners
+  listeners: MontageExportListeners,
+  // Dev only (doc/export-device-checklist.md L91): ask the native side to attach A/V
+  // diagnostics to the complete event so the `.debug.jsonl` sidecar can be written.
+  diagnostics = false
 ): Promise<MontageExportHandle> {
   const exportsDirectory = `${FileSystem.documentDirectory}exports/`;
   const directoryInfo = await FileSystem.getInfoAsync(exportsDirectory);
@@ -403,6 +450,7 @@ export async function startMontageExport(
       mode: "full",
       overlay: getOverlaySettings(renderSize),
       outputPath,
+      diagnostics,
     },
     listeners
   );

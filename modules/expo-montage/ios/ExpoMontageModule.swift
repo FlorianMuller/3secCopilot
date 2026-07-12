@@ -71,6 +71,10 @@ struct MontageSettingsRecord: Record {
   @Field var overlay: OverlaySettingsRecord? = nil
   /// file:// URL under the app's documents directory (parent dir is created)
   @Field var outputPath: String = ""
+  /// Dev only (doc/export-device-checklist.md L91): collect per-source / per-chunk /
+  /// assembled A/V measurements and return them in onExportComplete.diagnostics so JS
+  /// can write the `.debug.jsonl` sidecar. Off in normal use.
+  @Field var diagnostics: Bool = false
 }
 
 public class ExpoMontageModule: Module {
@@ -125,6 +129,7 @@ public class ExpoMontageModule: Module {
         overlayStyle: overlayStyle,
         missingDayClick: settings.missingDayClick,
         outputURL: outputURL,
+        collectDiagnostics: settings.diagnostics,
         sendProgress: { [weak self] phase, progress in
           self?.sendEvent("onExportProgress", ["taskId": taskId, "progress": progress, "phase": phase])
         },
@@ -201,7 +206,8 @@ private final class SpikeComposer {
       config: config,
       warnings: &warnings
     )
-    let audioMode: EncodeAudioMode = composition.tracks(withMediaType: .audio).isEmpty ? .none : .reader
+    let audioMode: EncodeAudioMode =
+      composition.tracks(withMediaType: .audio).isEmpty ? .none : .reader(duration: composition.duration)
 
     // Transient AVFoundation failures (media services reset, -11819) are worth one
     // automatic retry with a fresh reader/writer graph and a fresh output file.

@@ -12,7 +12,7 @@ import { DynamicBottomSheetProvider } from "./src/contexts/DynamicBottomSheetCon
 import { db, expoSqliteDb } from "./src/db/db";
 import { CameraRollNavigation } from "./src/navigation/CameraRollNavigation";
 import { ExportNavigation } from "./src/navigation/ExportNavigation";
-import { seedDemoData } from "./src/services/devSeed";
+import { seedBatchRepro, seedDemoData } from "./src/services/devSeed";
 import { OptionsNavigation } from "./src/navigation/OptionsNavigation";
 import { myDarkTheme, myLightTheme } from "./src/theme/themes";
 import "./src/utils/polyfills";
@@ -30,7 +30,11 @@ const devInitialTab = (__DEV__ && process.env.EXPO_PUBLIC_INITIAL_TAB) || "Camer
 
 function useDevAutoSeed() {
   useEffect(() => {
-    if (__DEV__ && process.env.EXPO_PUBLIC_AUTOSEED) {
+    if (__DEV__ && process.env.EXPO_PUBLIC_SEED_BATCH) {
+      seedBatchRepro()
+        .then((status) => console.log(`[autoseed] ${status}`))
+        .catch((e) => console.error("[autoseed] failed:", e));
+    } else if (__DEV__ && process.env.EXPO_PUBLIC_AUTOSEED) {
       seedDemoData()
         .then((status) => console.log(`[autoseed] ${status}`))
         .catch((e) => console.error("[autoseed] failed:", e));
