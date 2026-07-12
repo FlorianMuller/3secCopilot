@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-3sec Copilot is a React Native mobile application built with Expo that helps users create video montages by selecting and trimming videos from their camera roll. The app allows users to select one video per day to create a "3-second" daily video compilation.
+3sec Copilot is a React Native mobile application built with Expo that helps users create video montages by selecting and trimming videos from their camera roll. The app allows users to select one video per day to create a "3-second" daily video compilation, and export a chosen period (year) as a single shareable montage video.
 
 ## Tech Stack
 
@@ -12,6 +12,7 @@
 - **Database**: SQLite with Drizzle ORM
 - **Animations**: React Native Reanimated v3 + Gesture Handler
 - **Video**: Expo Video with thumbnail generation
+- **Export**: Local Expo native module (Swift, AVFoundation) in `modules/expo-montage/`
 - **Styling**: React Native StyleSheet with custom theming
 - **State Management**: React hooks with custom preference system
 
@@ -26,6 +27,10 @@
 ├── app.json               # Expo configuration
 ├── drizzle.config.ts      # Database ORM configuration
 ├── Makefile               # Development commands
+├── modules/
+│   └── expo-montage/      # Local Expo module: native montage export (Swift/AVFoundation)
+│       ├── ios/           # Encode pipeline, overlays, click sound resource
+│       └── src/           # TS API (exportMontage, analyzeClips, cancelExport, events)
 └── src/
     ├── components/        # Reusable UI components
     │   ├── MyTabBar.tsx   # Custom floating tab bar
@@ -36,13 +41,15 @@
     │   └── schema.ts      # Drizzle schemas
     ├── features/          # Feature-based components
     │   ├── CameraRoll/    # Video browsing and selection
+    │   ├── Export/        # Period list + export screen (stats, options, preview, export)
     │   └── Options/       # Settings and preferences
     ├── hooks/             # Custom React hooks
     ├── navigation/        # Navigation configuration
     ├── services/          # Business logic layer
     │   ├── preferences.ts # User preferences management
     │   ├── selection.ts   # Video selection logic
-    │   └── dayShift.ts    # Day shifting functionality
+    │   ├── dayShift.ts    # Day shifting functionality
+    │   └── montage.ts     # Export orchestration (timeline build, quality combos, size estimate)
     ├── theme/             # Theming system (light/dark modes)
     └── utils/             # Utility functions
 ```
@@ -53,8 +60,9 @@
 2. **Video Selection**: Select one video per day for the montage
 3. **Video Trimming**: Set start/end times for selected portions
 4. **Day Shifting**: Assign videos to different dates
-5. **Preferences**: User settings with database persistence
-6. **Theming**: Light/dark mode support with custom color schemes
+5. **Montage Export**: Render a period's selected clips into one video (opening title card, missing-day beats with click sound, date/hour/title overlays, quality picker, inline preview, save/share)
+6. **Preferences**: User settings with database persistence
+7. **Theming**: Light/dark mode support with custom color schemes
 
 ### Database Schema
 
@@ -78,10 +86,23 @@ Tab Navigator (Bottom Tabs with Custom Floating Bar)
 ├── Videos Tab (CameraRollNavigation)
 │   ├── CameraRoll (Main video list)
 │   └── VideoPlayer (Video playback with controls)
-├── Preview Tab (Placeholder for montage preview)
+├── Export Tab (ExportNavigation)
+│   ├── PeriodList (One row per period with ≥1 selected video)
+│   └── ExportScreen (Stats + options + preview + export for one period)
 └── Settings Tab (OptionsNavigation)
     └── Options (Settings and preferences)
 ```
+
+### Export Feature (v1 complete)
+
+The export pipeline turns a period's selected & trimmed clips into a single `.mp4` montage. Full spec and current status: `doc/export-spec.md`; remaining on-device verification items: `doc/export-device-checklist.md`; native implementation guide: `doc/expo-montage-field-guide.html`.
+
+- **Source of truth is metadata**: export reads original camera-roll assets (`PHAsset` by `video_id`) and applies `trim_start_time`/`trim_end_time` during composition — files under `trimmedVideos/` are a playback cache only, never an export input.
+- **Native side** (`modules/expo-montage/`, Swift): chunked `AVAssetReader`+`AVAssetWriter` pipeline (~monthly chunks, then passthrough-video / continuous-audio assemble), CoreImage overlays, H.264 High + AAC output, progress events, cancellation, per-asset degradation to black beats. Frame reordering (B-frames) is deliberately disabled — required for the passthrough chunk concat.
+- **JS side**: `src/services/montage.ts` builds the day timeline (opening card, one beat per missing day), formats overlay strings (luxon, device locale), owns the bitrate table and size estimate, and computes quality combos from `analyzeClips` results. Export options are ordinary preferences (`export*` keys in `preferences.ts`), only surfaced on the ExportScreen.
+- **Preview** renders through the same pipeline at 640×360 into `cacheDirectory/exports-preview/`; full exports go to `documentDirectory/exports/<periodId>-<timestamp>.mp4` (visible in the Files app, never overwritten).
+- **Iteration**: JS hot-reloads via Metro; Swift rebuilds fastest from Xcode (`make xcode-open-workspace`); compile-check the module without a device via `xcodebuild -project ios/Pods/Pods.xcodeproj -target ExpoMontage -sdk iphonesimulator build`.
+- **Dev hooks** (`__DEV__`-gated, set as env vars on `expo run:ios`): `EXPO_PUBLIC_AUTOSEED`, `EXPO_PUBLIC_INITIAL_TAB`, `EXPO_PUBLIC_AUTO_OPEN_PERIOD`, `EXPO_PUBLIC_AUTO_EXPORT`, `EXPO_PUBLIC_AUTO_PREVIEW`, `EXPO_PUBLIC_AUTO_QUALITY`, `EXPO_PUBLIC_AUTO_CANCEL_MS` — used to drive export flows headlessly on the seeded `verify-iphone` simulator (see spec §0 for the full recipe).
 
 ## Development Workflow
 
