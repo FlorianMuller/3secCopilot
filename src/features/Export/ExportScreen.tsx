@@ -128,6 +128,9 @@ export function ExportScreen() {
   const { exportMissingDayDurationMs, saveExportMissingDayDurationMs } =
     preferences.useExportMissingDayDurationMsPreference();
   const { exportOrientation, saveExportOrientation } = preferences.useExportOrientationPreference();
+  // Overlay date/hour wording follows the app language pref (Settings tab); refetched
+  // on focus so a change made in Settings applies without reopening the app
+  const { appLanguage } = preferences.useAppLanguagePreference({ refetchOnFocus: true });
 
   // Dev A/V-sync debugging (doc/export-device-checklist.md L91): when the pref is on in
   // a dev build, the Export screen writes a `.debug.jsonl` sidecar and can limit the
@@ -250,6 +253,7 @@ export function ExportScreen() {
       exportMissingDays === undefined ||
       exportMissingDayDurationMs === undefined ||
       exportOrientation === undefined ||
+      appLanguage === undefined ||
       exportHandleRef.current !== undefined ||
       // Preview and export share the native one-at-a-time slot
       previewHandleRef.current !== undefined
@@ -270,6 +274,7 @@ export function ExportScreen() {
         showDate: exportShowDate,
         showHour: exportShowHour,
         showTitle: exportShowTitle,
+        language: appLanguage,
       });
       autoExportLog(`quality=${quality.label}`);
       exportHandleRef.current = await startMontageExport(
@@ -339,6 +344,7 @@ export function ExportScreen() {
     exportMissingDays,
     exportMissingDayDurationMs,
     exportOrientation,
+    appLanguage,
     debugEnabled,
     debugRangeOn,
     debugFrom,
@@ -381,6 +387,7 @@ export function ExportScreen() {
       exportMissingDays === undefined ||
       exportMissingDayDurationMs === undefined ||
       exportOrientation === undefined ||
+      appLanguage === undefined ||
       previewHandleRef.current !== undefined ||
       exportHandleRef.current !== undefined
     ) {
@@ -396,6 +403,7 @@ export function ExportScreen() {
         showDate: exportShowDate,
         showHour: exportShowHour,
         showTitle: exportShowTitle,
+        language: appLanguage,
       });
       autoPreviewLog(
         `clips=${previewClips.length} (videos=${previewClips.filter((c) => c.type === "video").length} beats=${
@@ -442,6 +450,7 @@ export function ExportScreen() {
     exportMissingDays,
     exportMissingDayDurationMs,
     exportOrientation,
+    appLanguage,
     discardPreview,
   ]);
 
@@ -454,6 +463,7 @@ export function ExportScreen() {
     exportMissingDays,
     exportMissingDayDurationMs,
     exportOrientation,
+    appLanguage,
     quality?.label,
   ].join("|");
   const previousPreviewOptionsKey = useRef(previewOptionsKey);
@@ -470,7 +480,8 @@ export function ExportScreen() {
     exportShowTitle !== undefined &&
     exportMissingDays !== undefined &&
     exportMissingDayDurationMs !== undefined &&
-    exportOrientation !== undefined;
+    exportOrientation !== undefined &&
+    appLanguage !== undefined;
 
   const statsReady =
     period !== undefined &&

@@ -216,6 +216,13 @@ function enumConverter<T extends string>(validValues: readonly T[]): Converter<T
 }
 
 // ----------------------------------------------------------------------------------------------------
+// App language — first step towards full i18n: for now it only drives the date/hour
+// wording baked into exported videos (see montage.ts overlay formatting).
+
+export const appLanguages = ["en", "fr"] as const;
+export type AppLanguage = (typeof appLanguages)[number];
+
+// ----------------------------------------------------------------------------------------------------
 // Export option enums (doc/export-spec.md §9.3)
 
 export const exportMissingDaysModes = ["show", "skip"] as const;
@@ -232,6 +239,7 @@ const preferences = {
   ...createPreferencesFunctions("birthdayDate", dateConverter),
   ...createPreferencesFunctions("dayShift", objectConverter<DayShiftTime>(), { hour: 0, minute: 0 }),
   ...createPreferencesFunctions("yearGroupingMode", enumConverter<YearGroupingMode>(yearGroupingModes), "calendar"),
+  ...createPreferencesFunctions("appLanguage", enumConverter<AppLanguage>(appLanguages), "en"),
   // Export options (doc/export-spec.md §9.3) — global defaults shared across all periods,
   // only surfaced inline in the Export flow (not in the Settings tab)
   ...createPreferencesFunctions("exportShowDate", booleanConverter, true),

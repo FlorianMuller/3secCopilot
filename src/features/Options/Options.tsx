@@ -1,6 +1,7 @@
 import { ScrollView, View } from "react-native";
 import { MyAppText } from "../../components/text/MyAppText";
 import { DayShiftSection } from "./sections/DayShiftSection";
+import { LanguageSection } from "./sections/LanguageSection";
 import { YearGroupingSection } from "./sections/YearGroupingSection";
 import { CacheOptionSection } from "./sections/CacheOptionSection";
 import { DatabaseBackupSection } from "./sections/DatabaseBackupSection";
@@ -14,6 +15,8 @@ export function Options() {
   return (
     <ScrollView style={{ paddingTop: 30 }}>
       <View style={{ gap: 20 }}>
+        <LanguageSection />
+
         <YearGroupingSection />
 
         <DayShiftSection />

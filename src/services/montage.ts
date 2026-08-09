@@ -16,7 +16,7 @@ import { DayShiftTime } from "../features/Options/sections/DayShiftSection";
 import { capitalize } from "../utils/capitalize";
 import { getDaysBetween } from "../utils/getDaysBetween";
 import { getEffectiveDate } from "./dayShift";
-import { ExportOrientation } from "./preferences";
+import { AppLanguage, ExportOrientation } from "./preferences";
 
 // JS side of the export pipeline (doc/export-spec.md §8).
 // Phase 2: timeline/day grouping and the size/duration math backing the export screen.
@@ -252,12 +252,16 @@ export interface BuildMontageClipsOptions {
   showDate: boolean;
   showHour: boolean;
   showTitle: boolean;
+  // Date/hour wording follows the appLanguage preference (not the device locale)
+  language: AppLanguage;
 }
 
-// "Lundi 4 juin" — luxon in the device locale (§7, confirmed: French dates on a
-// French device, correct elsewhere), capitalized for locales with lowercase weekdays
-function formatOverlayDate(day: Date): string {
-  return capitalize(DateTime.fromJSDate(day).toLocaleString({ weekday: "long", day: "numeric", month: "long" }));
+// "Lundi 4 juin" — luxon in the preferred app language (§7), capitalized for
+// locales with lowercase weekdays
+function formatOverlayDate(day: Date, language: AppLanguage): string {
+  return capitalize(
+    DateTime.fromJSDate(day).setLocale(language).toLocaleString({ weekday: "long", day: "numeric", month: "long" })
+  );
 }
 
 // Bottom-left overlay parts for one filled day. The date is the *effective* (possibly
@@ -270,10 +274,12 @@ function buildClipOverlay(
 ): ClipOverlay | undefined {
   const overlay: ClipOverlay = {};
   if (options.showDate) {
-    overlay.dateText = formatOverlayDate(day);
+    overlay.dateText = formatOverlayDate(day, options.language);
   }
   if (options.showHour) {
-    overlay.hourText = DateTime.fromJSDate(metadata.videoOriginalDate).toLocaleString(DateTime.TIME_SIMPLE);
+    overlay.hourText = DateTime.fromJSDate(metadata.videoOriginalDate)
+      .setLocale(options.language)
+      .toLocaleString(DateTime.TIME_SIMPLE);
   }
   if (options.showTitle && metadata.title) {
     overlay.titleText = metadata.title;
@@ -302,7 +308,7 @@ function buildMissingDayClip(day: Date, options: BuildMontageClipsOptions): Mont
   return {
     type: "missingDay",
     durationMs: options.missingDayDurationMs,
-    overlay: options.showDate ? { dateText: formatOverlayDate(day) } : undefined,
+    overlay: options.showDate ? { dateText: formatOverlayDate(day, options.language) } : undefined,
   };
 }
 
