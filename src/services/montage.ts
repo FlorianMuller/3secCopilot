@@ -247,8 +247,8 @@ export interface BuildMontageClipsOptions {
   periodLabel: string;
   showMissingDays: boolean;
   missingDayDurationMs: number;
-  // Overlay toggles (§9.3): date/hour on the first line, title on the first line,
-  // description (tied to the title toggle) on the second
+  // Overlay toggles (§9.3): date/hour and title share the first line, description
+  // (tied to the title toggle) has its own fixed slot below (§7 "Overlay format")
   showDate: boolean;
   showHour: boolean;
   showTitle: boolean;

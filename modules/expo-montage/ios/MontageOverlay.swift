@@ -54,21 +54,26 @@ struct ClipOverlayContent {
 /// Renders overlay text blocks into CIImages, one per segment, cached by the
 /// timeline and composited per frame in the encode loop. Text is drawn with
 /// UIGraphicsImageRenderer (thread-safe) — full control over mixed font sizes,
-/// baseline alignment and the rounded scrim, unlike CIAttributedTextImageGenerator.
+/// baseline alignment and the soft text shadow, unlike CIAttributedTextImageGenerator.
 enum MontageOverlayRenderer {
   private static let textColor = UIColor.white
   private static let dimmedAlpha: CGFloat = 0.72
   private static let descriptionAlpha: CGFloat = 0.85
-  private static let scrimColor = UIColor(white: 0, alpha: 0.35)
+  // Soft "Apple-style" text shadow (ratios of the run's font size): nearly
+  // invisible on dark footage, keeps white text readable on bright footage.
+  private static let shadowAlpha: CGFloat = 0.65
+  private static let shadowBlurRatio: CGFloat = 0.3
+  private static let shadowOffsetRatio: CGFloat = 0.07
 
-  /// Bottom-left clip/missing-day overlay over a subtle rounded scrim:
+  /// Bottom-left clip/missing-day overlay, two fixed slots stacked bottom-left:
   ///   <date> <hour> - <title>     (hour smaller & de-emphasized)
-  ///   <description>               (only if present)
+  ///   <description>
+  /// Slot heights come from the fonts, not the content, so each slot keeps its
+  /// exact position whether or not the other is filled — labels never jump
+  /// between clips. Readability comes from a soft shadow on the text, no scrim box.
   /// Positioned in CoreImage coordinates (origin bottom-left), ready to be
   /// `composited(over:)` a full render-size frame.
   static func clipOverlay(content: ClipOverlayContent, style: OverlayStyle, renderSize: CGSize) -> CIImage? {
-    var lines: [NSAttributedString] = []
-
     let firstLine = NSMutableAttributedString()
     if let date = content.dateText, !date.isEmpty {
       firstLine.append(attributed(date, size: style.dateFontSize, weight: .semibold))
@@ -85,42 +90,56 @@ enum MontageOverlayRenderer {
       }
       firstLine.append(attributed(title, size: style.titleFontSize, weight: .regular))
     }
-    if firstLine.length > 0 {
-      lines.append(firstLine)
-    }
-    if let description = content.descriptionText, !description.isEmpty {
-      lines.append(
-        attributed(description, size: style.descriptionFontSize, weight: .regular, alpha: descriptionAlpha)
-      )
-    }
-    guard !lines.isEmpty else { return nil }
+
+    let slots: [(text: NSAttributedString?, height: CGFloat)] = [
+      (
+        firstLine.length > 0 ? firstLine : nil,
+        ceil(max(
+          UIFont.systemFont(ofSize: style.dateFontSize, weight: .semibold).lineHeight,
+          UIFont.systemFont(ofSize: style.titleFontSize, weight: .regular).lineHeight
+        ))
+      ),
+      (
+        content.descriptionText.flatMap {
+          $0.isEmpty ? nil : attributed($0, size: style.descriptionFontSize, weight: .regular, alpha: descriptionAlpha)
+        },
+        ceil(UIFont.systemFont(ofSize: style.descriptionFontSize, weight: .regular).lineHeight)
+      ),
+    ]
+    guard slots.contains(where: { $0.text != nil }) else { return nil }
 
     let margin = renderSize.height * 0.05
-    let padding = style.dateFontSize * 0.45
     let lineSpacing = style.dateFontSize * 0.25
-    let maxTextWidth = renderSize.width - 2 * margin - 2 * padding
+    let maxTextWidth = renderSize.width - 2 * margin
+    // Transparent border around the drawn text so the shadow blur never clips
+    // at the image edge
+    let maxFontSize = max(style.dateFontSize, style.titleFontSize, style.descriptionFontSize)
+    let bleed = ceil(maxFontSize * (2 * shadowBlurRatio + shadowOffsetRatio))
 
-    let lineSizes = lines.map { line -> CGSize in
-      let natural = line.size()
-      return CGSize(width: min(ceil(natural.width), maxTextWidth), height: ceil(natural.height))
+    let slotWidths = slots.map { slot -> CGFloat in
+      guard let text = slot.text else { return 0 }
+      return min(ceil(text.size().width), maxTextWidth)
     }
-    let textWidth = lineSizes.map(\.width).max() ?? 0
-    let textHeight = lineSizes.map(\.height).reduce(0, +) + CGFloat(max(lines.count - 1, 0)) * lineSpacing
-    let blockSize = CGSize(width: textWidth + 2 * padding, height: textHeight + 2 * padding)
+    let textWidth = slotWidths.max() ?? 0
+    let textHeight = slots.map(\.height).reduce(0, +) + CGFloat(slots.count - 1) * lineSpacing
+    let imageSize = CGSize(width: textWidth + 2 * bleed, height: textHeight + 2 * bleed)
 
-    let image = drawImage(size: blockSize) { _ in
-      scrimColor.setFill()
-      UIBezierPath(roundedRect: CGRect(origin: .zero, size: blockSize), cornerRadius: padding * 0.5).fill()
-      var y = padding
-      for (line, size) in zip(lines, lineSizes) {
-        truncated(line).draw(in: CGRect(x: padding, y: y, width: size.width, height: size.height))
-        y += size.height + lineSpacing
+    let image = drawImage(size: imageSize) { _ in
+      var y = bleed
+      for (slot, width) in zip(slots, slotWidths) {
+        if let text = slot.text {
+          truncated(text).draw(in: CGRect(x: bleed, y: y, width: width, height: slot.height))
+        }
+        y += slot.height + lineSpacing
       }
     }
     guard let cgImage = image.cgImage else { return nil }
     // UIKit draws top-down, CIImage(cgImage:) preserves the visual orientation;
-    // CI coordinates are bottom-left-origin, so this lands the block bottom-left.
-    return CIImage(cgImage: cgImage).transformed(by: CGAffineTransform(translationX: margin, y: margin))
+    // CI coordinates are bottom-left-origin, so this lands the block bottom-left
+    // with the text (not the bleed border) at the margin.
+    return CIImage(cgImage: cgImage).transformed(
+      by: CGAffineTransform(translationX: margin - bleed, y: margin - bleed)
+    )
   }
 
   /// Opening title card (§6.1): centered lines over black, cardFontSize, no scrim.
@@ -164,11 +183,16 @@ enum MontageOverlayRenderer {
     weight: UIFont.Weight,
     alpha: CGFloat = 1
   ) -> NSAttributedString {
-    NSAttributedString(
+    let shadow = NSShadow()
+    shadow.shadowColor = UIColor.black.withAlphaComponent(shadowAlpha)
+    shadow.shadowBlurRadius = size * shadowBlurRatio
+    shadow.shadowOffset = CGSize(width: 0, height: size * shadowOffsetRatio)
+    return NSAttributedString(
       string: text,
       attributes: [
         .font: UIFont.systemFont(ofSize: size, weight: weight),
         .foregroundColor: textColor.withAlphaComponent(alpha),
+        .shadow: shadow,
       ]
     )
   }

@@ -204,14 +204,14 @@ Chunking is an internal detail of the module (`chunk encode → passthrough-vide
 
 ### Overlay format
 
-Bottom-left corner, with a subtle scrim/shadow for readability over any footage (or over black, for missing days):
+Bottom-left corner, white text with a soft black shadow (Apple-style — no scrim box) for readability over any footage (or over black, for missing days). Two fixed slots — the date/hour/title line and the description — whose heights come from the fonts, not the content, so each slot keeps its exact position whether or not the other is filled and labels never jump between clips:
 
 ```
 Lundi 4 juin 12h39 - <title>      ← hour rendered in a smaller font than the date, de-emphasized
-<Description>                      ← second line, only if present
+<Description>                      ← only if present (slot stays reserved)
 ```
 
-Treated as a first draft — easy to nudge (position, sizes, colors) once visible in the in-app preview.
+Treated as a first draft — easy to nudge (position, sizes, colors, shadow strength) once visible in the in-app preview.
 
 ## 8. Export pipeline (JS service layer)
 
