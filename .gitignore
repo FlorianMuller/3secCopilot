@@ -17,7 +17,7 @@ web-build/
 .vscode
 
 # Dev build
-ios
+/ios
 ios-dev-build
 ios-prod
 android

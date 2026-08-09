@@ -44,7 +44,8 @@
     "react-native-video-trim": "^5.0.2",
     "typescript": "~5.8.3",
     "zeego": "^3.0.6",
-    "expo-constants": "~17.1.8"
+    "expo-constants": "~17.1.8",
+    "expo-keep-awake": "~14.1.4"
   },
   "devDependencies": {
     "@babel/core": "^7.12.9",

@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>:root{color-scheme:light dark}body{margin:0;padding:0}img{max-width:100%}</style>
+</head>
+<body>
+<title>expo-montage — Field Guide</title>
+<style>
+  :root {
+    --paper: #f5f6f8;
+    --panel: #ffffff;
+    --panel-2: #eef0f4;
+    --ink: #1a1d25;
+    --muted: #5c6472;
+    --faint: #8a92a1;
+    --line: #e0e3e9;
+    --line-strong: #cfd4dd;
+    --accent: #dd5533;
+    --accent-soft: #fbe9e2;
+    --steel: #2a6f97;
+    --steel-soft: #e2eef5;
+    --code-bg: #1c2028;
+    --code-ink: #d8dce4;
+    --code-kw: #ff8a6b;
+    --code-str: #8fd6a0;
+    --code-num: #e0b978;
+    --code-com: #6b7385;
+    --code-type: #7ec4e0;
+    --good: #2f8f5b;
+    --warn: #b26a00;
+    --radius: 10px;
+    --measure: 68ch;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #101216;
+      --panel: #181b21;
+      --panel-2: #1f232b;
+      --ink: #e6e8 ed;
+      --ink: #e6e8ed;
+      --muted: #9aa2b0;
+      --faint: #6f7686;
+      --line: #262b33;
+      --line-strong: #333a45;
+      --accent: #ff7a56;
+      --accent-soft: #33211c;
+      --steel: #6fb1d6;
+      --steel-soft: #17252e;
+      --code-bg: #0c0e12;
+      --code-ink: #d8dce4;
+      --good: #57b47e;
+      --warn: #d09030;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101216; --panel: #181b21; --panel-2: #1f232b; --ink: #e6e8ed;
+    --muted: #9aa2b0; --faint: #6f7686; --line: #262b33; --line-strong: #333a45;
+    --accent: #ff7a56; --accent-soft: #33211c; --steel: #6fb1d6; --steel-soft: #17252e;
+    --code-bg: #0c0e12; --code-ink: #d8dce4; --good: #57b47e; --warn: #d09030;
+  }
+  :root[data-theme="light"] {
+    --paper: #f5f6f8; --panel: #ffffff; --panel-2: #eef0f4; --ink: #1a1d25;
+    --muted: #5c6472; --faint: #8a92a1; --line: #e0e3e9; --line-strong: #cfd4dd;
+    --accent: #dd5533; --accent-soft: #fbe9e2; --steel: #2a6f97; --steel-soft: #e2eef5;
+    --code-bg: #1c2028; --code-ink: #d8dce4; --good: #2f8f5b; --warn: #b26a00;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell { display: grid; grid-template-columns: 288px minmax(0, 1fr); min-height: 100vh; }
+
+  /* ---- Sidebar ---- */
+  aside {
+    position: sticky; top: 0; align-self: start;
+    height: 100vh; overflow-y: auto;
+    border-right: 1px solid var(--line);
+    background: var(--panel);
+    padding: 26px 20px 40px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; margin-bottom: 4px; }
+  .brand .mark {
+    width: 34px; height: 34px; border-radius: 9px; flex: none;
+    background: linear-gradient(150deg, var(--accent), #b8391c);
+    display: grid; place-items: center; font-size: 18px;
+    box-shadow: 0 2px 8px -2px rgba(0,0,0,.35);
+  }
+  .brand .title { font-weight: 680; font-size: 15px; letter-spacing: -0.01em; line-height: 1.15; }
+  .brand .sub { font-size: 11.5px; color: var(--faint); font-family: var(--mono); letter-spacing: .02em; }
+
+  nav { margin-top: 26px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-chapter {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 9px 11px; border-radius: 8px;
+    color: var(--muted); text-decoration: none; cursor: pointer;
+    border: 1px solid transparent; transition: background .15s, color .15s;
+  }
+  .nav-chapter:hover { background: var(--panel-2); color: var(--ink); }
+  .nav-chapter.active { background: var(--accent-soft); color: var(--ink); border-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .nav-chapter .num { font-family: var(--mono); font-size: 12px; color: var(--accent); font-weight: 600; width: 1.4em; flex: none; }
+  .nav-chapter .lab { font-size: 14px; font-weight: 550; line-height: 1.3; }
+  .nav-note { margin-top: auto; }
+  .side-foot { margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); line-height: 1.5; }
+
+  /* ---- Main ---- */
+  main { padding: 0; }
+  .page { display: none; }
+  .page.active { display: block; animation: fade .3s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .page.active { animation: none; } }
+
+  .hero {
+    padding: 54px clamp(24px, 5vw, 72px) 40px;
+    border-bottom: 1px solid var(--line);
+    background:
+      radial-gradient(120% 140% at 88% -10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
+      var(--panel);
+  }
+  .eyebrow { font-family: var(--mono); font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .hero h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.08; letter-spacing: -0.025em; margin: 14px 0 12px; font-weight: 720; text-wrap: balance; max-width: 20ch; }
+  .hero p.lede { font-size: 18px; color: var(--muted); max-width: var(--measure); margin: 0; }
+
+  .body-wrap { padding: 38px clamp(24px, 5vw, 72px) 90px; max-width: calc(var(--measure) + 120px); }
+  .page h2 {
+    font-size: 22px; letter-spacing: -0.015em; margin: 46px 0 6px; font-weight: 660;
+    padding-top: 10px; scroll-margin-top: 20px;
+  }
+  .page h2 .h2num { font-family: var(--mono); font-size: 14px; color: var(--accent); margin-right: 10px; font-weight: 600; }
+  .page h3 { font-size: 16.5px; margin: 30px 0 4px; font-weight: 640; letter-spacing: -0.01em; }
+  .page p { max-width: var(--measure); }
+  .page > .body-wrap > p, .body-wrap > section > p { color: var(--ink); }
+  .lead-rule { height: 2px; width: 46px; background: var(--accent); border: 0; margin: 10px 0 20px; border-radius: 2px; }
+  .muted { color: var(--muted); }
+  strong { font-weight: 640; }
+  a.link { color: var(--steel); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--steel) 40%, transparent); }
+  a.link:hover { border-bottom-color: var(--steel); }
+  code.inl {
+    font-family: var(--mono); font-size: 0.86em;
+    background: var(--panel-2); padding: 1px 6px; border-radius: 5px;
+    border: 1px solid var(--line); color: color-mix(in srgb, var(--ink) 88%, var(--accent));
+    white-space: nowrap;
+  }
+
+  /* code blocks */
+  .code {
+    background: var(--code-bg); color: var(--code-ink);
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.62;
+    border-radius: var(--radius); padding: 16px 18px; margin: 18px 0;
+    overflow-x: auto; border: 1px solid rgba(255,255,255,.06);
+    box-shadow: 0 8px 24px -18px rgba(0,0,0,.6);
+  }
+  .code .cap { display:block; font-size: 11px; color: var(--code-com); margin-bottom: 10px; letter-spacing:.03em; text-transform: uppercase; }
+  .code pre { margin: 0; white-space: pre; }
+  .kw { color: var(--code-kw); } .str { color: var(--code-str); } .num { color: var(--code-num); }
+  .com { color: var(--code-com); font-style: italic; } .ty { color: var(--code-type); }
+
+  /* callouts */
+  .call { border-radius: var(--radius); padding: 15px 18px; margin: 20px 0; border: 1px solid var(--line); background: var(--panel); }
+  .call .k { font-family: var(--mono); font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; display:flex; align-items:center; gap:7px; margin-bottom: 6px; }
+  .call p { margin: 0; max-width: none; font-size: 15px; }
+  .call.analogy { background: var(--steel-soft); border-color: color-mix(in srgb, var(--steel) 28%, transparent); }
+  .call.analogy .k { color: var(--steel); }
+  .call.gotcha { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 28%, transparent); }
+  .call.gotcha .k { color: var(--accent); }
+  .call.note { background: var(--panel-2); }
+  .call.note .k { color: var(--muted); }
+
+  ul.clean { max-width: var(--measure); padding-left: 20px; }
+  ul.clean li { margin: 7px 0; }
+  ul.clean li::marker { color: var(--accent); }
+
+  /* definition grid */
+  .defs { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin: 20px 0; }
+  .defs .row { display: grid; grid-template-columns: 190px 1fr; gap: 0; background: var(--panel); }
+  .defs .row > div { padding: 12px 16px; }
+  .defs .term { font-family: var(--mono); font-size: 13px; color: var(--steel); border-right: 1px solid var(--line); font-weight: 550; }
+  .defs .desc { font-size: 14.5px; color: var(--ink); }
+  @media (max-width: 620px) { .defs .row { grid-template-columns: 1fr; } .defs .term { border-right: 0; border-bottom: 1px solid var(--line); } }
+
+  /* pipeline diagram */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 24px 0; }
+  .flow .stage {
+    border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 13px 16px; background: var(--panel);
+    display: grid; grid-template-columns: 34px 1fr; gap: 13px; align-items: start;
+  }
+  .flow .stage .idx { font-family: var(--mono); font-weight: 600; color: var(--accent); font-size: 13px; padding-top: 2px; }
+  .flow .stage .st-t { font-weight: 620; font-size: 15px; }
+  .flow .stage .st-d { font-size: 13.5px; color: var(--muted); }
+  .flow .stage .st-d code { font-family: var(--mono); font-size: 12px; background: var(--panel-2); padding: 0 4px; border-radius: 4px; }
+  .flow .arrow { height: 18px; width: 1px; margin: 0 0 0 33px; background: var(--line-strong); position: relative; }
+  .flow .arrow::after { content: "▾"; position: absolute; left: -5px; bottom: -4px; color: var(--line-strong); font-size: 11px; }
+
+  .filemap { display: grid; gap: 10px; margin: 20px 0; }
+  .filemap .f { border: 1px solid var(--line); border-radius: 9px; padding: 12px 15px; background: var(--panel); }
+  .filemap .f .fn { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+  .filemap .f .fd { font-size: 14px; color: var(--muted); margin-top: 3px; }
+
+  .toc-mini { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 6px; }
+  .toc-mini a { font-family: var(--mono); font-size: 12px; color: var(--muted); text-decoration: none; border: 1px solid var(--line); padding: 4px 10px; border-radius: 20px; }
+  .toc-mini a:hover { color: var(--ink); border-color: var(--line-strong); }
+
+  .pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--line); }
+  .pager a { text-decoration: none; color: var(--ink); font-size: 14px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; max-width: 48%; }
+  .pager a:hover { border-color: var(--accent); }
+  .pager a span { display: block; font-size: 11px; color: var(--faint); font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+  .pager a.next { text-align: right; margin-left: auto; }
+
+  /* stat tiles */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 22px 0; }
+  @media (max-width: 620px) { .stats { grid-template-columns: 1fr; } }
+  .stat { border: 1px solid var(--line); border-radius: var(--radius); padding: 15px 16px; background: var(--panel); }
+  .stat .n { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.12; }
+  .stat .n .u { font-size: 14px; font-weight: 500; color: var(--muted); margin-left: 3px; }
+  .stat .c { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  .stat.hot { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 26%, transparent); }
+  .stat.hot .n { color: var(--accent); }
+
+  /* data-rate comparison bars */
+  .ratebar { margin: 22px 0 8px; display: grid; gap: 11px; }
+  .ratebar .rb { display: grid; grid-template-columns: 208px 1fr; gap: 14px; align-items: center; }
+  .ratebar .rb .lbl { font-size: 13px; font-family: var(--mono); color: var(--muted); text-align: right; line-height: 1.3; }
+  .ratebar .rb .lbl b { color: var(--ink); font-weight: 600; }
+  .ratebar .rb .track { background: var(--panel-2); border-radius: 6px; height: 26px; position: relative; overflow: hidden; border: 1px solid var(--line); }
+  .ratebar .rb .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px 0 0 6px; min-width: 5px; }
+  .ratebar .rb .fill.raw { background: linear-gradient(90deg, #b8391c, var(--accent)); }
+  .ratebar .rb .fill.enc { background: linear-gradient(90deg, #1f5f80, var(--steel)); }
+  .ratecap { font-size: 13px; color: var(--muted); font-style: italic; max-width: var(--measure); margin: 0 0 8px; }
+  @media (max-width: 560px) { .ratebar .rb { grid-template-columns: 1fr; } .ratebar .rb .lbl { text-align: left; } }
+
+  /* live estimator */
+  .calc { border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 20px 22px; margin: 24px 0; background: var(--panel); box-shadow: 0 10px 30px -24px rgba(0,0,0,.5); }
+  .calc .ctitle { font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 16px; }
+  .calc .inputs { display: flex; flex-wrap: wrap; gap: 16px 22px; align-items: flex-end; }
+  .calc label { display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .calc select, .calc input { font-family: var(--sans); font-size: 15px; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--paper); color: var(--ink); min-width: 130px; }
+  .calc input:focus, .calc select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .calc .out { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 30px; }
+  .calc .metric .n { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .calc .metric .n .u { font-size: 13px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+  .calc .metric .c { font-size: 11.5px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin-top: 4px; }
+  .calc .metric.big .n { color: var(--accent); font-size: 30px; }
+
+  /* mobile */
+  .menu-btn { display: none; }
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; }
+    aside { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+    aside nav { display: none; }
+    aside.open nav { display: flex; }
+    .menu-btn { display: inline-flex; margin-left: auto; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-family: var(--mono); font-size: 12px; padding: 6px 12px; cursor: pointer; }
+    .brand { justify-content: flex-start; }
+    .side-foot { display: none; }
+  }
+</style>
+
+<div class="shell">
+  <aside id="side">
+    <div class="brand">
+      <div class="mark">🎞️</div>
+      <div>
+        <div class="title">expo-montage</div>
+        <div class="sub">field guide</div>
+      </div>
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">menu</button>
+    </div>
+    <nav id="nav">
+      <a class="nav-chapter active" data-page="p1"><span class="num">01</span><span class="lab">Swift, for polyglots</span></a>
+      <a class="nav-chapter" data-page="p2"><span class="num">02</span><span class="lab">Swift inside React&nbsp;Native &amp; Expo</span></a>
+      <a class="nav-chapter" data-page="p3"><span class="num">03</span><span class="lab">How expo-montage works</span></a>
+      <a class="nav-chapter" data-page="p4"><span class="num">04</span><span class="lab">Bitrate, resolution &amp; file size</span></a>
+    </nav>
+    <div class="side-foot">
+      A learning wiki for the export feature.<br>Written against the real module code — file &amp; line references point at your tree.
+    </div>
+  </aside>
+
+  <main>
+    <!-- ============ PAGE 1 ============ -->
+    <article class="page active" id="p1">
+      <header class="hero">
+        <div class="eyebrow">Chapter 01 · Language</div>
+        <h1>Swift, seen from JS, Go &amp; a bit of C</h1>
+        <p class="lede">You already think in types, functions and async. Swift mostly rearranges what you know and adds two ideas that pay off constantly in this project: <strong>optionals</strong> and <strong>value vs. reference types</strong>. This is the 20-minute orientation, not the manual.</p>
+      </header>
+      <div class="body-wrap">
+
+        <div class="toc-mini">
+          <a href="#p1-what">What it is</a>
+          <a href="#p1-basics">Syntax</a>
+          <a href="#p1-optionals">Optionals</a>
+          <a href="#p1-types">struct vs class</a>
+          <a href="#p1-enum">Enums</a>
+          <a href="#p1-proto">Protocols &amp; closures</a>
+          <a href="#p1-err">Errors &amp; async</a>
+          <a href="#p1-mem">Memory (ARC)</a>
+        </div>
+
+        <section>
+        <h2 id="p1-what"><span class="h2num">1.1</span>What Swift actually is</h2>
+        <hr class="lead-rule">
+        <p>Swift is Apple's <strong>compiled, statically-typed</strong> language — the modern replacement for Objective-C. Mentally file it next to <strong>Go</strong>: compiled to a native binary, strong static types, garbage-pressure kept low, first-class concurrency. The flavour is closer to <strong>TypeScript + Rust</strong>: heavy type inference so it <em>reads</em> like a scripting language, but with strict null-safety and value semantics underneath.</p>
+        <div class="defs">
+          <div class="row"><div class="term">Compiled</div><div class="desc">Ahead-of-time to a native ARM binary by the Swift compiler (via LLVM). No interpreter, no JIT. Same family as Go/C++.</div></div>
+          <div class="row"><div class="term">Static + inferred</div><div class="desc">Every type is known at compile time, but you rarely write them out — like TS with <code class="inl">strict</code> on.</div></div>
+          <div class="row"><div class="term">Memory</div><div class="desc">No GC. Uses <strong>ARC</strong> (automatic reference counting) — deterministic, like C++ smart pointers. See §1.8.</div></div>
+          <div class="row"><div class="term">Null safety</div><div class="desc">There is no implicit null. A value that can be absent is a distinct type: an <strong>Optional</strong>. This is the biggest day-to-day difference.</div></div>
+        </div>
+
+        <h2 id="p1-basics"><span class="h2num">1.2</span>The syntax in one screen</h2>
+        <hr class="lead-rule">
+        <p>Almost everything here has a direct JS/Go analogue. Read the comments — they map each line to something you already know.</p>
+        <div class="code">
+<span class="cap">Swift essentials</span><pre><span class="kw">let</span> title = <span class="str">"2026"</span>        <span class="com">// const — immutable, type inferred as String</span>
+<span class="kw">var</span> count = <span class="num">0</span>            <span class="com">// let (mutable in JS sense)</span>
+<span class="kw">let</span> fps: <span class="ty">Int</span> = <span class="num">30</span>        <span class="com">// explicit type annotation, when you want it</span>
+
+<span class="com">// Functions: `func`, params are `name: Type`, return after `-&gt;`</span>
+<span class="kw">func</span> bitrate(<span class="kw">for</span> height: <span class="ty">Int</span>, fps: <span class="ty">Int</span>) -&gt; <span class="ty">Int</span> {
+  <span class="kw">return</span> height &gt;= <span class="num">1080</span> ? <span class="num">16_000_000</span> : <span class="num">8_000_000</span>
+}                          <span class="com">// note: 16_000_000 — underscores are just digit separators</span>
+
+<span class="com">// String interpolation with \( ), like `${ }`</span>
+<span class="kw">let</span> msg = <span class="str">"Encoding \(count) clips at \(fps)fps"</span>
+
+<span class="com">// Collections</span>
+<span class="kw">let</span> ids: [<span class="ty">String</span>] = [<span class="str">"A1"</span>, <span class="str">"B2"</span>]     <span class="com">// array</span>
+<span class="kw">let</span> sizes: [<span class="ty">String</span>: <span class="ty">Int</span>] = [<span class="str">"720p"</span>: <span class="num">8</span>]  <span class="com">// dictionary (object/map)</span>
+<span class="kw">for</span> id <span class="kw">in</span> ids { print(id) }               <span class="com">// for…of</span>
+<span class="kw">let</span> doubled = ids.map { $0.uppercased() } <span class="com">// $0 = first arg shorthand</span></pre>
+        </div>
+        <div class="call analogy">
+          <div class="k">◇ For the JS/Go dev</div>
+          <p><code class="inl">let</code> = <code class="inl">const</code>, <code class="inl">var</code> = a reassignable binding. The one that trips people: Swift's <code class="inl">let</code>/<code class="inl">var</code> is about <em>mutability</em>, not scope — there's no <code class="inl">var</code>-hoisting weirdness. Semicolons are optional and nobody uses them.</p>
+        </div>
+
+        <h2 id="p1-optionals"><span class="h2num">1.3</span>Optionals — the one to internalise</h2>
+        <hr class="lead-rule">
+        <p>An <code class="inl">Int</code> can <em>never</em> be nil. If a value might be absent, its type is <code class="inl">Int?</code> (an <strong>Optional</strong>) — a genuinely different type that the compiler forces you to unwrap before use. This is TypeScript's <code class="inl">number | null</code> with <code class="inl">strictNullChecks</code>, but enforced everywhere with dedicated syntax.</p>
+        <div class="code">
+<span class="cap">Working with optionals</span><pre><span class="kw">var</span> endMs: <span class="ty">Double</span>? = <span class="kw">nil</span>       <span class="com">// might hold a Double, might be nil</span>
+
+<span class="com">// 1. if-let: unwrap into a non-optional binding for the block</span>
+<span class="kw">if let</span> end = endMs {
+  print(<span class="str">"trim to \(end)"</span>)     <span class="com">// `end` is a plain Double here</span>
+}
+
+<span class="com">// 2. guard-let: unwrap or bail out early (very common in this codebase)</span>
+<span class="kw">func</span> use(_ endMs: <span class="ty">Double</span>?) {
+  <span class="kw">guard let</span> end = endMs <span class="kw">else</span> { <span class="kw">return</span> }   <span class="com">// no value → leave now</span>
+  <span class="com">// `end` stays unwrapped for the *rest* of the function</span>
+}
+
+<span class="com">// 3. ?? — nil-coalescing (identical to JS ??)</span>
+<span class="kw">let</span> duration = endMs ?? <span class="num">3000</span>
+
+<span class="com">// 4. optional chaining — like JS ?.</span>
+<span class="kw">let</span> w = settings.overlay?.cardFontSize</pre>
+        </div>
+        <div class="call analogy">
+          <div class="k">◇ You already met this in the module</div>
+          <p>In <code class="inl">ExpoMontageModule.swift</code>, every trim field is <code class="inl">Double?</code> — <code class="inl">startMs</code>/<code class="inl">endMs</code> are nil when the clip uses its full length. And <code class="inl">guard let assetId = record.assetId, !assetId.isEmpty else { throw … }</code> is exactly pattern #2: unwrap-or-fail at the top of the initializer.</p>
+        </div>
+
+        <h2 id="p1-types"><span class="h2num">1.4</span>struct vs class — value vs reference</h2>
+        <hr class="lead-rule">
+        <p>This distinction doesn't exist in JS (everything non-primitive is a reference) and is looser in Go. In Swift it's load-bearing:</p>
+        <div class="defs">
+          <div class="row"><div class="term">struct</div><div class="desc"><strong>Value type.</strong> Copied on assignment/pass, like a Go struct or a C struct. No shared identity. Swift's default choice — most of your data models are structs.</div></div>
+          <div class="row"><div class="term">class</div><div class="desc"><strong>Reference type.</strong> Passed by pointer, has identity, is ref-counted by ARC. Use when you need shared mutable state or a lifecycle — e.g. the long-lived <code>MontageExporter</code>.</div></div>
+        </div>
+        <div class="code">
+<span class="cap">The two, side by side</span><pre><span class="kw">struct</span> <span class="ty">WriterConfig</span> {        <span class="com">// value: copied when passed around</span>
+  <span class="kw">let</span> width: <span class="ty">Int</span>
+  <span class="kw">let</span> height: <span class="ty">Int</span>
+}
+
+<span class="kw">final class</span> <span class="ty">MontageExporter</span> {   <span class="com">// reference: one instance, shared, mutated</span>
+  <span class="kw">let</span> taskId: <span class="ty">String</span>
+  <span class="kw">private var</span> cancelRequested = <span class="kw">false</span>  <span class="com">// mutable lifecycle state</span>
+}</pre>
+        </div>
+        <div class="call note">
+          <div class="k">▸ Why it matters here</div>
+          <p><code class="inl">final class</code> (the <code class="inl">final</code> just means "no subclassing", a small speed win) is used for the exporter and encode session because they <em>own</em> mutable state and must be a single shared thing that a cancel button can reach. Config/records are <code class="inl">struct</code>s because they're just immutable bundles of numbers.</p>
+        </div>
+
+        <h2 id="p1-enum"><span class="h2num">1.5</span>Enums that carry data</h2>
+        <hr class="lead-rule">
+        <p>Swift enums are far more powerful than C's integer enums or a TS string union — each case can carry its own <strong>associated values</strong>. This is a <em>tagged union / sum type</em> (like a Rust enum or a TS discriminated union), and your module leans on it hard.</p>
+        <div class="code">
+<span class="cap">MontageSupport.swift — the real thing</span><pre><span class="kw">enum</span> <span class="ty">ExportClipSpec</span> {
+  <span class="kw">case</span> video(assetId: <span class="ty">String</span>, startMs: <span class="ty">Double</span>?, endMs: <span class="ty">Double</span>?, overlay: <span class="ty">ClipOverlayContent</span>?)
+  <span class="kw">case</span> missingDay(durationMs: <span class="ty">Double</span>, overlay: <span class="ty">ClipOverlayContent</span>?)
+  <span class="kw">case</span> card(durationMs: <span class="ty">Double</span>, lines: [<span class="ty">String</span>])
+}
+
+<span class="com">// You consume it with `switch`, which the compiler forces to be exhaustive:</span>
+<span class="kw">switch</span> spec {
+<span class="kw">case</span> .video(<span class="kw">let</span> assetId, <span class="kw">let</span> start, <span class="kw">let</span> end, _):
+  <span class="com">// handle a real clip; `_` ignores the overlay</span>
+<span class="kw">case</span> .missingDay(<span class="kw">let</span> durationMs, _):
+  <span class="com">// draw a black beat</span>
+<span class="kw">case</span> .card(<span class="kw">let</span> durationMs, <span class="kw">let</span> lines):
+  <span class="com">// draw the title card</span>
+}</pre>
+        </div>
+        <div class="call analogy">
+          <div class="k">◇ Mental model</div>
+          <p>It's the TS <code class="inl">MontageClip</code> union from <code class="inl">ExpoMontage.types.ts</code> — <code class="inl">{ type: "video" } | { type: "missingDay" } | { type: "card" }</code> — but the compiler <em>guarantees</em> you handled every case and gives you the payload already unwrapped. The native <code class="inl">ExportClipSpec</code> is literally the Swift twin of that TS type.</p>
+        </div>
+
+        <h2 id="p1-proto"><span class="h2num">1.6</span>Protocols &amp; closures</h2>
+        <hr class="lead-rule">
+        <p><strong>Protocols</strong> are interfaces (Go interfaces / TS interfaces) — a set of requirements a type can conform to. You'll see <code class="inl">Record</code>, <code class="inl">Sendable</code>, <code class="inl">Error</code> used as protocols in the module. <strong>Closures</strong> are anonymous functions / lambdas — the trailing-closure syntax <code class="inl">{ … }</code> after a call is pure Swift sugar.</p>
+        <div class="code">
+<span class="cap">Closures & protocol conformance</span><pre><span class="com">// A closure stored as a property — the module's progress callback:</span>
+<span class="kw">let</span> sendProgress: (<span class="ty">String</span>, <span class="ty">Double</span>) -&gt; <span class="ty">Void</span>   <span class="com">// takes (phase, progress)</span>
+
+<span class="com">// "trailing closure": the { } is the last argument, pulled outside the parens</span>
+<span class="kw">let</span> upper = ids.map { $0.uppercased() }
+
+<span class="com">// conforming to a protocol — `: Record` means "this struct is a Record"</span>
+<span class="kw">struct</span> <span class="ty">SpikeOptions</span>: <span class="ty">Record</span> {
+  <span class="kw">@Field var</span> width: <span class="ty">Double</span> = <span class="num">1920</span>
+}</pre>
+        </div>
+        <p class="muted">That <code class="inl">@Field</code> is a <em>property wrapper</em> — an annotation the Expo Modules API reads to marshal JS values into the struct. More on that in Chapter&nbsp;02.</p>
+
+        <h2 id="p1-err"><span class="h2num">1.7</span>Errors &amp; async/await</h2>
+        <hr class="lead-rule">
+        <p>Two pieces of very familiar machinery, with slightly different spelling:</p>
+        <ul class="clean">
+          <li><strong>Errors</strong> are thrown and caught, but a function that can throw must <em>declare</em> it with <code class="inl">throws</code>, and every call to it must be marked <code class="inl">try</code>. So the danger is visible at the call site — closer to Go's explicit <code class="inl">if err != nil</code> than JS's invisible throws.</li>
+          <li><strong>async/await</strong> is nearly identical to JS. <code class="inl">await</code> suspends; the surrounding function is marked <code class="inl">async</code>. AVFoundation's modern API is async, which is why the module is full of <code class="inl">try await asset.load(.duration)</code>.</li>
+        </ul>
+        <div class="code">
+<span class="cap">throws / try / async — from buildComposition</span><pre><span class="kw">func</span> buildComposition() <span class="kw">async throws</span> -&gt; <span class="ty">AVMutableComposition</span> {
+  <span class="kw">let</span> asset = <span class="kw">try await</span> resolver.resolve(assetId: id)  <span class="com">// may throw, is async</span>
+  <span class="kw">let</span> duration = <span class="kw">try await</span> asset.load(.duration)
+  <span class="kw">guard let</span> track = <span class="kw">try await</span> asset.loadTracks(withMediaType: .video).first
+  <span class="kw">else</span> { <span class="kw">throw</span> <span class="ty">MontageError</span>.noVideoTrack(id) }  <span class="com">// throw a typed error</span>
+  <span class="kw">return</span> composition
+}</pre>
+        </div>
+        <div class="call note">
+          <div class="k">▸ Project convention</div>
+          <p>Your <code class="inl">CLAUDE.md</code> says: <em>in helper/reusable functions, don't catch errors — let the caller handle them.</em> That's why the composition helpers freely <code class="inl">throw</code> and only the top-level exporter decides what to do (retry, degrade to a black beat, or emit <code class="inl">onExportError</code>).</p>
+        </div>
+
+        <h2 id="p1-mem"><span class="h2num">1.8</span>Memory: ARC, strong &amp; weak</h2>
+        <hr class="lead-rule">
+        <p>No garbage collector. Instead, every <code class="inl">class</code> instance carries a <strong>reference count</strong>; when the last reference goes away, it's freed immediately (deterministic, like C++ <code class="inl">shared_ptr</code>). Two reference flavours matter:</p>
+        <div class="defs">
+          <div class="row"><div class="term">strong (default)</div><div class="desc">Keeps the object alive. Owning references.</div></div>
+          <div class="row"><div class="term">weak</div><div class="desc">Does <em>not</em> keep it alive; becomes <code>nil</code> when the object dies. Used to break retain cycles and for back-pointers.</div></div>
+        </div>
+        <div class="call gotcha">
+          <div class="k">⚠ The bug you already hit</div>
+          <p>Phase 3's nastiest native bug (spec §0): <code class="inl">AVAssetTrack.asset</code> is a <strong>weak</strong> back-pointer. The code resolved <code class="inl">AVAsset</code>s, inserted their tracks, then let the assets go out of scope — ARC freed them, the weak pointer went nil, and <code class="inl">startReading</code> failed with <code class="inl">-11800</code>. The fix — <code class="inl">ChunkBuild.retainedAssets</code> holding <em>strong</em> refs until the encode ends — <em>is</em> this section in practice. Same reason <code class="inl">ClickSource.asset</code> keeps an explicit strong ref with a comment about it.</p>
+        </div>
+        <p>The other memory concept in the module is <code class="inl">autoreleasepool</code> (spec §11.5): the encode loop makes hundreds of ~8&nbsp;MB frame buffers per callback; draining them each iteration keeps peak memory flat instead of OOM-killing the app.</p>
+
+        <div class="call note">
+          <div class="k">▸ Go deeper (official)</div>
+          <p><a class="link" href="https://www.swift.org/documentation/">swift.org/documentation</a> · <a class="link" href="https://docs.swift.org/swift-book/">The Swift Programming Language</a> (free book — the <em>Optionals</em>, <em>Enumerations</em> and <em>ARC</em> chapters are the high-value ones for you) · <a class="link" href="https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/">Concurrency chapter</a> for async/await.</p>
+        </div>
+
+        <div class="pager">
+          <span></span>
+          <a class="next" data-goto="p2"><span>Next chapter →</span>Swift inside React&nbsp;Native &amp; Expo</a>
+        </div>
+        </section>
+      </div>
+    </article>
+
+    <!-- ============ PAGE 2 ============ -->
+    <article class="page" id="p2">
+      <header class="hero">
+        <div class="eyebrow">Chapter 02 · Architecture</div>
+        <h1>How Swift plugs into React Native &amp; Expo</h1>
+        <p class="lede">Your app is JavaScript running in a JS engine. AVFoundation is Swift running on the device. The <strong>Expo Modules API</strong> is the wire between them — it turns a Swift class into something you can <code class="inl">import</code> and <code class="inl">await</code> from TypeScript. This chapter is that wire, end to end.</p>
+      </header>
+      <div class="body-wrap">
+
+        <div class="toc-mini">
+          <a href="#p2-why">Why native</a>
+          <a href="#p2-bridge">The two worlds</a>
+          <a href="#p2-dsl">The Module DSL</a>
+          <a href="#p2-marshal">Data marshalling</a>
+          <a href="#p2-events">Events &amp; promises</a>
+          <a href="#p2-wiring">Wiring &amp; build</a>
+        </div>
+
+        <section>
+        <h2 id="p2-why"><span class="h2num">2.1</span>Why drop to native at all</h2>
+        <hr class="lead-rule">
+        <p>React Native lets you write UI in JS, but JS can't touch the phone's video hardware. Anything that needs <strong>AVFoundation / VideoToolbox</strong> — decoding footage, compositing frames on the GPU, hardware H.264 encoding — has to run in Swift. A <strong>native module</strong> is a small Swift package that exposes a few functions to JS; your UI stays in React, and the heavy lifting happens in <code class="inl">modules/expo-montage/</code>.</p>
+        <p class="muted">Spec §3 spells out why AVFoundation over ffmpeg: the whole decode → composite → encode pipeline stays on media hardware, several times faster and lighter than ffmpeg's CPU filter graph for a year-scale render.</p>
+
+        <h2 id="p2-bridge"><span class="h2num">2.2</span>The two worlds, and the wire between</h2>
+        <hr class="lead-rule">
+        <p>Picture two processes-of-the-mind in one app:</p>
+        <div class="flow">
+          <div class="stage"><div class="idx">JS</div><div><div class="st-t">Your React code</div><div class="st-d"><code>ExportScreen.tsx</code> → <code>src/services/montage.ts</code> calls <code>exportMontage(clips, settings)</code>. Pure TypeScript.</div></div></div>
+          <div class="arrow"></div>
+          <div class="stage"><div class="idx">↕</div><div><div class="st-t">The Expo Modules bridge</div><div class="st-d">Serialises the JS arguments, hops threads, invokes the matching Swift function, and marshals the result back as a resolved Promise. You never write this layer — the API generates it.</div></div></div>
+          <div class="arrow"></div>
+          <div class="stage"><div class="idx">SW</div><div><div class="st-t">Your Swift module</div><div class="st-d"><code>ExpoMontageModule.swift</code> receives typed Swift values and runs AVFoundation. Results and progress flow back the same wire.</div></div></div>
+        </div>
+        <div class="call analogy">
+          <div class="k">◇ Closest analogy you know</div>
+          <p>It's like calling a WebAssembly export from JS, or a cgo function from Go: a foreign, faster runtime reached through a typed boundary that copies values across. The "old" React Native version of this wire was the <em>bridge</em> (JSON over an async queue); Expo's version uses <strong>JSI</strong> (direct C++ calls, much faster), but the mental model — <em>marshal args → call → marshal result</em> — is unchanged.</p>
+        </div>
+
+        <h2 id="p2-dsl"><span class="h2num">2.3</span>The Module DSL — where JS names meet Swift</h2>
+        <hr class="lead-rule">
+        <p>An Expo module is a Swift class with one method, <code class="inl">definition()</code>, that returns a little declarative description. This <strong>DSL</strong> (domain-specific language) is the entire contract with JS — each entry becomes a callable or an event on the JS side.</p>
+        <div class="code">
+<span class="cap">ExpoMontageModule.swift (trimmed)</span><pre><span class="kw">public class</span> <span class="ty">ExpoMontageModule</span>: <span class="ty">Module</span> {
+  <span class="kw">public func</span> definition() -&gt; <span class="ty">ModuleDefinition</span> {
+    <span class="ty">Name</span>(<span class="str">"ExpoMontage"</span>)                              <span class="com">// the JS-visible module name</span>
+
+    <span class="ty">Events</span>(<span class="str">"onExportProgress"</span>, <span class="str">"onExportComplete"</span>, <span class="str">"onExportError"</span>)  <span class="com">// pushable events</span>
+
+    <span class="ty">AsyncFunction</span>(<span class="str">"analyzeClips"</span>) { (assetIds: [<span class="ty">String</span>]) <span class="kw">async</span> -&gt; [[<span class="ty">String</span>: <span class="ty">Any</span>]] <span class="kw">in</span>
+      <span class="kw">await</span> <span class="ty">ClipAnalyzer</span>.analyze(assetIds: assetIds)  <span class="com">// ← runs Swift, returns to a JS Promise</span>
+    }
+
+    <span class="ty">AsyncFunction</span>(<span class="str">"exportMontage"</span>) { (clips: [<span class="ty">MontageClipRecord</span>], settings: <span class="ty">MontageSettingsRecord</span>) <span class="kw">throws</span> -&gt; [<span class="ty">String</span>: <span class="ty">Any</span>] <span class="kw">in</span>
+      <span class="com">// … starts the export, returns ["taskId": …] immediately</span>
+    }
+  }
+}</pre>
+        </div>
+        <div class="defs">
+          <div class="row"><div class="term">Name("…")</div><div class="desc">The string JS uses to find the module. Matches <code>requireNativeModule("ExpoMontage")</code> on the TS side.</div></div>
+          <div class="row"><div class="term">AsyncFunction</div><div class="desc">A function whose Swift body returns a value (or throws) and surfaces in JS as a <code>Promise</code>. There's also <code>Function</code> for synchronous ones.</div></div>
+          <div class="row"><div class="term">Events(…)</div><div class="desc">Declares named events the native side can push at any time — the basis for progress streaming (§2.5).</div></div>
+        </div>
+
+        <h2 id="p2-marshal"><span class="h2num">2.4</span>Data marshalling: Records &amp; the TS twin</h2>
+        <hr class="lead-rule">
+        <p>JS passes plain objects; Swift wants typed structs. A <strong>Record</strong> is the adapter: a struct conforming to the <code class="inl">Record</code> protocol, whose <code class="inl">@Field</code>-annotated properties the API fills from the incoming JS object (with the defaults you give as fallbacks). You maintain the shape <em>twice</em> — once in TS for your own type-safety, once as a Record for the native boundary.</p>
+        <div class="code">
+<span class="cap">The same object, both sides</span><pre><span class="com">// TypeScript — ExpoMontage.types.ts</span>
+<span class="kw">type</span> <span class="ty">MontageSettings</span> = {
+  renderSize: { width: <span class="ty">number</span>; height: <span class="ty">number</span> };
+  fps: <span class="ty">number</span>;
+  videoAverageBitrate: <span class="ty">number</span>;
+  missingDayClick: <span class="ty">boolean</span>;
+  mode: <span class="str">"preview"</span> | <span class="str">"full"</span>;
+  outputPath: <span class="ty">string</span>;
+};
+
+<span class="com">// Swift — ExpoMontageModule.swift</span>
+<span class="kw">struct</span> <span class="ty">MontageSettingsRecord</span>: <span class="ty">Record</span> {
+  <span class="kw">@Field var</span> renderSize: <span class="ty">RenderSizeRecord</span> = <span class="ty">RenderSizeRecord</span>()
+  <span class="kw">@Field var</span> fps: <span class="ty">Double</span> = <span class="num">30</span>
+  <span class="kw">@Field var</span> videoAverageBitrate: <span class="ty">Double</span> = <span class="num">16_000_000</span>
+  <span class="kw">@Field var</span> missingDayClick: <span class="ty">Bool</span> = <span class="kw">false</span>
+  <span class="kw">@Field var</span> mode: <span class="ty">String</span> = <span class="str">"full"</span>
+  <span class="kw">@Field var</span> outputPath: <span class="ty">String</span> = <span class="str">""</span>
+}</pre>
+        </div>
+        <div class="call gotcha">
+          <div class="k">⚠ These two must stay in sync by hand</div>
+          <p>Nothing auto-generates one from the other. Add a field in TS, add the matching <code class="inl">@Field</code> in the Record, or the value silently falls back to its default on the native side. Note the type mapping too: JS <code class="inl">number</code> → Swift <code class="inl">Double</code> (then often cast to <code class="inl">Int</code>), JS <code class="inl">boolean</code> → <code class="inl">Bool</code>.</p>
+        </div>
+        <p>Going the other way — Swift back to JS — the module returns <code class="inl">[String: Any]</code> dictionaries (e.g. <code class="inl">["taskId": taskId]</code>), which arrive in JS as plain objects. That's why return types are loosely typed on the Swift side but strongly typed in the TS declaration.</p>
+
+        <h2 id="p2-events"><span class="h2num">2.5</span>Promises for results, events for progress</h2>
+        <hr class="lead-rule">
+        <p>A long export can't be a single Promise that resolves 7 minutes later with no feedback. So the module uses <strong>both</strong> mechanisms, deliberately:</p>
+        <ul class="clean">
+          <li><strong>Promise</strong> — <code class="inl">exportMontage</code> returns <em>immediately</em> with a <code class="inl">taskId</code>, just acknowledging "started".</li>
+          <li><strong>Events</strong> — progress, completion and errors stream over the declared events. Native calls <code class="inl">self.sendEvent("onExportProgress", […])</code>; JS listens with <code class="inl">addListener</code>.</li>
+        </ul>
+        <div class="code">
+<span class="cap">Native push → JS listener</span><pre><span class="com">// Swift: fired repeatedly as the encode advances</span>
+self.sendEvent(<span class="str">"onExportProgress"</span>, [<span class="str">"taskId"</span>: taskId, <span class="str">"progress"</span>: progress, <span class="str">"phase"</span>: phase])
+
+<span class="com">// TypeScript: the shape is declared as an events map on the module</span>
+<span class="kw">type</span> <span class="ty">ExpoMontageModuleEvents</span> = {
+  onExportProgress: (e: <span class="ty">ExportProgressEvent</span>) =&gt; <span class="ty">void</span>;
+  onExportComplete: (e: <span class="ty">ExportCompleteEvent</span>) =&gt; <span class="ty">void</span>;
+  onExportError:    (e: <span class="ty">ExportErrorEvent</span>) =&gt; <span class="ty">void</span>;
+};</pre>
+        </div>
+        <p class="muted">The <code class="inl">[weak self]</code> in those Swift callbacks (see <code class="inl">ExpoMontageModule.swift</code>) is §1.8 in action — the closure must not keep the module alive by itself, so it holds a weak reference.</p>
+
+        <h2 id="p2-wiring"><span class="h2num">2.6</span>How JS finds the module, and how it builds</h2>
+        <hr class="lead-rule">
+        <p>Three files stitch the Swift code into your app. This is the plumbing you rarely touch but should recognise:</p>
+        <div class="filemap">
+          <div class="f"><div class="fn">expo-module.config.json</div><div class="fd">The manifest Expo <strong>autolinking</strong> reads at build time. Yours declares platform <code class="inl">apple</code> and module class <code class="inl">ExpoMontageModule</code> — that's how the native class gets discovered and compiled in without manual Xcode wiring. <em>(This is the file open in your editor.)</em></div></div>
+          <div class="f"><div class="fn">ios/ExpoMontage.podspec</div><div class="fd">A <strong>CocoaPods</strong> spec — iOS's dependency/build descriptor. Lists the Swift sources and, here, the <code class="inl">resource_bundles</code> that ship <code class="inl">click.caf</code> into <code class="inl">ExpoMontage.bundle</code>. CocoaPods is roughly "npm for native iOS libs".</div></div>
+          <div class="f"><div class="fn">src/ExpoMontageModule.ts</div><div class="fd">The JS entry point: <code class="inl">requireNativeModule("ExpoMontage")</code> hands back the live native module, typed via a <code class="inl">declare class</code> so TS knows the signatures. Everything else imports from here.</div></div>
+        </div>
+        <div class="code">
+<span class="cap">src/ExpoMontageModule.ts — the JS handle</span><pre><span class="kw">import</span> { requireNativeModule } <span class="kw">from</span> <span class="str">"expo"</span>;
+
+<span class="kw">declare class</span> <span class="ty">ExpoMontageModule</span> <span class="kw">extends</span> <span class="ty">NativeModule</span>&lt;<span class="ty">ExpoMontageModuleEvents</span>&gt; {
+  analyzeClips(assetIds: <span class="ty">string</span>[]): <span class="ty">Promise</span>&lt;<span class="ty">ClipAnalysis</span>[]&gt;;
+  exportMontage(clips: <span class="ty">MontageClip</span>[], settings: <span class="ty">MontageSettings</span>): <span class="ty">Promise</span>&lt;{ taskId: <span class="ty">string</span> }&gt;;
+  cancelExport(taskId: <span class="ty">string</span>): <span class="ty">Promise</span>&lt;<span class="ty">void</span>&gt;;
+}
+
+<span class="kw">export default</span> requireNativeModule&lt;<span class="ty">ExpoMontageModule</span>&gt;(<span class="str">"ExpoMontage"</span>);</pre>
+        </div>
+        <div class="call note">
+          <div class="k">▸ The build reality</div>
+          <p>Because this is a <em>native</em> module, it isn't hot-reloadable like JS — a Swift change needs a native rebuild. Your spec §0 notes the fast loop: edit in Xcode (<code class="inl">make xcode-open-workspace</code>, Cmd+R) or compile-check the pod target with <code class="inl">xcodebuild … -target ExpoMontage</code> without a device. JS changes still hot-reload through Metro as usual.</p>
+        </div>
+
+        <div class="call note">
+          <div class="k">▸ Go deeper (official)</div>
+          <p><a class="link" href="https://docs.expo.dev/modules/overview/">Expo Modules API overview</a> · <a class="link" href="https://docs.expo.dev/modules/module-api/">Module API reference</a> (Name / Function / AsyncFunction / Events) · <a class="link" href="https://docs.expo.dev/modules/module-api/#records">Records</a> · <a class="link" href="https://docs.expo.dev/modules/native-module-tutorial/">Native module tutorial</a>.</p>
+        </div>
+
+        <div class="pager">
+          <a data-goto="p1"><span>← Previous</span>Swift, for polyglots</a>
+          <a class="next" data-goto="p3"><span>Next chapter →</span>How expo-montage works</a>
+        </div>
+        </section>
+      </div>
+    </article>
+
+    <!-- ============ PAGE 3 ============ -->
+    <article class="page" id="p3">
+      <header class="hero">
+        <div class="eyebrow">Chapter 03 · The module</div>
+        <h1>How expo-montage turns metadata into one video</h1>
+        <p class="lede">Given a list of clips (each with a trim range) plus settings, the module produces a single <code class="inl">.mp4</code>. Between those two points sits AVFoundation. This chapter gives you the vocabulary first, then the broad algorithm, then a map of which file does what.</p>
+      </header>
+      <div class="body-wrap">
+
+        <div class="toc-mini">
+          <a href="#p3-vocab">Video vocabulary</a>
+          <a href="#p3-av">AVFoundation nouns</a>
+          <a href="#p3-api">The public API</a>
+          <a href="#p3-algo">The broad algorithm</a>
+          <a href="#p3-chunk">Chunk &amp; assemble</a>
+          <a href="#p3-files">File map</a>
+        </div>
+
+        <section>
+        <h2 id="p3-vocab"><span class="h2num">3.1</span>Video terms, in plain words</h2>
+        <hr class="lead-rule">
+        <p>You said you don't have the video vocabulary yet — here's the minimum to read the code and the spec's §4.2 table.</p>
+        <div class="defs">
+          <div class="row"><div class="term">Resolution</div><div class="desc">Pixel dimensions of each frame, e.g. <code>1920×1080</code> ("1080p"). Bigger = sharper &amp; heavier. The module's <code>renderSize</code>.</div></div>
+          <div class="row"><div class="term">Frame rate (fps)</div><div class="desc">Frames shown per second — 30 or 60 here. Higher = smoother motion &amp; more data.</div></div>
+          <div class="row"><div class="term">Codec</div><div class="desc">The compression algorithm. <strong>H.264</strong> (a.k.a. AVC) is the universal safe choice you're using — every phone, Photos, and YouTube read it. HEVC/H.265 is the newer, HDR-capable one (post-v1).</div></div>
+          <div class="row"><div class="term">Profile</div><div class="desc">A feature tier within a codec. <strong>H.264 High</strong> = best quality/efficiency level for 1080p+ playback.</div></div>
+          <div class="row"><div class="term">Bitrate</div><div class="desc">Bits used per second of video — the main quality/size dial. Spec §4.2 sets Premiere-class targets (16&nbsp;Mbps @1080p30). File size ≈ bitrate × duration.</div></div>
+          <div class="row"><div class="term">Container</div><div class="desc">The wrapper file format holding the encoded video + audio streams. <code>.mp4</code> here.</div></div>
+          <div class="row"><div class="term">Codec vs container</div><div class="desc">Container = the box (<code>.mp4</code>); codec = how the picture inside is compressed (H.264). Same box can hold different codecs.</div></div>
+          <div class="row"><div class="term">Encode / decode</div><div class="desc">Encode = compress raw frames → H.264. Decode = the reverse. Both run on the phone's dedicated media chip (VideoToolbox), not the CPU.</div></div>
+          <div class="row"><div class="term">SDR / HDR</div><div class="desc">Standard vs high dynamic range (brightness/colour). v1 outputs SDR <strong>BT.709</strong> and tone-maps HDR sources down to it (spec §4.2).</div></div>
+          <div class="row"><div class="term">B-frames</div><div class="desc">Compression frames that reference <em>future</em> frames. Great for size, but their reorder delay broke chunk concatenation — so the module disables them (<code>AVVideoAllowFrameReorderingKey: false</code>, spec §0).</div></div>
+        </div>
+
+        <h2 id="p3-av"><span class="h2num">3.2</span>AVFoundation's nouns</h2>
+        <hr class="lead-rule">
+        <p>These are the Apple types the module is built from. Learn these six and the code reads cleanly.</p>
+        <div class="defs">
+          <div class="row"><div class="term">PHAsset</div><div class="desc">A photo/video <em>as catalogued by the Photos library</em> — an id + metadata, not the raw file. Your <code>videoId</code> is a PHAsset <code>localIdentifier</code>. Reached via the <code>Photos</code> framework.</div></div>
+          <div class="row"><div class="term">AVAsset</div><div class="desc">The actual playable media (tracks, duration, transforms). You get one from a PHAsset via <code>PHImageManager.requestAVAsset</code> — which also downloads iCloud-offloaded footage on demand.</div></div>
+          <div class="row"><div class="term">Track</div><div class="desc">One stream inside an asset — a <em>video</em> track, an <em>audio</em> track. Some clips (screen recordings) have no audio track → the module inserts silence.</div></div>
+          <div class="row"><div class="term">AVMutableComposition</div><div class="desc">A virtual timeline you build by <em>inserting time-ranges</em> of source tracks. The spec's "exactly 2 tracks" (1 video + 1 audio) live here. Trimming <em>is</em> the insertion — nothing written to disk per clip.</div></div>
+          <div class="row"><div class="term">AVMutableVideoComposition</div><div class="desc">The render recipe layered over the composition: output <code>renderSize</code>, <code>frameDuration</code> (fps), per-clip transforms (rotate/aspect-fit), and forced BT.709 colour.</div></div>
+          <div class="row"><div class="term">AVAssetReader / Writer</div><div class="desc">The manual encode engine (spec §3): the Reader pulls decoded frames out of the composition, and the Writer compresses them to the file at your exact bitrate. Chosen over <code>AVAssetExportSession</code> precisely because it gives bitrate control.</div></div>
+          <div class="row"><div class="term">CMTime</div><div class="desc">A rational time value (<code>value/timescale</code>) used everywhere instead of floats, so 1/30-second boundaries stay exact. Your trims are ms → converted to CMTime.</div></div>
+        </div>
+
+        <h2 id="p3-api"><span class="h2num">3.3</span>The public surface</h2>
+        <hr class="lead-rule">
+        <p>Everything JS can do, from <code class="inl">src/ExpoMontageModule.ts</code>:</p>
+        <div class="defs">
+          <div class="row"><div class="term">analyzeClips(ids)</div><div class="desc">Metadata-only scan → <code>[{ assetId, width, height, fps }]</code>. Feeds the quality picker and the default render target (spec §4.1). No decode, no download; unresolvable assets are simply omitted.</div></div>
+          <div class="row"><div class="term">exportMontage(clips, settings)</div><div class="desc">Starts the export, returns <code>{ taskId }</code> at once. All real output arrives via events. Rejects if one is already running — one export at a time (it saturates the media hardware).</div></div>
+          <div class="row"><div class="term">cancelExport(taskId)</div><div class="desc">Tears down reader/writer, deletes temp chunks &amp; the partial output, then emits <code>onExportError</code> with message <code>"cancelled"</code>.</div></div>
+          <div class="row"><div class="term">events</div><div class="desc"><code>onExportProgress { progress, phase }</code>, <code>onExportComplete { outputPath, durationMs, fileSizeBytes, peakMemoryMB, warnings }</code>, <code>onExportError { message, failedAssetId? }</code>.</div></div>
+        </div>
+        <div class="call note">
+          <div class="k">▸ Who calls this</div>
+          <p>Not your components directly. <code class="inl">src/services/montage.ts</code> is the JS service layer (spec §8) that reads <code class="inl">videos_metadata</code>, builds the day-by-day timeline, formats overlay strings with luxon in the device locale, computes the size estimate, then calls <code class="inl">exportMontage</code> and forwards events to <code class="inl">ExportScreen</code>.</p>
+        </div>
+
+        <h2 id="p3-algo"><span class="h2num">3.4</span>The broad algorithm</h2>
+        <hr class="lead-rule">
+        <p>End to end, one export run:</p>
+        <div class="flow">
+          <div class="stage"><div class="idx">1</div><div><div class="st-t">JS builds the timeline</div><div class="st-d"><code>montage.ts</code> turns the period into an ordered <code>MontageClip[]</code>: an opening <em>card</em>, then each day as a <em>video</em> (with trim + overlay) or a <em>missingDay</em> beat. Overlay text is pre-formatted here.</div></div></div>
+          <div class="arrow"></div>
+          <div class="stage"><div class="idx">2</div><div><div class="st-t">Native validates &amp; sets up</div><div class="st-d"><code>ExpoMontageModule</code> maps each record → <code>ExportClipSpec</code>, builds a <code>WriterConfig</code> (size/fps/bitrate) and <code>OverlayStyle</code>, and hands a new <code>MontageExporter</code> the whole plan.</div></div></div>
+          <div class="arrow"></div>
+          <div class="stage"><div class="idx">3</div><div><div class="st-t">Chunk the timeline</div><div class="st-d"><code>MontageExporter</code> splits the ~365 items into ~monthly chunks of ≤31 items (<code>chunkItemLimit</code>) — bounded memory, since 365 open assets at once is an OOM risk (spec §5.2).</div></div></div>
+          <div class="arrow"></div>
+          <div class="stage"><div class="idx">4</div><div><div class="st-t">Encode each chunk</div><div class="st-d">Per chunk: resolve its assets → build a 2-track composition → run an <code>EncodeSession</code> (Reader → CoreImage overlay/black-frame generation → Writer) to a uniform intermediate <code>.mp4</code>. Downloads &amp; encode emit progress.</div></div></div>
+          <div class="arrow"></div>
+          <div class="stage"><div class="idx">5</div><div><div class="st-t">Assemble the chunks</div><div class="st-d">One final pass over the chunk files: <strong>video passthrough</strong> (compressed samples copied, no re-encode) + <strong>one continuous AAC audio encode</strong> (avoids per-boundary clicks). Produces the single output file.</div></div></div>
+          <div class="arrow"></div>
+          <div class="stage"><div class="idx">6</div><div><div class="st-t">Report</div><div class="st-d"><code>onExportComplete</code> fires with the path, duration, size and peak memory. JS offers Save / Share / Delete.</div></div></div>
+        </div>
+
+        <h3>What happens inside one EncodeSession</h3>
+        <p>This is the heart (spec §5.3). The Reader emits decoded frames; the loop decides per frame whether it needs an overlay:</p>
+        <div class="code">
+<span class="cap">Conceptual — the reader → writer pump</span><pre><span class="kw">for</span> each frame the reader emits {
+  <span class="kw">if</span> this frame's time falls in an overlaid segment {
+    frame = overlayCIImage.composited(over: frame)   <span class="com">// GPU CoreImage</span>
+  }
+  <span class="kw">if</span> this is a black beat / card {
+    frame = solid black + centered text straight into a pool buffer
+  }
+  writer.append(frame)                               <span class="com">// hardware H.264 encode</span>
+  drain autoreleasepool                              <span class="com">// keep peak memory flat (§11.5)</span>
+}</pre>
+        </div>
+        <div class="call gotcha">
+          <div class="k">⚠ Why overlays aren't CATextLayers</div>
+          <p>The "obvious" way — <code class="inl">AVVideoCompositionCoreAnimationTool</code> with text layers — is <em>rejected by AVAssetReader</em> (it's export-session-only). So overlays are drawn once into a cached <code class="inl">CIImage</code> and composited between reader and writer. This is spec §5.3 and it's why <code class="inl">MontageOverlay.swift</code> exists.</p>
+        </div>
+
+        <h2 id="p3-chunk"><span class="h2num">3.5</span>Why chunk-then-assemble (not one big pass)</h2>
+        <hr class="lead-rule">
+        <p>Two problems force this shape:</p>
+        <ul class="clean">
+          <li><strong>Memory.</strong> A single composition holding 365 source assets exhausts memory. Chunking caps how many are open at once.</li>
+          <li><strong>Audio seams.</strong> AAC encoders add "priming samples" at the start of each independently-encoded stream — naïvely concatenating chunks produces an audible click at every boundary (12 in a year). The fix: assemble video by <em>passthrough</em> (lossless copy) but re-encode <em>all</em> audio in one continuous pass, so there are no internal seams.</li>
+          <li><strong>Bonus:</strong> chunk boundaries are natural resume points for a future background-export feature (spec §9.5).</li>
+        </ul>
+        <p class="muted">The subtlety that cost a debugging session (spec §0): passthrough concat only works if the chunk streams have <em>no B-frame reorder delay</em> — hence B-frames are disabled, plus per-segment first-sample anchoring. You don't need this to use the module, but it explains the odd-looking encoder flags.</p>
+
+        <h2 id="p3-files"><span class="h2num">3.6</span>File map</h2>
+        <hr class="lead-rule">
+        <p>Where each responsibility lives under <code class="inl">modules/expo-montage/ios/</code>:</p>
+        <div class="filemap">
+          <div class="f"><div class="fn">ExpoMontageModule.swift</div><div class="fd">The boundary. The Module DSL, the JS-facing Records, and the one-export-at-a-time lock. Also holds the phase-1 <code>SpikeComposer</code> dev harness. <span class="muted">(~339 lines)</span></div></div>
+          <div class="f"><div class="fn">MontageExporter.swift</div><div class="fd">The orchestrator — the biggest file. Chunking, cancellation, progress weighting, temp-file hygiene, per-asset degradation to black beats, click-sound loading, diagnostics. <span class="muted">(~1040 lines)</span></div></div>
+          <div class="f"><div class="fn">MontageEncodeSession.swift</div><div class="fd">The engine. The Reader→Writer pumps for video, audio, and synthesized silence (with spliced clicks); pool pixel buffers; black/card frame generation. <span class="muted">(~514 lines)</span></div></div>
+          <div class="f"><div class="fn">MontageSupport.swift</div><div class="fd">Shared plumbing: <code>MontageError</code>, <code>WriterConfig</code>, <code>MemoryTracker</code>, <code>ClipAnalyzer</code> (§4.1), <code>AssetResolver</code> (PHAsset→AVAsset, iCloud, Live Photos), and composition helpers (clamping, aspect-fit transform). <span class="muted">(~367 lines)</span></div></div>
+          <div class="f"><div class="fn">MontageOverlay.swift</div><div class="fd">Text rendering (UIGraphics → CIImage), the overlay style/content model, and the missing-day click sound (locate + decode PCM). <span class="muted">(~246 lines)</span></div></div>
+          <div class="f"><div class="fn">resources/click.caf</div><div class="fd">The bundled 100&nbsp;ms tick played on missing-day beats, shipped via the podspec's <code>resource_bundles</code>. <span class="muted">(spec §6.2)</span></div></div>
+        </div>
+
+        <div class="call note">
+          <div class="k">▸ Go deeper (official)</div>
+          <p><a class="link" href="https://developer.apple.com/documentation/avfoundation">AVFoundation</a> · <a class="link" href="https://developer.apple.com/documentation/avfoundation/avmutablecomposition">AVMutableComposition</a> · <a class="link" href="https://developer.apple.com/documentation/avfoundation/avassetwriter">AVAssetWriter</a> · <a class="link" href="https://developer.apple.com/documentation/photokit">PhotoKit (PHAsset)</a> · <a class="link" href="https://developer.apple.com/documentation/coreimage">Core Image</a>. And your own <code class="inl">doc/export-spec.md</code> — §5 is the pipeline in prose.</p>
+        </div>
+
+        <div class="pager">
+          <a data-goto="p2"><span>← Previous</span>Swift inside RN &amp; Expo</a>
+          <a class="next" data-goto="p4"><span>Next chapter →</span>Bitrate, resolution &amp; file size</a>
+        </div>
+        </section>
+      </div>
+    </article>
+
+    <!-- ============ PAGE 4 ============ -->
+    <article class="page" id="p4">
+      <header class="hero">
+        <div class="eyebrow">Chapter 04 · Deep dive</div>
+        <h1>Bitrate, resolution &amp; file size</h1>
+        <p class="lede">You spotted the key idea already: with no compression, a video's size is <em>fixed</em> by its pixels — there's no dial. The codec is what turns size into something you can <strong>choose</strong>, and <strong>bitrate</strong> is that dial. This chapter follows the numbers from raw pixels to the app's size estimate.</p>
+      </header>
+      <div class="body-wrap">
+
+        <div class="toc-mini">
+          <a href="#p4-raw">The raw number</a>
+          <a href="#p4-dial">The dial appears</a>
+          <a href="#p4-budget">Bitrate as budget</a>
+          <a href="#p4-vbr">Average vs constant</a>
+          <a href="#p4-size">File size = rate × time</a>
+          <a href="#p4-rules">Rules of thumb</a>
+        </div>
+
+        <section>
+        <h2 id="p4-raw"><span class="h2num">4.1</span>The number nobody ships</h2>
+        <hr class="lead-rule">
+        <p>A raw frame is just a grid of pixels, each pixel a fixed number of bits. So an uncompressed video's data rate is <em>forced</em> — <code class="inl">resolution × colour-depth × fps</code>, multiplied out. Nothing to choose. For 1080p30 at 24-bit colour (3 bytes/pixel):</p>
+        <div class="code">
+<span class="cap">Uncompressed 1080p30 — the forced rate</span><pre>1920 × 1080        = 2,073,600 <span class="com">pixels per frame</span>
+× 3 bytes          ≈ 6.2 MB    <span class="com">per frame</span>
+× 30 frames/sec    ≈ 186 MB/s  ≈  1,500 Mbps   <span class="com">(1.5 Gbps!)</span>
+
+<span class="com">→ one minute ≈ 11 GB. A full year montage: ~200 GB. Unshippable.</span></pre>
+        </div>
+        <p>That's why every video you've ever watched is compressed. The codec's whole job is to describe those same frames with drastically fewer bits, by discarding what the eye won't miss — redundancy <em>within</em> a frame (smooth areas) and <em>between</em> frames (a mostly-static background barely changes shot to shot).</p>
+        <div class="stats">
+          <div class="stat"><div class="n">~1,500<span class="u">Mbps</span></div><div class="c">Raw 1080p30 data rate — fixed by the pixels</div></div>
+          <div class="stat"><div class="n">16<span class="u">Mbps</span></div><div class="c">What the app actually encodes (spec §4.2)</div></div>
+          <div class="stat hot"><div class="n">~90×</div><div class="c">Compression ratio — bits thrown away, invisibly</div></div>
+        </div>
+        <div class="ratebar">
+          <div class="rb"><div class="lbl"><b>Uncompressed</b><br>~1,500 Mbps</div><div class="track"><div class="fill raw" style="width:100%"></div></div></div>
+          <div class="rb"><div class="lbl"><b>H.264 High</b><br>16 Mbps</div><div class="track"><div class="fill enc" style="width:1.1%"></div></div></div>
+        </div>
+        <p class="ratecap">To scale. H.264 keeps roughly <strong>1 bit for every 90</strong> the raw frames would need — and you can't tell by looking. That sliver is the shipped file.</p>
+
+        <h2 id="p4-dial"><span class="h2num">4.2</span>Compression turns size into a dial</h2>
+        <hr class="lead-rule">
+        <p>Here's the answer to your exact question: <strong>yes — bitrate is a parameter you hand the encoder</strong>, a target output data rate ("aim for ~16 million bits per second"). The <em>same</em> codec (H.264) can encode the <em>same</em> footage at 4 Mbps or 40 Mbps. It's the number in <code class="inl">AVVideoAverageBitRateKey</code> and every row of the spec's §4.2 table.</p>
+        <p>And <strong>yes — it is essentially "how much the video is compressed,"</strong> read inversely:</p>
+        <div class="defs">
+          <div class="row"><div class="term">Lower bitrate</div><div class="desc">Smaller file, <em>more</em> aggressive compression, more information discarded → visible artefacts creep in: blocking, smearing, banding in gradients.</div></div>
+          <div class="row"><div class="term">Higher bitrate</div><div class="desc">Bigger file, <em>less</em> discarded, closer to the original — up to a point of diminishing returns where the eye can't tell any more (that's the "visually transparent" sweet spot Premiere aims for).</div></div>
+        </div>
+        <div class="call note">
+          <div class="k">▸ Codec vs bitrate — don't conflate them</div>
+          <p>The <strong>codec</strong> (H.264) is the <em>method</em> of compression — the toolbox of tricks. The <strong>bitrate</strong> is the <em>budget</em> you allow that method to spend. Two separate choices: you could keep H.264 and halve the bitrate (smaller, worse), or keep the bitrate and switch to HEVC/H.265 (same size, better — because it's a smarter method). v1 fixes the codec at H.264 High and varies only the bitrate.</p>
+        </div>
+
+        <h2 id="p4-budget"><span class="h2num">4.3</span>Bitrate is a budget shared across pixels</h2>
+        <hr class="lead-rule">
+        <p>This is the piece that makes the spec's table make sense. Bitrate and resolution are <strong>separate dials you set independently</strong> — but they interact, because a fixed bitrate is a fixed number of bits per second that <em>all the pixels have to share</em>.</p>
+        <p>Divide the shipped budget by the pixels it covers and you get bits-per-pixel — the real quality signal:</p>
+        <div class="code">
+<span class="cap">Same 16 Mbps, different resolutions</span><pre>16 Mbps ÷ (1920×1080 × 30fps) ≈ <span class="num">0.26</span> bits / pixel   <span class="com">1080p — plenty</span>
+16 Mbps ÷ (3840×2160 × 30fps) ≈ <span class="num">0.06</span> bits / pixel   <span class="com">4K — starved, looks worse!</span></pre>
+        </div>
+        <p>A 4K video at 16 Mbps looks <em>worse</em> than 1080p at 16 Mbps, because four times as many pixels are fighting over the same bits. So to hold the <em>same</em> quality, more pixels (higher resolution) or more frames (higher fps) each need a bigger budget. That's the entire logic of §4.2 — and why the app derives the bitrate <em>from</em> the chosen resolution/fps rather than letting you set it directly:</p>
+        <div class="defs">
+          <div class="row"><div class="term">720p → 8 Mbps</div><div class="desc">Fewer pixels, smaller budget holds quality.</div></div>
+          <div class="row"><div class="term">1080p → 16 Mbps</div><div class="desc">4× the pixels of 720p ⇒ ~2× the budget.</div></div>
+          <div class="row"><div class="term">4K → 45 Mbps</div><div class="desc">4× the pixels of 1080p ⇒ big jump again.</div></div>
+          <div class="row"><div class="term">…× 1.5 at 60 fps</div><div class="desc">Doubling fps only adds ~50% (not 100%) — see §4.5.</div></div>
+        </div>
+
+        <h2 id="p4-vbr"><span class="h2num">4.4</span>"Average" bitrate — the VBR nuance</h2>
+        <hr class="lead-rule">
+        <p>The key is <code class="inl">AVVideoAverage&#8203;BitRateKey</code> — note <em>average</em>. That signals <strong>VBR</strong> (variable bitrate): the encoder doesn't spend exactly 16 Mbps every second. It spends <em>more</em> on a complex, fast-moving shot and <em>less</em> on a simple, static one, averaging out to your target. The eye gets bits where it needs them.</p>
+        <div class="defs">
+          <div class="row"><div class="term">CBR</div><div class="desc">Constant bitrate — same bits every second regardless of content. Simple, wasteful; used for live streaming where the pipe is fixed.</div></div>
+          <div class="row"><div class="term">VBR (average)</div><div class="desc">What you're using. Allocates the budget intelligently across the timeline. This <em>is</em> what "Premiere-class high quality" means in spec §4 — a controlled VBR encode at a visually-transparent average, not a dumb constant rate.</div></div>
+        </div>
+        <p class="muted">Because it's an <em>average</em>, the real file lands close to the estimate but not to the byte — a montage of calm, static clips comes in a touch under; lots of motion, a touch over.</p>
+
+        <h2 id="p4-size"><span class="h2num">4.5</span>File size = bitrate × duration</h2>
+        <hr class="lead-rule">
+        <p>Once bitrate is the budget, file size falls out of one multiplication — this is literally the app's estimate (spec §4.2, §8.6):</p>
+        <div class="code">
+<span class="cap">The estimate formula</span><pre>fileSize ≈ (videoBitrate + audioBitrate) × totalDuration ÷ 8
+
+<span class="com">// bits/s × seconds = bits;  ÷8 = bytes.  Audio (AAC 256 kbps) is ~1.6% of the budget.</span></pre>
+        </div>
+        <p>Note what's <em>not</em> in that formula: the number of clips, the resolution, the fps. They only affect size <strong>through</strong> the bitrate you pick. Bitrate and duration are the only two levers — which is why the app can update the estimate live as you toggle missing-day beats (duration) or change the resolution combo (bitrate).</p>
+
+        <div class="calc" role="group" aria-label="File size estimator">
+          <div class="ctitle">◆ Live estimator — the app's own maths</div>
+          <div class="inputs">
+            <label>Resolution
+              <select id="calcRes">
+                <option value="720">720p (1280×720)</option>
+                <option value="1080" selected>1080p (1920×1080)</option>
+                <option value="2160">4K (3840×2160)</option>
+              </select>
+            </label>
+            <label>Frame rate
+              <select id="calcFps">
+                <option value="30" selected>30 fps</option>
+                <option value="60">60 fps</option>
+              </select>
+            </label>
+            <label>Montage length
+              <input id="calcDur" type="number" min="0" step="0.5" value="18"> <span style="font:inherit"></span>
+            </label>
+          </div>
+          <div class="out">
+            <div class="metric"><div class="n" id="calcBitrate">16<span class="u">Mbps</span></div><div class="c">Video bitrate (§4.2)</div></div>
+            <div class="metric"><div class="n" id="calcTotal">16.3<span class="u">Mbps</span></div><div class="c">+ AAC audio</div></div>
+            <div class="metric big"><div class="n" id="calcSize">2.2<span class="u">GB</span></div><div class="c">Estimated file size</div></div>
+          </div>
+        </div>
+        <p class="muted">Length is in minutes — a full year of ~3-second daily clips is ≈ 18 min. Defaults reproduce the whole-year 1080p30 case.</p>
+        <div class="call note">
+          <div class="k">▸ Ground truth from your own logs</div>
+          <p>Set it to 1080p / 30 / and think in the spec's checkpoint units: §0 records <strong>264 MB for a 130-second export</strong> at 1080p30. Plug 130 s into the formula — <code class="inl">(16 + 0.256) Mbps × 130 s ÷ 8 ≈ 264 MB</code> — an exact match. The estimator here runs the identical arithmetic, so it agrees with what the device actually wrote.</p>
+        </div>
+
+        <h2 id="p4-rules"><span class="h2num">4.6</span>Rules of thumb to carry</h2>
+        <hr class="lead-rule">
+        <ul class="clean">
+          <li><strong>Bitrate is the only lever on size.</strong> Resolution and fps move size only by moving the bitrate you choose.</li>
+          <li><strong>Size is linear in both bitrate and duration.</strong> Double either → double the file. Independent of clip count.</li>
+          <li><strong>~4× the pixels ⇒ ~2× the bitrate</strong> to hold quality (720p→1080p→4K roughly doubles then jumps).</li>
+          <li><strong>Doubling fps adds only ~50%,</strong> not 100% — consecutive frames are highly similar, so temporal compression gets most of the extra frames nearly free (that's why 30→60 goes 16→24, not 16→32).</li>
+          <li><strong>Audio is a rounding error.</strong> 256 kbps AAC is ~1.6% of a 16 Mbps budget — you can almost ignore it in your head.</li>
+          <li><strong>Below a threshold, lower bitrate stops saving grace and starts adding artefacts</strong> (blocking, banding). The §4.2 targets sit comfortably above that line — "visually transparent."</li>
+        </ul>
+
+        <div class="call note">
+          <div class="k">▸ Go deeper</div>
+          <p>Apple: <a class="link" href="https://developer.apple.com/documentation/avfoundation/avvideoaveragebitratekey">AVVideoAverageBitRateKey</a> · <a class="link" href="https://developer.apple.com/documentation/videotoolbox">VideoToolbox</a> (the hardware encoder). Background: <a class="link" href="https://en.wikipedia.org/wiki/Bit_rate#Video">Bit rate — video</a>, <a class="link" href="https://en.wikipedia.org/wiki/Chroma_subsampling">chroma subsampling</a> (why real raw video is ~12 bits/pixel, not 24). And your own <code class="inl">doc/export-spec.md</code> §4.2 for the shipped table.</p>
+        </div>
+
+        <div class="pager">
+          <a data-goto="p3"><span>← Previous</span>How expo-montage works</a>
+          <span></span>
+        </div>
+        </section>
+      </div>
+    </article>
+  </main>
+</div>
+
+<script>
+  (function () {
+    var chapters = Array.prototype.slice.call(document.querySelectorAll(".nav-chapter"));
+    var pages = { p1: document.getElementById("p1"), p2: document.getElementById("p2"), p3: document.getElementById("p3"), p4: document.getElementById("p4") };
+    var side = document.getElementById("side");
+
+    function show(id) {
+      if (!pages[id]) id = "p1";
+      Object.keys(pages).forEach(function (k) { pages[k].classList.toggle("active", k === id); });
+      chapters.forEach(function (c) { c.classList.toggle("active", c.getAttribute("data-page") === id); });
+      if (history.replaceState) history.replaceState(null, "", "#" + id);
+      window.scrollTo({ top: 0, behavior: "auto" });
+      side.classList.remove("open");
+    }
+
+    chapters.forEach(function (c) {
+      c.addEventListener("click", function () { show(c.getAttribute("data-page")); });
+    });
+    document.querySelectorAll("[data-goto]").forEach(function (a) {
+      a.addEventListener("click", function (e) { e.preventDefault(); show(a.getAttribute("data-goto")); });
+    });
+    var mb = document.getElementById("menuBtn");
+    if (mb) mb.addEventListener("click", function () { side.classList.toggle("open"); });
+
+    var initial = (location.hash || "").replace("#", "");
+    if (pages[initial]) show(initial);
+  })();
+
+  // ---- File-size estimator (Chapter 04) — mirrors the app's §4.2 maths ----
+  (function () {
+    var res = document.getElementById("calcRes");
+    var fps = document.getElementById("calcFps");
+    var dur = document.getElementById("calcDur");
+    if (!res || !fps || !dur) return;
+
+    // §4.2 video bitrate table, in Mbps, keyed by resolution long-edge then fps
+    var TABLE = { "720": { "30": 8, "60": 12 }, "1080": { "30": 16, "60": 24 }, "2160": { "30": 45, "60": 68 } };
+    var AUDIO = 0.256; // Mbps — AAC stereo 256 kbps
+
+    function withUnit(text, unit) { return text + '<span class="u">' + unit + "</span>"; }
+    function fmtSize(mb) {
+      if (mb >= 1024) return withUnit((mb / 1024).toFixed(2), "GB");
+      return withUnit(String(Math.round(mb)), "MB");
+    }
+    function update() {
+      var f = fps.value === "60" ? "60" : "30";
+      var vb = TABLE[res.value][f];
+      var total = vb + AUDIO;
+      var minutes = parseFloat(dur.value);
+      if (!isFinite(minutes) || minutes < 0) minutes = 0;
+      var mb = total * (minutes * 60) / 8; // Mbps × seconds ÷ 8 = MB
+      document.getElementById("calcBitrate").innerHTML = withUnit(String(vb), "Mbps");
+      document.getElementById("calcTotal").innerHTML = withUnit(total.toFixed(1), "Mbps");
+      document.getElementById("calcSize").innerHTML = fmtSize(mb);
+    }
+    [res, fps, dur].forEach(function (el) {
+      el.addEventListener("input", update);
+      el.addEventListener("change", update);
+    });
+    update();
+  })();
+</script>
+
+</body></html></body>
+</html>

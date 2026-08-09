@@ -167,6 +167,17 @@ const booleanConverter: Converter<boolean> = {
   },
 };
 
+const numberConverter: Converter<number> = {
+  toString: (v) => v.toString(),
+  fromString: (v) => {
+    if (v === null) {
+      return null;
+    }
+    const parsed = Number(v);
+    return Number.isFinite(parsed) ? parsed : null;
+  },
+};
+
 const dateConverter: Converter<Date> = {
   toString: (v) => v.toISOString(),
   fromString: (v) => {
@@ -205,6 +216,22 @@ function enumConverter<T extends string>(validValues: readonly T[]): Converter<T
 }
 
 // ----------------------------------------------------------------------------------------------------
+// App language — first step towards full i18n: for now it only drives the date/hour
+// wording baked into exported videos (see montage.ts overlay formatting).
+
+export const appLanguages = ["en", "fr"] as const;
+export type AppLanguage = (typeof appLanguages)[number];
+
+// ----------------------------------------------------------------------------------------------------
+// Export option enums (doc/export-spec.md §9.3)
+
+export const exportMissingDaysModes = ["show", "skip"] as const;
+export type ExportMissingDaysMode = (typeof exportMissingDaysModes)[number];
+
+export const exportOrientations = ["landscape", "portrait"] as const;
+export type ExportOrientation = (typeof exportOrientations)[number];
+
+// ----------------------------------------------------------------------------------------------------
 // Preferences definition
 
 const preferences = {
@@ -212,5 +239,18 @@ const preferences = {
   ...createPreferencesFunctions("birthdayDate", dateConverter),
   ...createPreferencesFunctions("dayShift", objectConverter<DayShiftTime>(), { hour: 0, minute: 0 }),
   ...createPreferencesFunctions("yearGroupingMode", enumConverter<YearGroupingMode>(yearGroupingModes), "calendar"),
+  ...createPreferencesFunctions("appLanguage", enumConverter<AppLanguage>(appLanguages), "en"),
+  // Export options (doc/export-spec.md §9.3) — global defaults shared across all periods,
+  // only surfaced inline in the Export flow (not in the Settings tab)
+  ...createPreferencesFunctions("exportShowDate", booleanConverter, true),
+  ...createPreferencesFunctions("exportShowHour", booleanConverter, false),
+  ...createPreferencesFunctions("exportShowTitle", booleanConverter, true),
+  ...createPreferencesFunctions("exportMissingDays", enumConverter<ExportMissingDaysMode>(exportMissingDaysModes), "show"),
+  ...createPreferencesFunctions("exportMissingDayDurationMs", numberConverter, 500),
+  ...createPreferencesFunctions("exportOrientation", enumConverter<ExportOrientation>(exportOrientations), "landscape"),
+  // Dev A/V-sync debugging (doc/export-device-checklist.md L91): when on, the Export
+  // screen shows a debug section (date-window limiter) and writes a `.debug.jsonl`
+  // sidecar next to each export. Off by default; only shown in dev builds.
+  ...createPreferencesFunctions("exportDebug", booleanConverter, false),
 };
 export default preferences;
